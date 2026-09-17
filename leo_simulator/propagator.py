@@ -177,8 +177,14 @@ class OrbitPropagator:
 
         t_eval = None
         if dt_eval is not None and dt_eval > 0.0:
-            t_eval = np.arange(t_span[0], t_span[1] + dt_eval, dt_eval)
-            t_eval[-1] = min(t_eval[-1], t_span[1])
+            num_steps = int(np.floor((t_span[1] - t_span[0]) / dt_eval))
+            t_eval = t_span[0] + np.arange(num_steps + 1) * dt_eval
+            if np.isclose(t_eval[-1], t_span[1], atol=1e-8 * dt_eval):
+                t_eval[-1] = t_span[1]
+            elif t_eval[-1] < t_span[1]:
+                t_eval = np.append(t_eval, t_span[1])
+            elif t_eval[-1] > t_span[1]:
+                t_eval[-1] = t_span[1]
 
         reentry_event = create_reentry_event(
             min_altitude_m=self.min_altitude_reentry, r_earth=self.r_earth

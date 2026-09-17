@@ -99,3 +99,37 @@ class TestOrbitPropagator:
         res = prop_rk45.propagate(orbit, duration_seconds=1000.0)
         assert res.success
         assert len(res.t) > 1
+
+    def test_fractional_dt_eval_sorting_stability(self):
+        # Durations and fractional dt_eval that would cause duplicate end timestamps in naive arange
+        prop = OrbitPropagator(include_central_gravity=True, include_j2=False, include_drag=False)
+        orbit = OrbitalElements(
+            a=R_EARTH + 400e3,
+            e=0.001,
+            i=np.radians(45.0),
+            raan=0.0,
+            arg_pe=0.0,
+            nu=0.0,
+        )
+
+        for n in [6, 9, 21, 24]:
+            dt = 1.0 / n
+            res = prop.propagate(orbit, duration_seconds=1.0, dt_eval=dt)
+            assert res.success
+            assert np.all(np.diff(res.t) > 0)
+            assert res.t[-1] == pytest.approx(1.0, abs=1e-12)
+
+    def test_raw_state_vector_input_and_invalid_duration(self):
+        prop = OrbitPropagator()
+        r0 = np.array([R_EARTH + 400e3, 0.0, 0.0])
+        v0 = np.array([0.0, 7670.0, 0.0])
+        raw_state = list(np.concatenate([r0, v0]))
+
+        # Should accept list input
+        res = prop.propagate(raw_state, duration_seconds=100.0)
+        assert res.success
+        assert len(res.t) > 1
+
+        # Should raise ValueError on negative duration
+        with pytest.raises(ValueError):
+            prop.propagate(raw_state, duration_seconds=-10.0)

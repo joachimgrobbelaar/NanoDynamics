@@ -167,11 +167,13 @@ def relative_velocity_vector(
     Returns:
         np.ndarray: Relative velocity vector [vx_rel, vy_rel, vz_rel] in m / s.
     """
+    r = np.asarray(r_vec, dtype=np.float64)
+    v = np.asarray(v_vec, dtype=np.float64)
     if not include_earth_rotation or omega_earth == 0.0:
-        return v_vec.copy()
+        return v.copy()
 
-    v_atm = np.array([-omega_earth * r_vec[1], omega_earth * r_vec[0], 0.0], dtype=np.float64)
-    return v_vec - v_atm
+    v_atm = np.array([-omega_earth * r[1], omega_earth * r[0], 0.0], dtype=np.float64)
+    return v - v_atm
 
 
 def aerodynamic_drag_acceleration(

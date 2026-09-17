@@ -70,6 +70,47 @@ class TestElementsConversions:
         assert recovered.a == pytest.approx(eq.a, rel=1e-8)
         assert recovered.e == pytest.approx(eq.e, rel=1e-8)
         assert recovered.i == pytest.approx(0.0, abs=1e-8)
+        assert recovered.arg_pe == pytest.approx(eq.arg_pe, rel=1e-8)
+        assert recovered.nu == pytest.approx(eq.nu, rel=1e-8)
+
+    def test_equatorial_retrograde_orbit_edge_case(self):
+        # Equatorial retrograde: i = pi
+        for test_arg_pe in [np.radians(30.0), np.radians(120.0), np.radians(210.0), np.radians(300.0)]:
+            eq_retro = OrbitalElements(
+                a=7200e3,
+                e=0.02,
+                i=np.pi,
+                raan=0.0,
+                arg_pe=test_arg_pe,
+                nu=np.radians(45.0),
+            )
+            r, v = coe_to_rv(eq_retro)
+            recovered = rv_to_coe(r, v)
+
+            assert recovered.a == pytest.approx(eq_retro.a, rel=1e-8)
+            assert recovered.e == pytest.approx(eq_retro.e, rel=1e-8)
+            assert recovered.i == pytest.approx(np.pi, rel=1e-8)
+            assert recovered.arg_pe == pytest.approx(eq_retro.arg_pe, rel=1e-6)
+            assert recovered.nu == pytest.approx(eq_retro.nu, rel=1e-6)
+
+    def test_circular_equatorial_retrograde_nu_resolution(self):
+        # Circular equatorial retrograde: e = 0, i = pi
+        for test_nu in [np.radians(45.0), np.radians(135.0), np.radians(225.0), np.radians(315.0)]:
+            circ_retro = OrbitalElements(
+                a=6900e3,
+                e=0.0,
+                i=np.pi,
+                raan=0.0,
+                arg_pe=0.0,
+                nu=test_nu,
+            )
+            r, v = coe_to_rv(circ_retro)
+            recovered = rv_to_coe(r, v)
+
+            assert recovered.a == pytest.approx(circ_retro.a, rel=1e-8)
+            assert recovered.e == pytest.approx(0.0, abs=1e-8)
+            assert recovered.i == pytest.approx(np.pi, rel=1e-8)
+            assert recovered.nu == pytest.approx(test_nu, rel=1e-6)
 
     def test_circular_velocity(self):
         alt = 400e3

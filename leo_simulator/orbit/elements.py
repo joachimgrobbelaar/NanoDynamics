@@ -156,7 +156,7 @@ def rv_to_coe(
         # Longitude of periapsis pi = Omega + omega = omega (since Omega = 0)
         ex_ratio = np.clip(e_vec[0] / e, -1.0, 1.0)
         arg_pe = float(np.arccos(ex_ratio))
-        if e_vec[1] < 0.0:
+        if (h_vec[2] >= 0.0 and e_vec[1] < 0.0) or (h_vec[2] < 0.0 and e_vec[1] > 0.0):
             arg_pe = 2.0 * np.pi - arg_pe
     else:
         ndote = np.clip(np.dot(n_vec, e_vec) / (n_norm * e), -1.0, 1.0)
@@ -169,7 +169,7 @@ def rv_to_coe(
         # Angle of position vector from x-axis
         rx_ratio = np.clip(r[0] / r_norm, -1.0, 1.0)
         nu = float(np.arccos(rx_ratio))
-        if r[1] < 0.0:
+        if (h_vec[2] >= 0.0 and r[1] < 0.0) or (h_vec[2] < 0.0 and r[1] > 0.0):
             nu = 2.0 * np.pi - nu
     elif is_circular:
         # Angle from ascending node vector
@@ -187,9 +187,9 @@ def rv_to_coe(
         a=float(a),
         e=float(e),
         i=float(i),
-        raan=float(raan),
-        arg_pe=float(arg_pe),
-        nu=float(nu),
+        raan=float(raan % (2.0 * np.pi)),
+        arg_pe=float(arg_pe % (2.0 * np.pi)),
+        nu=float(nu % (2.0 * np.pi)),
     )
 
 
