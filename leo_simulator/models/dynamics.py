@@ -40,6 +40,21 @@ class OrbitalDynamics:
         j2: float = J2_EARTH,
         omega_earth: float = OMEGA_EARTH,
     ) -> None:
+        if not np.isfinite(mass) or mass <= 0.0:
+            raise ValueError(f"Mass must be strictly positive and finite, got {mass}")
+        if not np.isfinite(area) or area < 0.0:
+            raise ValueError(f"Drag area cannot be negative and must be finite, got {area}")
+        if not np.isfinite(cd) or cd < 0.0:
+            raise ValueError(f"Drag coefficient cannot be negative and must be finite, got {cd}")
+        if not np.isfinite(mu) or mu <= 0.0:
+            raise ValueError(f"Gravitational parameter mu must be strictly positive and finite, got {mu}")
+        if not np.isfinite(r_earth) or r_earth <= 0.0:
+            raise ValueError(f"Earth radius must be strictly positive and finite, got {r_earth}")
+        if not np.isfinite(j2):
+            raise ValueError(f"J2 harmonic coefficient must be finite, got {j2}")
+        if not np.isfinite(omega_earth):
+            raise ValueError(f"Earth rotation rate must be finite, got {omega_earth}")
+
         self.cd = float(cd)
         self.area = float(area)
         self.mass = float(mass)

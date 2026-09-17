@@ -42,7 +42,22 @@ class TestGravityModels:
             central_gravity_acceleration([np.nan, 0.0, 0.0])
 
         with pytest.raises(ValueError):
+            central_gravity_acceleration([7000e3, 0.0, 0.0], mu=float("nan"))
+
+        with pytest.raises(ValueError):
+            central_gravity_acceleration([7000e3, 0.0, 0.0], mu=-1.0)
+
+        with pytest.raises(ValueError):
             j2_perturbation_acceleration([np.nan, 0.0, 0.0])
+
+        with pytest.raises(ValueError):
+            j2_perturbation_acceleration([7000e3, 0.0, 0.0], mu=float("nan"))
+
+        with pytest.raises(ValueError):
+            j2_perturbation_acceleration([7000e3, 0.0, 0.0], r_earth=float("nan"))
+
+        with pytest.raises(ValueError):
+            j2_perturbation_acceleration([7000e3, 0.0, 0.0], j2=float("nan"))
 
     def test_j2_perturbation_equator(self):
         # At equator (z=0), perturbation should be radially inward
@@ -129,7 +144,19 @@ class TestDragModels:
         with pytest.raises(ValueError):
             aerodynamic_drag_acceleration(r, v, cd=2.2, area=0.03, mass=-1.0)
         with pytest.raises(ValueError):
+            aerodynamic_drag_acceleration(r, v, cd=2.2, area=0.03, mass=float("nan"))
+        with pytest.raises(ValueError):
             aerodynamic_drag_acceleration(r, v, cd=-1.0, area=0.03, mass=4.0)
+        with pytest.raises(ValueError):
+            aerodynamic_drag_acceleration(r, v, cd=float("nan"), area=0.03, mass=4.0)
+        with pytest.raises(ValueError):
+            aerodynamic_drag_acceleration(r, v, cd=2.2, area=float("nan"), mass=4.0)
+        with pytest.raises(ValueError):
+            aerodynamic_drag_acceleration(r, v, cd=2.2, area=-0.01, mass=4.0)
+        with pytest.raises(ValueError):
+            aerodynamic_drag_acceleration(r, v, cd=2.2, area=0.03, mass=4.0, r_earth=float("nan"))
+        with pytest.raises(ValueError):
+            aerodynamic_drag_acceleration(r, v, cd=2.2, area=0.03, mass=4.0, omega_earth=float("nan"))
         with pytest.raises(ValueError):
             aerodynamic_drag_acceleration([0.0, 0.0, 0.0], v, cd=2.2, area=0.03, mass=4.0)
         with pytest.raises(ValueError):
@@ -144,6 +171,8 @@ class TestDragModels:
             relative_velocity_vector(r, [1.0, 2.0])
         with pytest.raises(ValueError):
             relative_velocity_vector([np.nan, 0.0, 0.0], v)
+        with pytest.raises(ValueError):
+            relative_velocity_vector(r, v, omega_earth=float("nan"))
 
     def test_atmosphere_non_finite_altitude(self):
         exp_atm = ExponentialAtmosphere()
@@ -152,6 +181,20 @@ class TestDragModels:
         piece_atm = PiecewiseExponentialAtmosphere()
         with pytest.raises(ValueError):
             piece_atm.density(float("nan"))
+
+    def test_atmosphere_non_finite_init_parameters(self):
+        with pytest.raises(ValueError):
+            ExponentialAtmosphere(scale_height=float("nan"))
+        with pytest.raises(ValueError):
+            ExponentialAtmosphere(scale_height=-100.0)
+        with pytest.raises(ValueError):
+            ExponentialAtmosphere(rho0=float("nan"))
+        with pytest.raises(ValueError):
+            ExponentialAtmosphere(rho0=-1e-12)
+        with pytest.raises(ValueError):
+            ExponentialAtmosphere(h0=float("nan"))
+        with pytest.raises(ValueError):
+            ExponentialAtmosphere(min_altitude=float("nan"))
 
 
 class TestDynamicsCombination:
@@ -164,3 +207,21 @@ class TestDynamicsCombination:
         np.testing.assert_allclose(dstate[0:3], state[3:6])
         # Velocity derivative is acceleration
         assert dstate[3] < 0.0  # gravity pulls inward (-x)
+
+    def test_dynamics_invalid_init_parameters(self):
+        with pytest.raises(ValueError):
+            OrbitalDynamics(mass=float("nan"))
+        with pytest.raises(ValueError):
+            OrbitalDynamics(mass=-1.0)
+        with pytest.raises(ValueError):
+            OrbitalDynamics(area=float("nan"))
+        with pytest.raises(ValueError):
+            OrbitalDynamics(cd=float("nan"))
+        with pytest.raises(ValueError):
+            OrbitalDynamics(mu=float("nan"))
+        with pytest.raises(ValueError):
+            OrbitalDynamics(r_earth=float("nan"))
+        with pytest.raises(ValueError):
+            OrbitalDynamics(j2=float("nan"))
+        with pytest.raises(ValueError):
+            OrbitalDynamics(omega_earth=float("nan"))

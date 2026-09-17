@@ -50,14 +50,14 @@ class OrbitalElements:
     @property
     def period(self) -> float:
         """Orbital period T = 2 * pi * sqrt(a^3 / mu) in seconds."""
-        if self.a <= 0.0:
+        if not np.isfinite(self.a) or self.a <= 0.0:
             return float("inf")
         return float(2.0 * np.pi * np.sqrt(self.a**3 / MU_EARTH))
 
     @property
     def mean_motion(self) -> float:
         """Mean motion n = sqrt(mu / a^3) in rad / s."""
-        if self.a <= 0.0:
+        if not np.isfinite(self.a) or self.a <= 0.0:
             return 0.0
         return float(np.sqrt(MU_EARTH / (self.a**3)))
 
@@ -145,48 +145,40 @@ def rv_to_coe(
     if is_equatorial:
         raan = 0.0
     else:
-        nx_ratio = np.clip(n_vec[0] / n_norm, -1.0, 1.0)
-        raan = float(np.arccos(nx_ratio))
-        if n_vec[1] < 0.0:
-            raan = 2.0 * np.pi - raan
+        raan = float(np.arctan2(n_vec[1], n_vec[0]) % (2.0 * np.pi))
 
     # Argument of Periapsis (omega, arg_pe)
-    if is_circular and is_equatorial:
-        # True longitude
-        arg_pe = 0.0
-    elif is_circular:
-        # Argument of latitude u = arg_pe + nu
+    if is_circular:
+        # Periapsis is undefined for circular orbits; standard convention is 0
         arg_pe = 0.0
     elif is_equatorial:
-        # Longitude of periapsis pi = Omega + omega = omega (since Omega = 0)
-        ex_ratio = np.clip(e_vec[0] / e, -1.0, 1.0)
-        arg_pe = float(np.arccos(ex_ratio))
-        if (h_vec[2] >= 0.0 and e_vec[1] < 0.0) or (h_vec[2] < 0.0 and e_vec[1] > 0.0):
-            arg_pe = 2.0 * np.pi - arg_pe
+        # Longitude of periapsis in equatorial plane
+        if h_vec[2] >= 0.0:
+            arg_pe = float(np.arctan2(e_vec[1], e_vec[0]) % (2.0 * np.pi))
+        else:
+            arg_pe = float(np.arctan2(-e_vec[1], e_vec[0]) % (2.0 * np.pi))
     else:
-        ndote = np.clip(np.dot(n_vec, e_vec) / (n_norm * e), -1.0, 1.0)
-        arg_pe = float(np.arccos(ndote))
-        if e_vec[2] < 0.0:
-            arg_pe = 2.0 * np.pi - arg_pe
+        sin_w = np.dot(np.cross(n_vec, e_vec), h_vec) / (n_norm * e * h_norm)
+        cos_w = np.dot(n_vec, e_vec) / (n_norm * e)
+        arg_pe = float(np.arctan2(sin_w, cos_w) % (2.0 * np.pi))
 
     # True Anomaly (nu)
     if is_circular and is_equatorial:
-        # Angle of position vector from x-axis
-        rx_ratio = np.clip(r[0] / r_norm, -1.0, 1.0)
-        nu = float(np.arccos(rx_ratio))
-        if (h_vec[2] >= 0.0 and r[1] < 0.0) or (h_vec[2] < 0.0 and r[1] > 0.0):
-            nu = 2.0 * np.pi - nu
+        # True longitude in equatorial plane
+        if h_vec[2] >= 0.0:
+            nu = float(np.arctan2(r[1], r[0]) % (2.0 * np.pi))
+        else:
+            nu = float(np.arctan2(-r[1], r[0]) % (2.0 * np.pi))
     elif is_circular:
-        # Angle from ascending node vector
-        ndotr = np.clip(np.dot(n_vec, r) / (n_norm * r_norm), -1.0, 1.0)
-        nu = float(np.arccos(ndotr))
-        if r[2] < 0.0:
-            nu = 2.0 * np.pi - nu
+        # Argument of latitude u in orbital plane
+        sin_u = np.dot(np.cross(n_vec, r), h_vec) / (n_norm * r_norm * h_norm)
+        cos_u = np.dot(n_vec, r) / (n_norm * r_norm)
+        nu = float(np.arctan2(sin_u, cos_u) % (2.0 * np.pi))
     else:
-        edotr = np.clip(np.dot(e_vec, r) / (e * r_norm), -1.0, 1.0)
-        nu = float(np.arccos(edotr))
-        if rdotv < 0.0:
-            nu = 2.0 * np.pi - nu
+        # True anomaly in orbital plane
+        sin_nu = np.dot(np.cross(e_vec, r), h_vec) / (e * r_norm * h_norm)
+        cos_nu = np.dot(e_vec, r) / (e * r_norm)
+        nu = float(np.arctan2(sin_nu, cos_nu) % (2.0 * np.pi))
 
     return OrbitalElements(
         a=float(a),
@@ -298,8 +290,19 @@ def analytical_j2_raan_rate(
     Returns:
         float: Nodal regression rate in rad / s. (Negative for prograde orbits i < 90 deg).
     """
-    if a <= 0.0 or e >= 1.0:
-        return 0.0
+    if not (
+        np.isfinite(a)
+        and np.isfinite(e)
+        and np.isfinite(i)
+        and np.isfinite(mu)
+        and np.isfinite(r_earth)
+        and np.isfinite(j2)
+    ):
+        raise ValueError("Orbital parameters and physical constants must be finite.")
+    if a <= 0.0 or e < 0.0 or e >= 1.0 or mu <= 0.0 or r_earth <= 0.0:
+        raise ValueError(
+            f"Invalid parameters: a={a}, e={e}, mu={mu}, r_earth={r_earth} for bounded elliptic orbit."
+        )
 
     p = a * (1.0 - e**2)
     n = np.sqrt(mu / (a**3))
@@ -309,5 +312,11 @@ def analytical_j2_raan_rate(
 
 def circular_velocity(altitude_m: float, mu: float = MU_EARTH, r_earth: float = R_EARTH) -> float:
     """Calculate circular orbital velocity at a given altitude in m/s."""
+    if not (np.isfinite(altitude_m) and np.isfinite(mu) and np.isfinite(r_earth)):
+        raise ValueError("Altitude, mu, and r_earth must be finite.")
     r = r_earth + altitude_m
+    if r <= 0.0:
+        raise ValueError(f"Radius (r_earth + altitude_m) must be strictly positive, got {r} m")
+    if mu <= 0.0:
+        raise ValueError(f"Gravitational parameter mu must be strictly positive, got {mu}")
     return float(np.sqrt(mu / r))

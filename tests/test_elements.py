@@ -177,3 +177,42 @@ class TestSatelliteClass:
             rv_to_coe([np.nan, 0.0, 0.0], [0.0, 7500.0, 0.0])
         with pytest.raises(ValueError):
             rv_to_coe([7000e3, 0.0, 0.0], [0.0, np.nan, 0.0])
+
+    def test_round_trip_cardinal_and_boundary_angles(self):
+        # Cardinal angles and 2*pi boundary
+        for ang in [0.0, np.pi / 2, np.pi, 3 * np.pi / 2, 2 * np.pi]:
+            elem = OrbitalElements(7000e3, 0.05, np.radians(45.0), 0.5, 1.2, ang)
+            r, v = coe_to_rv(elem)
+            rec = rv_to_coe(r, v)
+            r2, v2 = coe_to_rv(rec)
+            # Must achieve sub-micrometer roundtrip consistency without arccos sqrt(eps) precision loss
+            assert np.linalg.norm(r2 - r) < 1e-6
+            assert np.linalg.norm(v2 - v) < 1e-6
+
+    def test_analytical_j2_raan_rate_validation(self):
+        with pytest.raises(ValueError):
+            analytical_j2_raan_rate(a=float("nan"), e=0.01, i=0.5)
+        with pytest.raises(ValueError):
+            analytical_j2_raan_rate(a=7000e3, e=float("nan"), i=0.5)
+        with pytest.raises(ValueError):
+            analytical_j2_raan_rate(a=-7000e3, e=0.01, i=0.5)
+        with pytest.raises(ValueError):
+            analytical_j2_raan_rate(a=7000e3, e=1.05, i=0.5)
+        with pytest.raises(ValueError):
+            analytical_j2_raan_rate(a=7000e3, e=0.01, i=0.5, mu=float("nan"))
+
+    def test_circular_velocity_validation(self):
+        with pytest.raises(ValueError):
+            circular_velocity(float("nan"))
+        with pytest.raises(ValueError):
+            circular_velocity(-R_EARTH - 100.0)  # Center/subterranean singularity
+        with pytest.raises(ValueError):
+            circular_velocity(400e3, mu=-1.0)
+
+    def test_orbital_elements_period_and_mean_motion_non_finite(self):
+        elem_nan = OrbitalElements(a=float("nan"), e=0.01, i=0.5, raan=0.0, arg_pe=0.0, nu=0.0)
+        assert elem_nan.period == float("inf")
+        assert elem_nan.mean_motion == 0.0
+        elem_neg = OrbitalElements(a=-7000e3, e=0.01, i=0.5, raan=0.0, arg_pe=0.0, nu=0.0)
+        assert elem_neg.period == float("inf")
+        assert elem_neg.mean_motion == 0.0

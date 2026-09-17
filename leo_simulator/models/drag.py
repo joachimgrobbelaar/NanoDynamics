@@ -59,10 +59,14 @@ class ExponentialAtmosphere(BaseAtmosphere):
             scale_height: Scale height H in meters (> 0).
             min_altitude: Minimum altitude clamp in meters.
         """
-        if scale_height <= 0.0:
-            raise ValueError(f"Scale height must be positive, got {scale_height}")
-        if rho0 < 0.0:
-            raise ValueError(f"Reference density cannot be negative, got {rho0}")
+        if not np.isfinite(scale_height) or scale_height <= 0.0:
+            raise ValueError(f"Scale height must be positive and finite, got {scale_height}")
+        if not np.isfinite(rho0) or rho0 < 0.0:
+            raise ValueError(f"Reference density cannot be negative and must be finite, got {rho0}")
+        if not np.isfinite(h0):
+            raise ValueError(f"Reference altitude must be finite, got {h0}")
+        if not np.isfinite(min_altitude):
+            raise ValueError(f"Minimum altitude must be finite, got {min_altitude}")
 
         self.h0 = float(h0)
         self.rho0 = float(rho0)
@@ -177,6 +181,8 @@ def relative_velocity_vector(
         raise ValueError(f"Vectors must have shape (3,), got r:{r.shape} and v:{v.shape}")
     if not np.all(np.isfinite(r)) or not np.all(np.isfinite(v)):
         raise ValueError("Position and velocity vectors must contain finite values.")
+    if not np.isfinite(omega_earth):
+        raise ValueError(f"Earth rotation rate must be finite, got {omega_earth}")
 
     if not include_earth_rotation or omega_earth == 0.0:
         return v.copy()
@@ -217,12 +223,16 @@ def aerodynamic_drag_acceleration(
     Raises:
         ValueError: If mass <= 0, area < 0, or cd < 0.
     """
-    if mass <= 0.0:
-        raise ValueError(f"Mass must be strictly positive, got {mass} kg")
-    if area < 0.0:
-        raise ValueError(f"Cross-sectional area must be non-negative, got {area} m^2")
-    if cd < 0.0:
-        raise ValueError(f"Drag coefficient must be non-negative, got {cd}")
+    if not np.isfinite(mass) or mass <= 0.0:
+        raise ValueError(f"Mass must be strictly positive and finite, got {mass} kg")
+    if not np.isfinite(area) or area < 0.0:
+        raise ValueError(f"Cross-sectional area must be non-negative and finite, got {area} m^2")
+    if not np.isfinite(cd) or cd < 0.0:
+        raise ValueError(f"Drag coefficient must be non-negative and finite, got {cd}")
+    if not np.isfinite(r_earth) or r_earth <= 0.0:
+        raise ValueError(f"Earth radius must be strictly positive and finite, got {r_earth}")
+    if not np.isfinite(omega_earth):
+        raise ValueError(f"Earth rotation rate must be finite, got {omega_earth}")
 
     r = np.asarray(r_vec, dtype=np.float64)
     v = np.asarray(v_vec, dtype=np.float64)

@@ -27,6 +27,9 @@ def central_gravity_acceleration(
     Raises:
         ValueError: If position vector magnitude is non-positive or coordinates are invalid.
     """
+    if not np.isfinite(mu) or mu <= 0.0:
+        raise ValueError(f"Gravitational parameter mu must be strictly positive and finite, got {mu}")
+
     r = np.asarray(r_vec, dtype=np.float64)
     if r.shape != (3,):
         raise ValueError(f"Position vector must have shape (3,), got {r.shape}")
@@ -66,6 +69,13 @@ def j2_perturbation_acceleration(
     Raises:
         ValueError: If position vector norm is non-positive or shape is invalid.
     """
+    if not np.isfinite(mu) or mu <= 0.0:
+        raise ValueError(f"Gravitational parameter mu must be strictly positive and finite, got {mu}")
+    if not np.isfinite(r_earth) or r_earth <= 0.0:
+        raise ValueError(f"Earth radius must be strictly positive and finite, got {r_earth}")
+    if not np.isfinite(j2):
+        raise ValueError(f"J2 harmonic coefficient must be finite, got {j2}")
+
     r = np.asarray(r_vec, dtype=np.float64)
     if r.shape != (3,):
         raise ValueError(f"Position vector must have shape (3,), got {r.shape}")

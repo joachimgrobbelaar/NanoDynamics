@@ -194,3 +194,72 @@ class TestOrbitPropagator:
 
         with pytest.raises(RuntimeError):
             _ = empty_res.raan_change
+
+        with pytest.raises(RuntimeError):
+            _ = empty_res.semi_major_axis_decay
+
+    def test_reentry_event_termination_with_dt_eval(self):
+        # Verify that terminal re-entry point is included even when dt_eval grid would cut off before event
+        prop = OrbitPropagator(
+            include_central_gravity=True,
+            include_j2=False,
+            include_drag=False,
+            min_altitude_reentry=0.0,
+        )
+        suborbital = OrbitalElements(
+            a=R_EARTH + 50e3,
+            e=0.1,
+            i=0.0,
+            raan=0.0,
+            arg_pe=0.0,
+            nu=np.radians(180.0),
+        )
+        result = prop.propagate(suborbital, duration_seconds=10000.0, dt_eval=10.0)
+        assert result.reentry_detected
+        assert result.reentry_time is not None
+        # Trajectory endpoint must match the re-entry event
+        assert result.t[-1] == pytest.approx(result.reentry_time, abs=1e-6)
+        assert result.final_altitude == pytest.approx(0.0, abs=1.0)
+
+    def test_subterranean_initial_state_rejected(self):
+        prop = OrbitPropagator()
+        # Initial position inside Earth (altitude = -100 m)
+        r0 = np.array([R_EARTH - 100.0, 0.0, 0.0])
+        v0 = np.array([0.0, 7500.0, 0.0])
+        state = np.concatenate([r0, v0])
+        with pytest.raises(ValueError, match="at or below the minimum re-entry altitude"):
+            prop.propagate(state, duration_seconds=100.0)
+
+    def test_zero_effective_duration_rejected(self):
+        prop = OrbitPropagator()
+        r0 = np.array([R_EARTH + 400e3, 0.0, 0.0])
+        v0 = np.array([0.0, 7670.0, 0.0])
+        state = np.concatenate([r0, v0])
+        with pytest.raises(ValueError, match="Effective duration .* is zero"):
+            prop.propagate(state, duration_seconds=1e-4, t_start=1e16)
+
+    def test_propagator_invalid_init_parameters(self):
+        with pytest.raises(ValueError):
+            OrbitPropagator(rtol=-1.0)
+        with pytest.raises(ValueError):
+            OrbitPropagator(rtol=float("nan"))
+        with pytest.raises(ValueError):
+            OrbitPropagator(atol=float("nan"))
+        with pytest.raises(ValueError):
+            OrbitPropagator(mu=float("nan"))
+        with pytest.raises(ValueError):
+            OrbitPropagator(r_earth=float("nan"))
+        with pytest.raises(ValueError):
+            OrbitPropagator(j2=float("nan"))
+        with pytest.raises(ValueError):
+            OrbitPropagator(omega_earth=float("nan"))
+        with pytest.raises(ValueError):
+            OrbitPropagator(min_altitude_reentry=float("nan"))
+
+    def test_semi_major_axis_decay_property(self):
+        sat = Satellite.cubesat_3u(mass=4.0, cd=2.2)
+        prop = OrbitPropagator(satellite=sat, include_central_gravity=True, include_j2=False, include_drag=True)
+        orbit = OrbitalElements(a=R_EARTH + 350e3, e=0.001, i=0.5, raan=0.0, arg_pe=0.0, nu=0.0)
+        res = prop.propagate(orbit, duration_seconds=1000.0)
+        assert res.semi_major_axis_decay > 0.0
+        assert res.semi_major_axis_decay == pytest.approx(res.semi_major_axes[0] - res.semi_major_axes[-1])

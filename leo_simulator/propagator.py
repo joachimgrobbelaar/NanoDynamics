@@ -67,6 +67,13 @@ class PropagationResult:
         return float(self.initial_altitude - self.final_altitude)
 
     @property
+    def semi_major_axis_decay(self) -> float:
+        """Compute net semi-major axis change (initial - final) in meters."""
+        if len(self.semi_major_axes) == 0:
+            raise RuntimeError("Propagation result contains no trajectory points.")
+        return float(self.semi_major_axes[0] - self.semi_major_axes[-1])
+
+    @property
     def final_raan(self) -> float:
         """Return final RAAN in radians."""
         if len(self.raans) == 0:
@@ -127,14 +134,29 @@ class OrbitPropagator:
         self.include_j2 = include_j2
         self.include_drag = include_drag
         self.include_earth_rotation = include_earth_rotation
+        if not np.isfinite(mu) or mu <= 0.0:
+            raise ValueError(f"Gravitational parameter mu must be strictly positive and finite, got {mu}")
+        if not np.isfinite(r_earth) or r_earth <= 0.0:
+            raise ValueError(f"Earth radius must be strictly positive and finite, got {r_earth}")
+        if not np.isfinite(j2):
+            raise ValueError(f"J2 coefficient must be finite, got {j2}")
+        if not np.isfinite(omega_earth):
+            raise ValueError(f"Earth rotation rate must be finite, got {omega_earth}")
+        if not np.isfinite(rtol) or rtol <= 0.0:
+            raise ValueError(f"rtol must be strictly positive and finite, got {rtol}")
+        if not np.isfinite(atol) or atol <= 0.0:
+            raise ValueError(f"atol must be strictly positive and finite, got {atol}")
+        if not np.isfinite(min_altitude_reentry):
+            raise ValueError(f"min_altitude_reentry must be finite, got {min_altitude_reentry}")
+
         self.mu = float(mu)
         self.r_earth = float(r_earth)
         self.j2 = float(j2)
         self.omega_earth = float(omega_earth)
         self.solver_method = solver_method
-        self.rtol = rtol
-        self.atol = atol
-        self.min_altitude_reentry = min_altitude_reentry
+        self.rtol = float(rtol)
+        self.atol = float(atol)
+        self.min_altitude_reentry = float(min_altitude_reentry)
 
         # Instantiate dynamics
         self.dynamics = OrbitalDynamics(
@@ -192,7 +214,18 @@ class OrbitPropagator:
         if not np.all(np.isfinite(y0)):
             raise ValueError("Initial state vector must contain finite values.")
 
+        r_init_norm = float(np.linalg.norm(y0[0:3]))
+        if r_init_norm <= self.r_earth + self.min_altitude_reentry:
+            raise ValueError(
+                f"Initial altitude ({r_init_norm - self.r_earth:.2f} m) is at or below "
+                f"the minimum re-entry altitude threshold ({self.min_altitude_reentry:.2f} m)."
+            )
+
         t_span = (float(t_start), float(t_start + duration_seconds))
+        if t_span[1] <= t_span[0]:
+            raise ValueError(
+                f"Effective duration ({t_span[1] - t_span[0]}) is zero due to floating point precision at epoch {t_start}."
+            )
 
         t_eval = None
         if dt_eval is not None:
@@ -224,12 +257,6 @@ class OrbitPropagator:
         # Extract output arrays
         t_arr = sol.t
         y_arr = sol.y  # shape (6, N)
-        r_arr = y_arr[0:3, :].T  # shape (N, 3)
-        v_arr = y_arr[3:6, :].T  # shape (N, 3)
-
-        r_norms = np.linalg.norm(r_arr, axis=1)
-        altitudes = r_norms - self.r_earth
-        speeds = np.linalg.norm(v_arr, axis=1)
 
         # Check for re-entry termination
         reentry_detected = False
@@ -237,6 +264,17 @@ class OrbitPropagator:
         if sol.t_events and len(sol.t_events[0]) > 0:
             reentry_detected = True
             reentry_time = float(sol.t_events[0][0])
+            reentry_y = sol.y_events[0][0]
+            if len(t_arr) == 0 or t_arr[-1] < reentry_time:
+                t_arr = np.append(t_arr, reentry_time)
+                y_arr = np.column_stack([y_arr, reentry_y])
+
+        r_arr = y_arr[0:3, :].T  # shape (N, 3)
+        v_arr = y_arr[3:6, :].T  # shape (N, 3)
+
+        r_norms = np.linalg.norm(r_arr, axis=1)
+        altitudes = r_norms - self.r_earth
+        speeds = np.linalg.norm(v_arr, axis=1)
 
         # Compute orbital elements along trajectory
         n_points = len(t_arr)

@@ -31,6 +31,9 @@ def plot_orbit_3d(
     Returns:
         matplotlib.figure.Figure
     """
+    if len(result.t) == 0:
+        raise ValueError("Cannot plot empty PropagationResult.")
+
     fig = plt.figure(figsize=(9, 8))
     ax = fig.add_subplot(111, projection="3d")
 
@@ -63,6 +66,8 @@ def plot_orbit_3d(
         r_km[:, 1].max() - r_km[:, 1].min(),
         r_km[:, 2].max() - r_km[:, 2].min(),
     ]).max() / 2.0
+    if max_range <= 0.0:
+        max_range = r_earth_km * 0.2
 
     mid_x = (r_km[:, 0].max() + r_km[:, 0].min()) * 0.5
     mid_y = (r_km[:, 1].max() + r_km[:, 1].min()) * 0.5
@@ -100,10 +105,17 @@ def plot_altitude_decay(
     else:
         results_dict = results
 
+    if not results_dict:
+        raise ValueError("No propagation results provided to plot.")
+
+    for label, res in results_dict.items():
+        if len(res.t) == 0:
+            raise ValueError(f"PropagationResult for '{label}' contains no trajectory points.")
+
     fig, ax = plt.subplots(figsize=(8, 5))
 
     for label, res in results_dict.items():
-        t_hours = res.t / 3600.0
+        t_hours = (res.t - res.t[0]) / 3600.0
         alt_km = res.altitudes / 1000.0
         ax.plot(t_hours, alt_km, label=label, linewidth=1.8)
 
@@ -138,17 +150,20 @@ def plot_raan_regression(
     Returns:
         matplotlib.figure.Figure
     """
+    if len(result.t) == 0:
+        raise ValueError("Cannot plot empty PropagationResult.")
+
     fig, ax = plt.subplots(figsize=(8, 5))
 
-    t_hours = result.t / 3600.0
+    t_hours = (result.t - result.t[0]) / 3600.0
     # Unwrap RAAN for smooth rate visualization
     raan_deg = np.degrees(np.unwrap(result.raans))
 
     ax.plot(t_hours, raan_deg, color="navy", linewidth=2.0, label="Numerical Integration (DOP853)")
 
     if analytical_rate is not None:
-        # Initial RAAN + analytical_rate * t
-        t_sec = result.t
+        # Initial RAAN + analytical_rate * (t - t0)
+        t_sec = result.t - result.t[0]
         raan_analytical = np.degrees(result.raans[0] + analytical_rate * t_sec)
         ax.plot(t_hours, raan_analytical, "r--", linewidth=1.6, label="Analytical J2 First-Order Rate")
 
@@ -181,10 +196,13 @@ def plot_orbital_elements_history(
     Returns:
         matplotlib.figure.Figure
     """
+    if len(result.t) == 0:
+        raise ValueError("Cannot plot empty PropagationResult.")
+
     fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(11, 8))
     fig.suptitle(title, fontsize=14, fontweight="bold")
 
-    t_hours = result.t / 3600.0
+    t_hours = (result.t - result.t[0]) / 3600.0
 
     # Semi-major axis
     ax1.plot(t_hours, result.semi_major_axes / 1000.0, color="crimson", linewidth=1.5)
