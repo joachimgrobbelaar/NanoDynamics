@@ -1,0 +1,125 @@
+"""Orbital equations of motion and state derivative functions.
+
+Computes d/dt [r, v] = [v, a_total] combining central gravity, J2 perturbation,
+and atmospheric drag.
+"""
+
+import numpy as np
+
+from leo_simulator.constants import J2_EARTH, MU_EARTH, OMEGA_EARTH, R_EARTH
+from leo_simulator.models.drag import (
+    BaseAtmosphere,
+    ExponentialAtmosphere,
+    aerodynamic_drag_acceleration,
+)
+from leo_simulator.models.gravity import (
+    central_gravity_acceleration,
+    j2_perturbation_acceleration,
+)
+
+
+class OrbitalDynamics:
+    """Configurable dynamical model providing orbital state derivatives for numerical integration.
+
+    State vector: y = [x, y, z, vx, vy, vz] in ECI meters and m/s.
+    Derivative: dy/dt = [vx, vy, vz, ax, ay, az].
+    """
+
+    def __init__(
+        self,
+        cd: float = 2.2,
+        area: float = 0.03,  # 3U CubeSat typical frontal area ~ 0.03 m^2 (0.1m x 0.3m)
+        mass: float = 4.0,   # 3U CubeSat typical mass ~ 4 kg
+        atmosphere: BaseAtmosphere | None = None,
+        include_central_gravity: bool = True,
+        include_j2: bool = True,
+        include_drag: bool = True,
+        include_earth_rotation: bool = True,
+        mu: float = MU_EARTH,
+        r_earth: float = R_EARTH,
+        j2: float = J2_EARTH,
+        omega_earth: float = OMEGA_EARTH,
+    ) -> None:
+        self.cd = float(cd)
+        self.area = float(area)
+        self.mass = float(mass)
+        self.atmosphere = atmosphere if atmosphere is not None else ExponentialAtmosphere()
+        self.include_central_gravity = include_central_gravity
+        self.include_j2 = include_j2
+        self.include_drag = include_drag
+        self.include_earth_rotation = include_earth_rotation
+        self.mu = float(mu)
+        self.r_earth = float(r_earth)
+        self.j2 = float(j2)
+        self.omega_earth = float(omega_earth)
+
+    def compute_accelerations(
+        self,
+        r_vec: np.ndarray,
+        v_vec: np.ndarray,
+    ) -> dict[str, np.ndarray]:
+        """Calculate individual acceleration contributions in m / s^2.
+
+        Returns:
+            dict containing 'central', 'j2', 'drag', and 'total' acceleration vectors.
+        """
+        a_central = (
+            central_gravity_acceleration(r_vec, mu=self.mu)
+            if self.include_central_gravity
+            else np.zeros(3, dtype=np.float64)
+        )
+
+        a_j2 = (
+            j2_perturbation_acceleration(r_vec, mu=self.mu, r_earth=self.r_earth, j2=self.j2)
+            if self.include_j2
+            else np.zeros(3, dtype=np.float64)
+        )
+
+        a_drag = (
+            aerodynamic_drag_acceleration(
+                r_vec,
+                v_vec,
+                cd=self.cd,
+                area=self.area,
+                mass=self.mass,
+                atmosphere_model=self.atmosphere,
+                r_earth=self.r_earth,
+                omega_earth=self.omega_earth,
+                include_earth_rotation=self.include_earth_rotation,
+            )
+            if self.include_drag
+            else np.zeros(3, dtype=np.float64)
+        )
+
+        a_total = a_central + a_j2 + a_drag
+
+        return {
+            "central": a_central,
+            "j2": a_j2,
+            "drag": a_drag,
+            "total": a_total,
+        }
+
+    def derivatives(self, t: float, state: np.ndarray) -> np.ndarray:
+        """Evaluate state derivatives [vx, vy, vz, ax, ay, az].
+
+        Args:
+            t: Current simulation time in seconds (unused explicitly for autonomous system).
+            state: Array-like of length 6 [x, y, z, vx, vy, vz].
+
+        Returns:
+            np.ndarray: Length 6 derivative array.
+        """
+        r_vec = state[0:3]
+        v_vec = state[3:6]
+
+        accels = self.compute_accelerations(r_vec, v_vec)
+        a_total = accels["total"]
+
+        dstate = np.empty(6, dtype=np.float64)
+        dstate[0:3] = v_vec
+        dstate[3:6] = a_total
+        return dstate
+
+    def __call__(self, t: float, state: np.ndarray) -> np.ndarray:
+        return self.derivatives(t, state)
