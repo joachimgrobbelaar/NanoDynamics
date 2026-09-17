@@ -38,6 +38,12 @@ class TestGravityModels:
         with pytest.raises(ValueError):
             central_gravity_acceleration([1000.0, 2000.0])
 
+        with pytest.raises(ValueError):
+            central_gravity_acceleration([np.nan, 0.0, 0.0])
+
+        with pytest.raises(ValueError):
+            j2_perturbation_acceleration([np.nan, 0.0, 0.0])
+
     def test_j2_perturbation_equator(self):
         # At equator (z=0), perturbation should be radially inward
         r_eq = np.array([7000e3, 0.0, 0.0])
@@ -124,6 +130,28 @@ class TestDragModels:
             aerodynamic_drag_acceleration(r, v, cd=2.2, area=0.03, mass=-1.0)
         with pytest.raises(ValueError):
             aerodynamic_drag_acceleration(r, v, cd=-1.0, area=0.03, mass=4.0)
+        with pytest.raises(ValueError):
+            aerodynamic_drag_acceleration([0.0, 0.0, 0.0], v, cd=2.2, area=0.03, mass=4.0)
+        with pytest.raises(ValueError):
+            aerodynamic_drag_acceleration([np.nan, 0.0, 0.0], v, cd=2.2, area=0.03, mass=4.0)
+
+    def test_relative_velocity_invalid_inputs(self):
+        r = np.array([7000e3, 0.0, 0.0])
+        v = np.array([0.0, 7500.0, 0.0])
+        with pytest.raises(ValueError):
+            relative_velocity_vector([1.0, 2.0], v)
+        with pytest.raises(ValueError):
+            relative_velocity_vector(r, [1.0, 2.0])
+        with pytest.raises(ValueError):
+            relative_velocity_vector([np.nan, 0.0, 0.0], v)
+
+    def test_atmosphere_non_finite_altitude(self):
+        exp_atm = ExponentialAtmosphere()
+        with pytest.raises(ValueError):
+            exp_atm.density(float("nan"))
+        piece_atm = PiecewiseExponentialAtmosphere()
+        with pytest.raises(ValueError):
+            piece_atm.density(float("nan"))
 
 
 class TestDynamicsCombination:

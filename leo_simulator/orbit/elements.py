@@ -97,6 +97,11 @@ def rv_to_coe(
     r = np.asarray(r_vec, dtype=np.float64)
     v = np.asarray(v_vec, dtype=np.float64)
 
+    if r.shape != (3,) or v.shape != (3,):
+        raise ValueError(f"Vectors must have shape (3,), got r:{r.shape} and v:{v.shape}")
+    if not np.all(np.isfinite(r)) or not np.all(np.isfinite(v)):
+        raise ValueError("Position and velocity vectors must contain finite values.")
+
     r_norm = np.linalg.norm(r)
     v_norm = np.linalg.norm(v)
 
@@ -213,10 +218,12 @@ def coe_to_rv(
     arg_pe = elements.arg_pe
     nu = elements.nu
 
-    if a <= 0.0:
-        raise ValueError("Semi-major axis must be positive for bound elliptic orbits.")
-    if e < 0.0 or e >= 1.0:
-        raise ValueError(f"Eccentricity must be in range [0, 1), got {e}")
+    if not np.isfinite(a) or a <= 0.0:
+        raise ValueError(f"Semi-major axis must be positive and finite for bound elliptic orbits, got {a}")
+    if not np.isfinite(e) or e < 0.0 or e >= 1.0:
+        raise ValueError(f"Eccentricity must be in range [0, 1) and finite, got {e}")
+    if not (np.isfinite(i) and np.isfinite(raan) and np.isfinite(arg_pe) and np.isfinite(nu)):
+        raise ValueError("Orbital angles (i, raan, arg_pe, nu) must be finite.")
 
     # Semi-latus rectum p
     p = a * (1.0 - e**2)

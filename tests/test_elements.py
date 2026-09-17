@@ -145,3 +145,35 @@ class TestSatelliteClass:
         sat3u = Satellite.cubesat_3u()
         assert sat3u.mass == 4.0
         assert sat3u.drag_area == 0.03
+
+    def test_satellite_non_finite_parameters(self):
+        with pytest.raises(ValueError):
+            Satellite(mass=float("nan"))
+        with pytest.raises(ValueError):
+            Satellite(drag_area=float("nan"))
+        with pytest.raises(ValueError):
+            Satellite(cd=float("nan"))
+
+    def test_elements_non_finite_validation(self):
+        # coe_to_rv with nan
+        for field in ["a", "e", "i", "raan", "arg_pe", "nu"]:
+            kwargs = {
+                "a": 7000e3,
+                "e": 0.01,
+                "i": 0.5,
+                "raan": 0.5,
+                "arg_pe": 0.5,
+                "nu": 0.5,
+            }
+            kwargs[field] = float("nan")
+            elem = OrbitalElements(**kwargs)
+            with pytest.raises(ValueError):
+                coe_to_rv(elem)
+
+        # rv_to_coe with invalid shape or nan
+        with pytest.raises(ValueError):
+            rv_to_coe([1.0, 2.0], [0.0, 7500.0, 0.0])
+        with pytest.raises(ValueError):
+            rv_to_coe([np.nan, 0.0, 0.0], [0.0, 7500.0, 0.0])
+        with pytest.raises(ValueError):
+            rv_to_coe([7000e3, 0.0, 0.0], [0.0, np.nan, 0.0])

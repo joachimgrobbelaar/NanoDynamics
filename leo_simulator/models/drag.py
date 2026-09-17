@@ -71,6 +71,8 @@ class ExponentialAtmosphere(BaseAtmosphere):
 
     def density(self, altitude_m: float) -> float:
         """Calculate density at altitude_m [m]."""
+        if not np.isfinite(altitude_m):
+            raise ValueError(f"Altitude must be finite, got {altitude_m}")
         clamped_h = max(altitude_m, self.min_altitude)
         exponent = -(clamped_h - self.h0) / self.scale_height
         # Prevent numerical underflow/overflow
@@ -123,6 +125,8 @@ class PiecewiseExponentialAtmosphere(BaseAtmosphere):
 
     def density(self, altitude_m: float) -> float:
         """Compute density via piecewise exponential interpolation."""
+        if not np.isfinite(altitude_m):
+            raise ValueError(f"Altitude must be finite, got {altitude_m}")
         if altitude_m <= 0.0:
             return float(self._rhos[0])
 
@@ -169,6 +173,11 @@ def relative_velocity_vector(
     """
     r = np.asarray(r_vec, dtype=np.float64)
     v = np.asarray(v_vec, dtype=np.float64)
+    if r.shape != (3,) or v.shape != (3,):
+        raise ValueError(f"Vectors must have shape (3,), got r:{r.shape} and v:{v.shape}")
+    if not np.all(np.isfinite(r)) or not np.all(np.isfinite(v)):
+        raise ValueError("Position and velocity vectors must contain finite values.")
+
     if not include_earth_rotation or omega_earth == 0.0:
         return v.copy()
 
@@ -220,6 +229,12 @@ def aerodynamic_drag_acceleration(
 
     if r.shape != (3,) or v.shape != (3,):
         raise ValueError(f"Vectors must have shape (3,), got r:{r.shape} and v:{v.shape}")
+    if not np.all(np.isfinite(r)) or not np.all(np.isfinite(v)):
+        raise ValueError("Position and velocity vectors must contain finite values.")
+
+    r_norm = np.linalg.norm(r)
+    if r_norm <= 0.0:
+        raise ValueError("Position vector norm must be positive.")
 
     if area == 0.0 or cd == 0.0:
         return np.zeros(3, dtype=np.float64)
@@ -227,7 +242,6 @@ def aerodynamic_drag_acceleration(
     if atmosphere_model is None:
         atmosphere_model = ExponentialAtmosphere()
 
-    r_norm = np.linalg.norm(r)
     altitude = r_norm - r_earth
 
     rho = atmosphere_model.density(altitude)

@@ -50,11 +50,15 @@ class PropagationResult:
     @property
     def final_altitude(self) -> float:
         """Return final propagated altitude in meters."""
+        if len(self.altitudes) == 0:
+            raise RuntimeError("Propagation result contains no trajectory points.")
         return float(self.altitudes[-1])
 
     @property
     def initial_altitude(self) -> float:
         """Return initial altitude in meters."""
+        if len(self.altitudes) == 0:
+            raise RuntimeError("Propagation result contains no trajectory points.")
         return float(self.altitudes[0])
 
     @property
@@ -65,16 +69,22 @@ class PropagationResult:
     @property
     def final_raan(self) -> float:
         """Return final RAAN in radians."""
+        if len(self.raans) == 0:
+            raise RuntimeError("Propagation result contains no trajectory points.")
         return float(self.raans[-1])
 
     @property
     def initial_raan(self) -> float:
         """Return initial RAAN in radians."""
+        if len(self.raans) == 0:
+            raise RuntimeError("Propagation result contains no trajectory points.")
         return float(self.raans[0])
 
     @property
     def raan_change(self) -> float:
         """Compute unwrap-adjusted net RAAN change (final - initial) in radians."""
+        if len(self.raans) == 0:
+            raise RuntimeError("Propagation result contains no trajectory points.")
         unwrapped = np.unwrap(self.raans)
         return float(unwrapped[-1] - unwrapped[0])
 
@@ -162,8 +172,14 @@ class OrbitPropagator:
         Returns:
             PropagationResult containing state time series and orbital elements.
         """
-        if duration_seconds <= 0.0:
-            raise ValueError(f"Duration must be strictly positive, got {duration_seconds}")
+        if not np.isfinite(duration_seconds) or duration_seconds <= 0.0:
+            raise ValueError(f"Duration must be strictly positive and finite, got {duration_seconds}")
+
+        if not np.isfinite(t_start):
+            raise ValueError(f"t_start must be finite, got {t_start}")
+
+        if dt_eval is not None and (not np.isfinite(dt_eval) or dt_eval <= 0.0):
+            raise ValueError(f"dt_eval must be strictly positive and finite, got {dt_eval}")
 
         if isinstance(initial_state, OrbitalElements):
             r0, v0 = coe_to_rv(initial_state, mu=self.mu)
@@ -173,10 +189,13 @@ class OrbitPropagator:
             if y0.shape != (6,):
                 raise ValueError(f"Initial state vector must have shape (6,), got {y0.shape}")
 
+        if not np.all(np.isfinite(y0)):
+            raise ValueError("Initial state vector must contain finite values.")
+
         t_span = (float(t_start), float(t_start + duration_seconds))
 
         t_eval = None
-        if dt_eval is not None and dt_eval > 0.0:
+        if dt_eval is not None:
             num_steps = int(np.floor((t_span[1] - t_span[0]) / dt_eval))
             t_eval = t_span[0] + np.arange(num_steps + 1) * dt_eval
             if np.isclose(t_eval[-1], t_span[1], atol=1e-8 * dt_eval):

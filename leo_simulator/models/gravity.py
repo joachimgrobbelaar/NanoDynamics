@@ -30,6 +30,8 @@ def central_gravity_acceleration(
     r = np.asarray(r_vec, dtype=np.float64)
     if r.shape != (3,):
         raise ValueError(f"Position vector must have shape (3,), got {r.shape}")
+    if not np.all(np.isfinite(r)):
+        raise ValueError("Position vector coordinates must be finite.")
 
     r_norm = np.linalg.norm(r)
     if r_norm <= 0.0:
@@ -67,6 +69,8 @@ def j2_perturbation_acceleration(
     r = np.asarray(r_vec, dtype=np.float64)
     if r.shape != (3,):
         raise ValueError(f"Position vector must have shape (3,), got {r.shape}")
+    if not np.all(np.isfinite(r)):
+        raise ValueError("Position vector coordinates must be finite.")
 
     r_norm = np.linalg.norm(r)
     if r_norm <= 0.0:

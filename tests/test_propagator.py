@@ -133,3 +133,64 @@ class TestOrbitPropagator:
         # Should raise ValueError on negative duration
         with pytest.raises(ValueError):
             prop.propagate(raw_state, duration_seconds=-10.0)
+
+    def test_non_finite_duration_and_epoch_validation(self):
+        prop = OrbitPropagator()
+        r0 = np.array([R_EARTH + 400e3, 0.0, 0.0])
+        v0 = np.array([0.0, 7670.0, 0.0])
+        state = np.concatenate([r0, v0])
+
+        for invalid_duration in [float("nan"), float("inf"), float("-inf"), 0.0]:
+            with pytest.raises(ValueError):
+                prop.propagate(state, duration_seconds=invalid_duration)
+
+        for invalid_t_start in [float("nan"), float("inf")]:
+            with pytest.raises(ValueError):
+                prop.propagate(state, duration_seconds=100.0, t_start=invalid_t_start)
+
+    def test_invalid_dt_eval_and_non_finite_initial_state(self):
+        prop = OrbitPropagator()
+        r0 = np.array([R_EARTH + 400e3, 0.0, 0.0])
+        v0 = np.array([0.0, 7670.0, 0.0])
+        state = np.concatenate([r0, v0])
+
+        for invalid_dt in [-1.0, 0.0, float("nan"), float("inf")]:
+            with pytest.raises(ValueError):
+                prop.propagate(state, duration_seconds=100.0, dt_eval=invalid_dt)
+
+        nan_state = state.copy()
+        nan_state[0] = np.nan
+        with pytest.raises(ValueError):
+            prop.propagate(nan_state, duration_seconds=100.0)
+
+    def test_empty_propagation_result_properties(self):
+        from leo_simulator.propagator import PropagationResult
+
+        empty_res = PropagationResult(
+            t=np.array([]),
+            r=np.empty((0, 3)),
+            v=np.empty((0, 3)),
+            altitudes=np.array([]),
+            speeds=np.array([]),
+            semi_major_axes=np.array([]),
+            eccentricities=np.array([]),
+            inclinations=np.array([]),
+            raans=np.array([]),
+            arg_pes=np.array([]),
+            true_anomalies=np.array([]),
+            success=False,
+            status=-1,
+            message="Failed before integration",
+        )
+
+        with pytest.raises(RuntimeError):
+            _ = empty_res.final_altitude
+
+        with pytest.raises(RuntimeError):
+            _ = empty_res.initial_altitude
+
+        with pytest.raises(RuntimeError):
+            _ = empty_res.final_raan
+
+        with pytest.raises(RuntimeError):
+            _ = empty_res.raan_change

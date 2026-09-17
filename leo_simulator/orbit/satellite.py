@@ -20,11 +20,11 @@ class Satellite:
     cd: float = 2.2
 
     def __post_init__(self) -> None:
-        if self.mass <= 0.0:
-            raise ValueError(f"Satellite mass must be positive, got {self.mass}")
-        if self.drag_area < 0.0:
+        if not (self.mass > 0.0):
+            raise ValueError(f"Satellite mass must be positive and finite, got {self.mass}")
+        if not (self.drag_area >= 0.0):
             raise ValueError(f"Drag area cannot be negative, got {self.drag_area}")
-        if self.cd < 0.0:
+        if not (self.cd >= 0.0):
             raise ValueError(f"Drag coefficient cannot be negative, got {self.cd}")
 
     @property
