@@ -7,8 +7,11 @@ Earth J2 oblateness, and aerodynamic drag.
 from leo_simulator.constants import (
     J2_EARTH,
     MU_EARTH,
+    MU_MOON,
     OMEGA_EARTH,
     R_EARTH,
+    R_MOON_ORBIT,
+    T_MOON_ORBIT,
 )
 from leo_simulator.models.drag import (
     BaseAtmosphere,
@@ -21,6 +24,8 @@ from leo_simulator.models.dynamics import OrbitalDynamics
 from leo_simulator.models.gravity import (
     central_gravity_acceleration,
     j2_perturbation_acceleration,
+    moon_position,
+    third_body_acceleration,
     total_gravity_acceleration,
 )
 from leo_simulator.orbit.elements import (
@@ -38,8 +43,11 @@ __version__ = "0.1.0"
 __all__ = [
     "J2_EARTH",
     "MU_EARTH",
+    "MU_MOON",
     "OMEGA_EARTH",
     "R_EARTH",
+    "R_MOON_ORBIT",
+    "T_MOON_ORBIT",
     "BaseAtmosphere",
     "ExponentialAtmosphere",
     "OrbitPropagator",
@@ -54,7 +62,9 @@ __all__ = [
     "circular_velocity",
     "coe_to_rv",
     "j2_perturbation_acceleration",
+    "moon_position",
     "relative_velocity_vector",
     "rv_to_coe",
+    "third_body_acceleration",
     "total_gravity_acceleration",
 ]

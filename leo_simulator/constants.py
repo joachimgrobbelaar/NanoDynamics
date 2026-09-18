@@ -23,6 +23,13 @@ J2_EARTH: Final[float] = 1.08262668e-3
 # Earth Mean Rotation Rate (sidereal angular velocity) [rad / s]
 OMEGA_EARTH: Final[float] = 7.2921150e-5
 
+# Moon Standard Gravitational Parameter [m^3 / s^2] (GRAIL)
+MU_MOON: Final[float] = 4.902800066e9
+
+# Approximate Moon circular-orbit ephemeris (equatorial plane)
+R_MOON_ORBIT: Final[float] = 384_400_000.0  # [m]
+T_MOON_ORBIT: Final[float] = 27.32 * 24 * 3600  # [s]
+
 # Default reference atmospheric parameters for exponential model at LEO
 # Reference altitude h0 = 400 km
 ATMOSPHERE_DEFAULT_H0: Final[float] = 400_000.0  # [m]

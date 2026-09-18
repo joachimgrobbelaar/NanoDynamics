@@ -169,6 +169,26 @@ def run_simulation() -> None:
     plot_orbital_elements_history(res_full, save_path=p_elem, title="Orbital Elements Evolution (Full Physics)")
     print(f"  Saved: {p_elem}")
 
+    # 6. Export Trajectory to JSON
+    import json
+    json_path = os.path.join(project_root, "trajectory.json")
+    print("\nExporting trajectory to JSON...")
+    
+    trajectory_data = []
+    for i in range(len(res_full.t)):
+        trajectory_data.append({
+            "t": float(res_full.t[i]),
+            "x": float(res_full.r[i, 0]),
+            "y": float(res_full.r[i, 1]),
+            "z": float(res_full.r[i, 2]),
+            "vx": float(res_full.v[i, 0]),
+            "vy": float(res_full.v[i, 1]),
+            "vz": float(res_full.v[i, 2])
+        })
+    with open(json_path, "w") as f:
+        json.dump(trajectory_data, f, indent=4)
+    print(f"  Saved trajectory to: {json_path}")
+
     print("\n[✓] Simulation run completed successfully.")
 
 

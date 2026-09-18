@@ -3,7 +3,15 @@
 import numpy as np
 import pytest
 
-from leo_simulator.constants import J2_EARTH, MU_EARTH, OMEGA_EARTH, R_EARTH
+from leo_simulator.constants import (
+    J2_EARTH,
+    MU_EARTH,
+    MU_MOON,
+    OMEGA_EARTH,
+    R_EARTH,
+    R_MOON_ORBIT,
+    T_MOON_ORBIT,
+)
 from leo_simulator.models.drag import (
     ExponentialAtmosphere,
     PiecewiseExponentialAtmosphere,
@@ -14,6 +22,8 @@ from leo_simulator.models.dynamics import OrbitalDynamics
 from leo_simulator.models.gravity import (
     central_gravity_acceleration,
     j2_perturbation_acceleration,
+    moon_position,
+    third_body_acceleration,
     total_gravity_acceleration,
 )
 
@@ -91,6 +101,57 @@ class TestGravityModels:
         a_j2 = j2_perturbation_acceleration(r)
         a_tot = total_gravity_acceleration(r, include_j2=True)
         np.testing.assert_allclose(a_tot, a_cent + a_j2, rtol=1e-14)
+
+
+class TestThirdBodyModels:
+    def test_third_body_points_toward_moon(self):
+        # Plan verification: lunar perturbation acceleration must have a
+        # positive component along the satellite-to-Moon direction.
+        r_sat = np.array([7000e3, 0.0, 0.0])
+        r_moon = moon_position(0.0)
+        a_3rd = third_body_acceleration(r_sat, r_moon)
+
+        to_moon = r_moon - r_sat
+        assert float(np.dot(a_3rd, to_moon)) > 0.0
+
+    def test_third_body_magnitude(self):
+        r_sat = np.array([7000e3, 0.0, 0.0])
+        r_moon = moon_position(0.0)
+        a_3rd = third_body_acceleration(r_sat, r_moon)
+
+        d = r_moon - r_sat
+        expected = MU_MOON * (d / np.linalg.norm(d) ** 3 - r_moon / np.linalg.norm(r_moon) ** 3)
+        np.testing.assert_allclose(a_3rd, expected, rtol=1e-12)
+
+    def test_moon_position_ephemeris(self):
+        # Circular equatorial orbit: fixed radius, zero z, full period return.
+        p0 = moon_position(0.0)
+        np.testing.assert_allclose(np.linalg.norm(p0), R_MOON_ORBIT, rtol=1e-12)
+        assert p0[2] == 0.0
+
+        p_full = moon_position(T_MOON_ORBIT)
+        np.testing.assert_allclose(p_full, p0, rtol=1e-9, atol=1e-3)
+
+        p_half = moon_position(T_MOON_ORBIT / 2.0)
+        np.testing.assert_allclose(p_half, -p0, rtol=1e-9, atol=1e-3)
+
+    def test_third_body_invalid_inputs(self):
+        r_sat = np.array([7000e3, 0.0, 0.0])
+        r_moon = moon_position(0.0)
+        with pytest.raises(ValueError):
+            third_body_acceleration(r_sat, r_moon, mu_moon=float("nan"))
+        with pytest.raises(ValueError):
+            third_body_acceleration(r_sat, r_moon, mu_moon=-1.0)
+        with pytest.raises(ValueError):
+            third_body_acceleration([1.0, 2.0], r_moon)
+        with pytest.raises(ValueError):
+            third_body_acceleration(r_sat, [np.nan, 0.0, 0.0])
+        with pytest.raises(ValueError):
+            third_body_acceleration(r_sat, r_sat)  # co-located
+        with pytest.raises(ValueError):
+            third_body_acceleration(r_sat, [0.0, 0.0, 0.0])  # degenerate Moon vector
+        with pytest.raises(ValueError):
+            moon_position(float("nan"))
 
 
 class TestDragModels:
@@ -208,6 +269,30 @@ class TestDynamicsCombination:
         # Velocity derivative is acceleration
         assert dstate[3] < 0.0  # gravity pulls inward (-x)
 
+    def test_dynamics_moon_disabled_by_default(self):
+        dyn = OrbitalDynamics()
+        state = np.array([7000e3, 0.0, 0.0, 0.0, 7500.0, 0.0])
+        accels = dyn.compute_accelerations(state[0:3], state[3:6], t=0.0)
+        np.testing.assert_allclose(accels["moon"], np.zeros(3), atol=0.0)
+        np.testing.assert_allclose(
+            accels["total"],
+            accels["central"] + accels["j2"] + accels["drag"],
+            rtol=1e-14,
+        )
+
+    def test_dynamics_moon_matches_third_body(self):
+        dyn = OrbitalDynamics(include_moon=True)
+        state = np.array([7000e3, 0.0, 0.0, 0.0, 7500.0, 0.0])
+        t = 3600.0
+        accels = dyn.compute_accelerations(state[0:3], state[3:6], t=t)
+        expected = third_body_acceleration(state[0:3], moon_position(t))
+        np.testing.assert_allclose(accels["moon"], expected, rtol=1e-12)
+        np.testing.assert_allclose(
+            accels["total"],
+            accels["central"] + accels["j2"] + accels["drag"] + accels["moon"],
+            rtol=1e-14,
+        )
+
     def test_dynamics_invalid_init_parameters(self):
         with pytest.raises(ValueError):
             OrbitalDynamics(mass=float("nan"))
@@ -225,3 +310,7 @@ class TestDynamicsCombination:
             OrbitalDynamics(j2=float("nan"))
         with pytest.raises(ValueError):
             OrbitalDynamics(omega_earth=float("nan"))
+        with pytest.raises(ValueError):
+            OrbitalDynamics(mu_moon=float("nan"))
+        with pytest.raises(ValueError):
+            OrbitalDynamics(mu_moon=-1.0)

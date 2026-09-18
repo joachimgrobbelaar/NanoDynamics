@@ -13,6 +13,7 @@ from scipy.integrate import solve_ivp
 from leo_simulator.constants import (
     J2_EARTH,
     MU_EARTH,
+    MU_MOON,
     OMEGA_EARTH,
     R_EARTH,
 )
@@ -119,10 +120,12 @@ class OrbitPropagator:
         include_j2: bool = True,
         include_drag: bool = True,
         include_earth_rotation: bool = True,
+        include_moon: bool = False,
         mu: float = MU_EARTH,
         r_earth: float = R_EARTH,
         j2: float = J2_EARTH,
         omega_earth: float = OMEGA_EARTH,
+        mu_moon: float = MU_MOON,
         solver_method: str = "DOP853",
         rtol: float = 1e-10,
         atol: float = 1e-12,
@@ -134,6 +137,10 @@ class OrbitPropagator:
         self.include_j2 = include_j2
         self.include_drag = include_drag
         self.include_earth_rotation = include_earth_rotation
+        self.include_moon = include_moon
+        if not np.isfinite(mu_moon) or mu_moon <= 0.0:
+            raise ValueError(f"Moon gravitational parameter mu_moon must be strictly positive and finite, got {mu_moon}")
+        self.mu_moon = float(mu_moon)
         if not np.isfinite(mu) or mu <= 0.0:
             raise ValueError(f"Gravitational parameter mu must be strictly positive and finite, got {mu}")
         if not np.isfinite(r_earth) or r_earth <= 0.0:
@@ -168,10 +175,12 @@ class OrbitPropagator:
             include_j2=self.include_j2,
             include_drag=self.include_drag,
             include_earth_rotation=self.include_earth_rotation,
+            include_moon=self.include_moon,
             mu=self.mu,
             r_earth=self.r_earth,
             j2=self.j2,
             omega_earth=self.omega_earth,
+            mu_moon=self.mu_moon,
         )
 
     def propagate(
