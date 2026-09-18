@@ -74,7 +74,9 @@
 </head>
 <body>
     <div id="top-nav">
+        <button onclick="newProject()">New Project</button>
         <button onclick="openModal()">+ New Satellite</button>
+        <button onclick="exportData()" style="background: #28a745;">Export Data</button>
         <div style="flex-grow: 1;"></div>
         <input type="text" id="save-name" placeholder="Simulation Name">
         <button onclick="saveSim()">Save</button>
@@ -188,7 +190,7 @@
         scene.add(new THREE.AxesHelper(earthRadius * 1.5));
 
         camera.position.set(earthRadius * 3, earthRadius * 2, earthRadius * 3);
-        controls.target.copy(earth.position);
+        if (controls) controls.target.copy(earth.position);
 
         // --- GUI Setup ---
         const gui = new lil.GUI({ title: 'View Settings', container: document.getElementById('gui-container') });
@@ -202,15 +204,18 @@
         // loop then keeps the target glued to it (follow-cam).
         function focusMoon() {
             selectedSatIndex = -2;
-            if (moonPoints.length > 0) {
-                const mp = moonPoints[globalTimeIdx % moonPoints.length];
+            if (controls) {
+                const mp = moonPoints.length > 0 ? moonPoints[0] : moon.position;
+                camera.position.set(mp.x + 2000, mp.y + 1000, mp.z + 2000);
                 controls.target.copy(mp);
-                camera.position.set(mp.x + 9000, mp.y + 5000, mp.z + 9000);
             }
             renderSidebar();
         }
         function handleFocusChange(v) {
-            if(v === 'Earth') { selectedSatIndex = -1; controls.target.set(0,0,0); }
+            if(v === 'Earth') { 
+                selectedSatIndex = -1; 
+                if (controls) controls.target.set(0,0,0); 
+            }
             else if(v === 'Moon') focusMoon();
             else selectedSatIndex = activeSatellites.findIndex(s => s.name === v);
             renderSidebar();
@@ -222,16 +227,9 @@
         fetch(`/moon_track?dt=60&n=1440`).then(r => r.json()).then(data => {
             if(data.error) return;
             moonPoints = data.map(p => new THREE.Vector3(p.x * M_TO_KM, p.y * M_TO_KM, p.z * M_TO_KM));
-            // Closed orbit path (the track spans a full 24 h revolution).
-            if (moonPoints.length > 1) {
-                if (moonOrbitLine) scene.remove(moonOrbitLine);
-                moonOrbitLine = new THREE.LineLoop(
-                    new THREE.BufferGeometry().setFromPoints(moonPoints),
-                    new THREE.LineBasicMaterial({ color: 0x888888, transparent: true, opacity: 0.5 })
-                );
-                scene.add(moonOrbitLine);
-                moon.position.copy(moonPoints[0]);
-            }
+            const geom = new THREE.BufferGeometry().setFromPoints(moonPoints);
+            moonOrbitLine = new THREE.Line(geom, new THREE.LineBasicMaterial({ color: 0x888888, transparent: true, opacity: 0.5 }));
+            scene.add(moonOrbitLine);
         });
 
         // --- Core Functions ---
@@ -251,6 +249,7 @@
 
             activeSatellites.push({
                 name: satData.name, params: satData.params, trajectory: satData.trajectory,
+                period_s: satData.period_s || 5400, // default 90m if missing
                 mesh, line, points: pts, times: tms, color
             });
 
@@ -264,6 +263,62 @@
             selectedSatIndex = -1;
             updateCameraDropdown();
             renderSidebar();
+        }
+
+        function newProject() {
+            clearSatellites();
+            document.getElementById('save-name').value = '';
+            globalTimeIdx = 0;
+            floatTimeIdx = 0;
+        }
+
+        function exportData() {
+            if (activeSatellites.length === 0) {
+                alert("No active satellites to export.");
+                return;
+            }
+
+            let csvContent = "Satellite,Time(s),X(m),Y(m),Z(m),VX(m/s),VY(m/s),VZ(m/s)\n";
+
+            activeSatellites.forEach(sat => {
+                const T = sat.period_s;
+                const step = T / 6.0;
+                
+                const times = sat.times;
+                if (times.length === 0) return;
+                
+                const t_end = times[times.length - 1];
+                const t_start = Math.max(0, t_end - 10 * T);
+                
+                let current_t = t_start;
+                
+                while (current_t <= t_end) {
+                    // Find closest index
+                    let closestIdx = 0;
+                    let minDiff = Infinity;
+                    for (let i = 0; i < times.length; i++) {
+                        let diff = Math.abs(times[i] - current_t);
+                        if (diff < minDiff) {
+                            minDiff = diff;
+                            closestIdx = i;
+                        }
+                    }
+                    
+                    const pt = sat.trajectory[closestIdx];
+                    csvContent += `${sat.name},${pt.t.toFixed(2)},${pt.x.toFixed(2)},${pt.y.toFixed(2)},${pt.z.toFixed(2)},${pt.vx.toFixed(4)},${pt.vy.toFixed(4)},${pt.vz.toFixed(4)}\n`;
+                    
+                    current_t += step;
+                }
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", "trajectory_export.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
 
         function updateCameraDropdown() {
@@ -336,7 +391,7 @@
             if(!name) return alert("Enter a name");
             const payload = {
                 filename: name,
-                satellites: activeSatellites.map(s => ({name: s.name, params: s.params, trajectory: s.trajectory, color: s.color}))
+                satellites: activeSatellites.map(s => ({name: s.name, params: s.params, period_s: s.period_s, trajectory: s.trajectory, color: s.color}))
             };
             await fetch('/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
             alert("Saved!");
@@ -391,16 +446,17 @@
                 sat.mesh.position.copy(sat.points[idx]);
             });
 
-            // Camera Target (Moon selection rides along: preserve the
-            // viewer's offset while tracking the Moon's motion).
-            if(selectedSatIndex === -2) {
-                camera.position.add(moon.position.clone().sub(controls.target));
-                controls.target.copy(moon.position);
-            }
-            else if(selectedSatIndex >= 0 && activeSatellites[selectedSatIndex]) {
-                controls.target.copy(activeSatellites[selectedSatIndex].mesh.position);
+            // Camera Target
+            if(selectedSatIndex === -2 && moonPoints.length > 0) {
+                // To keep the moon smoothly in view, apply an offset based on its position
+                if (controls) {
+                    camera.position.add(moon.position.clone().sub(controls.target));
+                    controls.target.copy(moon.position);
+                }
+            } else if(selectedSatIndex >= 0 && activeSatellites[selectedSatIndex]) {
+                if (controls) controls.target.copy(activeSatellites[selectedSatIndex].mesh.position);
             } else {
-                controls.target.set(0,0,0);
+                if (controls) controls.target.set(0,0,0);
             }
 
             // Update Telemetry if focused
