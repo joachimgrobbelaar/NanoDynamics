@@ -51,6 +51,12 @@
             z-index: 100;
         }
 
+        /* View-settings panel: docked below the top nav so it can never
+           cover the Save/Load buttons (click its title to collapse it). */
+        #gui-container {
+            position: absolute; top: 60px; right: 10px; z-index: 90;
+        }
+
         /* Modal */
         #modal-overlay {
             display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -75,6 +81,8 @@
         <select id="load-dropdown"><option value="">Select File...</option></select>
         <button onclick="loadSim()">Load</button>
     </div>
+
+    <div id="gui-container"></div>
 
     <div id="sidebar">
         <h3>Active Satellites</h3>
@@ -125,13 +133,33 @@
         // --- Three.js Setup ---
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 2000000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
+        let renderer;
+        try {
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+        } catch (e) {
+            const errorBanner = document.createElement('div');
+            errorBanner.style.position = 'absolute';
+            errorBanner.style.top = '50%';
+            errorBanner.style.left = '50%';
+            errorBanner.style.transform = 'translate(-50%, -50%)';
+            errorBanner.style.color = 'white';
+            errorBanner.style.background = 'red';
+            errorBanner.style.padding = '20px';
+            errorBanner.style.zIndex = '1000';
+            errorBanner.innerText = 'WebGL Initialization Failed: ' + e.message;
+            document.body.appendChild(errorBanner);
+            console.error("WebGL failed to initialize:", e);
+            // We cannot proceed with 3D rendering, but we shouldn't crash the rest of the JS.
+        }
 
-        const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.dampingFactor = 0.05;
+        let controls;
+        if (renderer) {
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+        }
 
         // Lighting & Textures
         const sunLight = new THREE.DirectionalLight(0xffffff, 1.2);
@@ -163,10 +191,13 @@
         controls.target.copy(earth.position);
 
         // --- GUI Setup ---
-        const gui = new lil.GUI({ title: 'View Settings' });
+        const gui = new lil.GUI({ title: 'View Settings', container: document.getElementById('gui-container') });
         const simSettings = { playbackSpeed: 5, cameraTarget: 'Earth' };
         gui.add(simSettings, 'playbackSpeed', 0, 20, 1).name('Playback Speed');
-        const cameraTargetCtrl = gui.add(simSettings, 'cameraTarget', ['Earth', 'Moon']).name('Camera Focus');
+        // NOTE: lil-gui's .options() DESTROYS the controller and returns a
+        // fresh one without handlers, so this must be re-assignable and the
+        // handler re-attached on every refresh (see updateCameraDropdown).
+        let cameraTargetCtrl = gui.add(simSettings, 'cameraTarget', ['Earth', 'Moon']).name('Camera Focus');
         // Snap the camera to a vantage point near the Moon; the animation
         // loop then keeps the target glued to it (follow-cam).
         function focusMoon() {
@@ -178,12 +209,13 @@
             }
             renderSidebar();
         }
-        cameraTargetCtrl.onChange(v => {
+        function handleFocusChange(v) {
             if(v === 'Earth') { selectedSatIndex = -1; controls.target.set(0,0,0); }
             else if(v === 'Moon') focusMoon();
             else selectedSatIndex = activeSatellites.findIndex(s => s.name === v);
             renderSidebar();
-        });
+        }
+        cameraTargetCtrl.onChange(handleFocusChange);
 
         // --- Fetch Moon ---
         let moonOrbitLine = null;
@@ -236,8 +268,18 @@
 
         function updateCameraDropdown() {
             const opts = ['Earth', 'Moon', ...activeSatellites.map(s => s.name)];
+            // Keep a valid selection, then rebuild: .options() destroys the
+            // old controller, so re-attach the focus handler to the new one.
+            if (!opts.includes(simSettings.cameraTarget)) {
+                simSettings.cameraTarget = 'Earth';
+                selectedSatIndex = -1;
+            }
             if (cameraTargetCtrl && typeof cameraTargetCtrl.options === 'function') {
-                cameraTargetCtrl.options(opts);
+                const fresh = cameraTargetCtrl.options(opts);
+                if (fresh && fresh !== cameraTargetCtrl) {
+                    cameraTargetCtrl = fresh;
+                    cameraTargetCtrl.onChange(handleFocusChange);
+                }
             }
         }
 
@@ -380,17 +422,17 @@
                 document.getElementById('telemetry').innerHTML = `Time: ${(globalTimeIdx*60).toFixed(1)} s<br>Altitude: -- km<br>Velocity: -- km/s`;
             }
 
-            controls.update();
-            renderer.render(scene, camera);
+            if (controls) controls.update();
+            if (renderer) renderer.render(scene, camera);
         }
         
         populateSaves();
-        animate();
+        if (renderer) animate();
 
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
+            if (renderer) renderer.setSize(window.innerWidth, window.innerHeight);
         });
     </script>
 </body>
