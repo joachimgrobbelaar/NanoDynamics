@@ -496,6 +496,32 @@
                 </div>
             </div>
 
+            <!-- Training & Prediction Accuracy History Section -->
+            <div style="margin-bottom:10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                    <span style="font-size:11px; font-weight:600; color:#cbd5e1;">📜 Training & Accuracy Log History</span>
+                    <button onclick="toggleMLHistoryTable()" style="background:#1e293b; border:1px solid #475569; color:#94a3b8; font-size:10px; padding:2px 8px; border-radius:3px; cursor:pointer;">Toggle Log View</button>
+                </div>
+                <div id="ml-history-container" style="max-height:120px; overflow-y:auto; background:#0b1120; border:1px solid #1e293b; border-radius:4px; font-size:11px;">
+                    <table style="width:100%; border-collapse:collapse; text-align:left; color:#cbd5e1;">
+                        <thead style="background:#1e293b; position:sticky; top:0; color:#94a3b8; font-size:10px;">
+                            <tr>
+                                <th style="padding:4px 6px;">Time (UTC)</th>
+                                <th style="padding:4px 6px;">Pairs</th>
+                                <th style="padding:4px 6px;">Epochs</th>
+                                <th style="padding:4px 6px;">Final Loss</th>
+                                <th style="padding:4px 6px;">Mean Drift</th>
+                                <th style="padding:4px 6px;">Final Drift</th>
+                                <th style="padding:4px 6px;">Eval Result</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ml-history-tbody">
+                            <tr><td colspan="7" style="text-align:center; padding:8px; color:#64748b;">No training or evaluation history yet.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <div id="ml-log-readout" style="display:none; max-height:120px; overflow-y:auto; background:#020617; border:1px solid #1e293b; padding:8px; border-radius:4px; font-family:monospace; font-size:11px; color:#38bdf8; margin-bottom:12px;"></div>
 
             <div class="modal-buttons">
@@ -2088,10 +2114,62 @@
     async function openMLModal() {
         document.getElementById('ml-modal-overlay').style.display = 'flex';
         await fetchMLStatus();
+        await fetchMLHistory();
     }
 
     function closeMLModal() {
         document.getElementById('ml-modal-overlay').style.display = 'none';
+    }
+
+    function toggleMLHistoryTable() {
+        const cont = document.getElementById('ml-history-container');
+        if (cont) {
+            cont.style.display = cont.style.display === 'none' ? 'block' : 'none';
+        }
+    }
+
+    async function fetchMLHistory() {
+        try {
+            const res = await fetch('/ai/history');
+            if (!res.ok) return;
+            const data = await res.json();
+            const tbody = document.getElementById('ml-history-tbody');
+            if (!tbody) return;
+
+            const evals = data.evaluation_history || [];
+            if (evals.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:8px; color:#64748b;">No training or evaluation history yet.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '';
+            // Display most recent first
+            evals.slice().reverse().forEach((item, idx) => {
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid #1e293b';
+                
+                const timeStr = item.timestamp ? new Date(item.timestamp).toISOString().replace('T', ' ').substring(0, 19) : '—';
+                const pairs = (item.n_pairs || 0).toLocaleString();
+                const epochs = item.epochs || '—';
+                const finalLoss = item.final_loss !== undefined ? item.final_loss.toExponential(3) : '—';
+                const meanDrift = item.mean_drift_pct !== undefined ? `${item.mean_drift_pct.toFixed(2)}%` : '—';
+                const finalDrift = item.final_drift_pct !== undefined ? `${item.final_drift_pct.toFixed(2)}%` : '—';
+                const passBadge = item.pass_5pct ? '<span style="color:#22c55e; font-weight:600;">PASS (&lt;5%)</span>' : '<span style="color:#ef4444; font-weight:600;">FAIL (&ge;5%)</span>';
+
+                tr.innerHTML = `
+                    <td style="padding:4px 6px; font-family:monospace; color:#94a3b8; font-size:10px;">${timeStr}</td>
+                    <td style="padding:4px 6px;">${pairs}</td>
+                    <td style="padding:4px 6px;">${epochs}</td>
+                    <td style="padding:4px 6px; font-family:monospace; color:#38bdf8;">${finalLoss}</td>
+                    <td style="padding:4px 6px;">${meanDrift}</td>
+                    <td style="padding:4px 6px; font-weight:600; color:#facc15;">${finalDrift}</td>
+                    <td style="padding:4px 6px;">${passBadge}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (e) {
+            console.warn('Failed to load ML history:', e);
+        }
     }
 
     async function fetchMLStatus() {
@@ -2184,6 +2262,7 @@
             if (r.best_loss) lossText.innerText = `Best Loss: ${r.best_loss.toExponential(4)}`;
             logBox.innerText += `>>> Training complete!\n>>> Status: ${r.status}\n>>> Pairs trained: ${r.n_pairs || 'N/A'}\n>>> Final Rollout Drift: ${r.final_drift_pct ? r.final_drift_pct.toFixed(2)+'%' : 'N/A'}\n>>> Mean Drift: ${r.mean_drift_pct ? r.mean_drift_pct.toFixed(2)+'%' : 'N/A'}\n>>> Checkpoint saved to: ${r.ckpt || 'ai/checkpoints/agent/transition.pt'}\n`;
             await fetchMLStatus();
+            await fetchMLHistory();
         } catch (err) {
             logBox.innerText += `>>> Error during training: ${err.message}\n`;
         } finally {

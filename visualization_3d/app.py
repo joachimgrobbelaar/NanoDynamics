@@ -601,14 +601,55 @@ async def api_train_ml(req: MLTrainRequest = MLTrainRequest()):
 @app.get("/ai/progress")
 def api_get_ml_progress():
     """Return live training iteration progress."""
-    live_path = os.path.join(PROJECT_ROOT, "ai", "data", "training_live.json")
-    if os.path.exists(live_path):
+    possible_paths = [
+        os.path.join(PROJECT_ROOT, "ai", "data", "training_live.json"),
+        os.path.join(PROJECT_ROOT, "ai", "data", "combined_dt60", "training_live.json"),
+    ]
+    for p in possible_paths:
+        if os.path.exists(p):
+            try:
+                with open(p, "r") as f:
+                    return json.load(f)
+            except Exception:
+                pass
+    return {"status": "idle", "epoch": 0, "total_epochs": 0, "progress_pct": 0.0}
+
+
+@app.get("/ai/history")
+def api_get_ml_history():
+    """Return historical log of training sessions and prediction accuracy evaluations."""
+    eval_history = []
+    eval_log_path = os.path.join(PROJECT_ROOT, "ai", "data", "evaluation_history.jsonl")
+    if os.path.exists(eval_log_path):
         try:
-            with open(live_path, "r") as f:
-                return json.load(f)
+            with open(eval_log_path, "r") as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        eval_history.append(json.loads(line))
         except Exception:
             pass
-    return {"status": "idle", "epoch": 0, "total_epochs": 0, "progress_pct": 0.0}
+
+    train_history = []
+    train_log_path = os.path.join(PROJECT_ROOT, "ai", "checkpoints", "agent", "training_history.jsonl")
+    if not os.path.exists(train_log_path):
+        train_log_path = os.path.join(PROJECT_ROOT, "ai", "data", "training_history.jsonl")
+    if os.path.exists(train_log_path):
+        try:
+            with open(train_log_path, "r") as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        train_history.append(json.loads(line))
+        except Exception:
+            pass
+
+    return {
+        "evaluation_history": eval_history,
+        "training_history": train_history,
+        "count_evaluations": len(eval_history),
+        "count_training_runs": len(train_history)
+    }
 
 
 @app.get("/ai/status")
@@ -629,5 +670,6 @@ def api_get_ml_status():
         except Exception:
             pass
     return {"status": "idle", "message": "No model trained yet. Run simulations and click Train ML Surrogate."}
+
 
 

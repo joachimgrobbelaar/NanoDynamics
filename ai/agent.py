@@ -99,15 +99,38 @@ def run_once(data_dir=None, ckpt_dir=None, csv_paths=(), dt=60.0, min_pairs=50,
                                   resume=resume)
     res = evaluate_rollout(ckpt_path, alt_km=alt_km, inc_deg=inc_deg, orbits=1.0)
     final_drift = float(res["drift_pct"][-1])
-    report = {"status": "trained", "data_hash": data_hash,
-              "n_pairs": int(sum(len(a) for a in xs)), "ckpt": ckpt_path,
-              "final_drift_pct": round(final_drift, 3),
-              "mean_drift_pct": round(float(res["drift_pct"].mean()), 3),
-              "pass_5pct": bool(final_drift < 5.0)}
+    mean_drift = float(res["drift_pct"].mean())
+    max_drift = float(res["drift_pct"].max())
+
+    import datetime
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    report = {
+        "timestamp": now_iso,
+        "status": "trained",
+        "data_hash": data_hash,
+        "n_pairs": int(sum(len(a) for a in xs)),
+        "ckpt": ckpt_path,
+        "final_drift_pct": round(final_drift, 3),
+        "mean_drift_pct": round(mean_drift, 3),
+        "max_drift_pct": round(max_drift, 3),
+        "pass_5pct": bool(final_drift < 5.0),
+        "eval_orbit": {"alt_km": alt_km, "inc_deg": inc_deg, "orbits": 1.0, "dt": dt},
+        "resumed": bool(resume),
+        "epochs": epochs,
+    }
     with open(state_path, "w") as f:
         json.dump(report, f, indent=2)
     with open(os.path.join(data_dir, "agent_report.json"), "w") as f:
         json.dump(report, f, indent=2)
+
+    # Append to persistent prediction accuracy history log
+    eval_log_path = os.path.join(data_dir, "evaluation_history.jsonl")
+    try:
+        with open(eval_log_path, "a") as f:
+            f.write(json.dumps(report) + "\n")
+    except Exception:
+        pass
+
     print(f"Agent report: {report['n_pairs']} pairs -> drift {report['final_drift_pct']}% "
           f"({'PASS' if report['pass_5pct'] else 'FAIL'} vs 5%).")
     return report

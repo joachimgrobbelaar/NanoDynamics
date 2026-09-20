@@ -70,6 +70,8 @@ def train(data_dir=None, out_dir=None, epochs=300, hidden=32, layers=2,
             tot += loss.item() * len(b)
         
         current_loss = tot / n
+        if epoch == 1:
+            initial_loss = current_loss
         if current_loss < best_loss:
             best_loss = current_loss
 
@@ -81,11 +83,12 @@ def train(data_dir=None, out_dir=None, epochs=300, hidden=32, layers=2,
             "progress_pct": round((epoch / epochs) * 100.0, 1),
             "status": "training" if epoch < epochs else "completed",
         }
-        try:
-            with open(live_path, "w") as f:
-                json.dump(live_info, f)
-        except Exception:
-            pass
+        for lpath in [live_path, os.path.join(AI_DIR, "data", "training_live.json")]:
+            try:
+                with open(lpath, "w") as f:
+                    json.dump(live_info, f)
+            except Exception:
+                pass
 
         if callback is not None:
             callback(live_info)
@@ -120,6 +123,29 @@ def train(data_dir=None, out_dir=None, epochs=300, hidden=32, layers=2,
             pass
         print(f"Saved checkpoint + TorchScript trace -> {out_dir}/ "
               f"({param_count(model)} params, ~{param_count(model) * 4 / 1024:.0f} KB fp32)")
+
+    # Record training run event in log file
+    import datetime
+    log_entry = {
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "event": "training_run",
+        "epochs": epochs,
+        "hidden": hidden,
+        "layers": layers,
+        "lr": lr,
+        "initial_loss": float(initial_loss if 'initial_loss' in locals() else best_loss),
+        "final_loss": float(best_loss),
+        "n_samples": int(len(x)),
+        "resumed": bool(resume),
+    }
+    for target_dir in filter(None, [data_dir, out_dir]):
+        log_file = os.path.join(target_dir, "training_history.jsonl")
+        try:
+            with open(log_file, "a") as f:
+                f.write(json.dumps(log_entry) + "\n")
+        except Exception:
+            pass
+
     print("Training complete.")
     return model, ckpt
 
