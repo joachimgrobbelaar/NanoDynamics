@@ -212,6 +212,26 @@ def _compute_forces(prop: OrbitPropagator, t_arr, r_arr, v_arr):
     return forces
 
 
+ML_LOG_PATH = os.path.join(PROJECT_ROOT, "ai", "data", "sim_log.jsonl")
+
+
+def _log_sim_for_ml(params: SatelliteParams, dt_eval: float, chunk: dict) -> None:
+    """Best-effort append of each /simulate run for the local ML agent.
+
+    Never raises: logging must not break the simulation response.
+    """
+    try:
+        os.makedirs(os.path.dirname(ML_LOG_PATH), exist_ok=True)
+        rec = {"name": params.name, "params": params.model_dump(),
+               "dt": float(dt_eval),
+               "trajectory": {k: chunk[k] for k in ("t", "x", "y", "z", "vx", "vy", "vz")
+                              if k in chunk}}
+        with open(ML_LOG_PATH, "a") as f:
+            f.write(json.dumps(rec) + "\n")
+    except Exception:
+        pass
+
+
 def _propagate_chunk(prop: OrbitPropagator, initial_state, t_start: float,
                      chunk_duration: float, dt_eval: float = 10.0):
     """Propagate a chunk. Returns PropagationResult."""
@@ -290,6 +310,8 @@ async def simulate_satellite(params: SatelliteParams):
         # Return final Cartesian state for /stream continuity
         last_state = res.r[-1].tolist() + res.v[-1].tolist()
         period_s = 2.0 * np.pi * np.sqrt((a_m**3) / body["mu"])
+
+        _log_sim_for_ml(params, dt_eval, chunk)
 
         return {
             "name": params.name,

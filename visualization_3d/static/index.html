@@ -768,6 +768,71 @@
         updateSatelliteTrail(sat, simTime);
     }
 
+    function interpAt(buf, t) {
+        if (!buf || !buf.t || buf.t.length === 0) return 0;
+        let lo = 0, hi = buf.t.length - 1;
+        if (t <= buf.t[lo]) return lo;
+        if (t >= buf.t[hi]) return hi;
+        while (hi - lo > 1) {
+            const mid = (lo + hi) >> 1;
+            if (buf.t[mid] <= t) lo = mid; else hi = mid;
+        }
+        const frac = (t - buf.t[lo]) / (buf.t[hi] - buf.t[lo] + 1e-12);
+        return { lo, hi, frac };
+    }
+
+    function getLocalPos(buf, idx) {
+        if (typeof idx === 'number') {
+            return new THREE.Vector3(buf.x[idx] * M_TO_KM, buf.y[idx] * M_TO_KM, buf.z[idx] * M_TO_KM);
+        }
+        const { lo, hi, frac } = idx;
+        return new THREE.Vector3(
+            (buf.x[lo] + frac * (buf.x[hi] - buf.x[lo])) * M_TO_KM,
+            (buf.y[lo] + frac * (buf.y[hi] - buf.y[lo])) * M_TO_KM,
+            (buf.z[lo] + frac * (buf.z[hi] - buf.z[lo])) * M_TO_KM
+        );
+    }
+
+    function getForce(buf, idx, key) {
+        if (!buf.forces || !buf.forces[key] || buf.forces[key].length === 0) return new THREE.Vector3();
+        const i = typeof idx === 'number' ? idx : idx.lo;
+        const f = buf.forces[key][i];
+        return f ? new THREE.Vector3(f[0], f[1], f[2]) : new THREE.Vector3();
+    }
+
+    async function fetchNextChunk(sat) {
+        if (sat.fetching || sat.reentry) return;
+        sat.fetching = true;
+        try {
+            const res = await fetch('/stream', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    params: sat.params,
+                    t_start: sat.lastT,
+                    state: sat.lastState,
+                    chunk_duration: 86400
+                })
+            });
+            const data = await res.json();
+            if (!res.ok) { console.error('Stream error:', data.detail); return; }
+            appendChunk(sat, data.trajectory);
+            sat.lastState = data.last_state;
+            sat.lastT = data.last_t;
+            if (data.reentry && !sat.reentry) {
+                sat.reentry = true;
+                sat.deorbitEpoch = data.reentry_time || sat.lastT;
+                sat.lifetimeSeconds = sat.deorbitEpoch;
+                sat.deorbitTime = formatTime(sat.lifetimeSeconds);
+                renderSidebar();
+            }
+        } catch (e) {
+            console.error('fetchNextChunk error:', e);
+        } finally {
+            sat.fetching = false;
+        }
+    }
+
     function createAvatarSprite(iconType, hexColor) {
         const canvas = document.createElement('canvas');
         canvas.width = 128;
