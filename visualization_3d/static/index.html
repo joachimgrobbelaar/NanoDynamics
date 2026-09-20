@@ -149,6 +149,7 @@
         <button onclick="newProject()">New Project</button>
         <button onclick="openModal()">+ New Satellite</button>
         <button class="lab-btn" onclick="openExperimentModal()">🧪 Experiment Lab</button>
+        <button class="lab-btn" onclick="openMLModal()" style="background:#7c3aed;">🤖 ML Surrogate</button>
         <button onclick="exportData()" style="background:#059669;">Export CSV</button>
         <div class="nav-sep"></div>
         <button class="view-btn" onclick="focusView('Earth')">🌍 Earth View</button>
@@ -172,6 +173,19 @@
 
         <h3>Active Satellites</h3>
         <ul id="sat-list"></ul>
+
+        <h3>🛰️ Inter-Satellite Kinematics</h3>
+        <div id="intersat-panel" style="background:#0f172a; padding:8px; border-radius:6px; border:1px solid #334155; font-size:12px; margin-bottom:12px;">
+            <div style="display:flex; gap:6px; margin-bottom:6px; align-items:center;">
+                <select id="isat-a" style="flex:1; background:#1e293b; color:white; border:1px solid #475569; padding:4px; border-radius:4px; font-size:11px;" onchange="updateInterSatCalculation()"></select>
+                <span style="color:#94a3b8; font-weight:bold;">↔</span>
+                <select id="isat-b" style="flex:1; background:#1e293b; color:white; border:1px solid #475569; padding:4px; border-radius:4px; font-size:11px;" onchange="updateInterSatCalculation()"></select>
+            </div>
+            <div><span class="label">3D Distance: </span><span id="isat-dist" class="val-highlight">— km</span></div>
+            <div><span class="label">Rel. Speed (Δv): </span><span id="isat-rel-v" class="val-accent">— km/s</span></div>
+            <div><span class="label">Range Rate: </span><span id="isat-range-rate">— km/s</span></div>
+            <div><span class="label">Line of Sight: </span><span id="isat-los" style="font-weight:600; color:#4ade80;">—</span></div>
+        </div>
 
         <h3>Telemetry & Geodetic Coords</h3>
         <div id="telemetry-panel">
@@ -250,8 +264,10 @@
             <ul id="burn-history-list"></ul>
         </div>
 
-        <div id="force-toggle">
+        <div id="force-toggle" style="display:flex; flex-direction:column; gap:6px;">
             <label><input type="checkbox" id="show-forces" onchange="toggleForceVectors()"> Show Force Vectors (3D Arrows)</label>
+            <label><input type="checkbox" id="show-body-axes" checked onchange="toggleBodyAxes()"> Show Body Axes (X:Red, Y:Green, Z:Blue)</label>
+            <label><input type="checkbox" id="show-intersat-line" checked onchange="toggleInterSatLine()"> Show Inter-Sat Laser Link</label>
         </div>
     </div>
 
@@ -417,6 +433,62 @@
         </div>
     </div>
 
+    <!-- ML Surrogate Lab Modal -->
+    <div id="ml-modal-overlay" class="modal-overlay">
+        <div class="modal-content" style="max-width:650px;">
+            <h3>🤖 ML Surrogate & TinyML Experimentation Lab</h3>
+            <div style="font-size:12px; color:#cbd5e1; margin-bottom:12px; line-height:1.4;">
+                Train a neural residual transition surrogate (<em>S<sub>t</sub> → S<sub>t+Δt</sub></em>) on simulation data accumulated from active runs, saved scenarios, and CSV exports. Evaluates one-step rollout prediction accuracy against <code>solve_ivp</code> numerical ground truth.
+            </div>
+            
+            <div id="ml-status-box" style="background:#0f172a; border:1px solid #334155; border-radius:6px; padding:10px; margin-bottom:12px; font-size:12px;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                    <strong style="color:#a78bfa;">Model Status:</strong>
+                    <span id="ml-status-badge" style="color:#38bdf8;">Checking...</span>
+                </div>
+                <div><span class="label">Training Pairs: </span><span id="ml-pairs-val">—</span></div>
+                <div><span class="label">Final Drift vs Numerical RK45: </span><span id="ml-drift-val" class="val-highlight">—</span></div>
+                <div><span class="label">Mean Orbit Drift: </span><span id="ml-mean-drift-val">—</span></div>
+                <div><span class="label">Checkpoint: </span><span id="ml-ckpt-val" style="font-family:monospace; color:#94a3b8; font-size:11px;">—</span></div>
+            </div>
+
+            <div class="form-section">
+                <div class="form-section-title">Training Parameters</div>
+                <div style="display:flex; gap:10px;">
+                    <div class="form-group" style="flex:1;">
+                        <label>Epochs:</label>
+                        <select id="ml-epochs">
+                            <option value="100">100 (Fast Smoke)</option>
+                            <option value="300" selected>300 (Standard)</option>
+                            <option value="600">600 (High Precision)</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label>Hidden Units:</label>
+                        <select id="ml-hidden">
+                            <option value="32" selected>32 (TinyML / ESP32 ~36KB)</option>
+                            <option value="64">64 (Standard Surrogate)</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label>Force Retrain:</label>
+                        <select id="ml-force">
+                            <option value="true" selected>Yes (Fresh Train)</option>
+                            <option value="false">No (Cache Hash)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div id="ml-log-readout" style="display:none; max-height:120px; overflow-y:auto; background:#020617; border:1px solid #1e293b; padding:8px; border-radius:4px; font-family:monospace; font-size:11px; color:#38bdf8; margin-bottom:12px;"></div>
+
+            <div class="modal-buttons">
+                <button onclick="closeMLModal()" style="background:#475569; color:white;">Close</button>
+                <button id="ml-train-btn" onclick="startMLTraining()" style="background:#7c3aed; color:white; font-weight:600;">⚡ Train ML Surrogate</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -557,6 +629,28 @@
     maneuverPreviewLine.visible = false;
     scene.add(maneuverPreviewLine);
 
+    // ── Coordinate Axes for Earth and Moon ──
+    const axesHelperEarth = new THREE.AxesHelper(R_EARTH_KM * 1.5);
+    scene.add(axesHelperEarth);
+
+    const axesHelperMoon = new THREE.AxesHelper(R_MOON_KM * 2.2);
+    axesHelperMoon.visible = false;
+    moon.add(axesHelperMoon);
+
+    // ── Inter-Satellite Laser / Ranging Link ──
+    const interSatGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+    const interSatMat = new THREE.LineDashedMaterial({
+        color: 0x38bdf8,
+        dashSize: 300,
+        gapSize: 150,
+        linewidth: 2,
+        transparent: true,
+        opacity: 0.85
+    });
+    const interSatLine = new THREE.Line(interSatGeo, interSatMat);
+    interSatLine.visible = false;
+    scene.add(interSatLine);
+
     camera.position.set(R_EARTH_KM * 3.5, R_EARTH_KM * 2.2, R_EARTH_KM * 3.5);
     if (controls) controls.target.set(0, 0, 0);
 
@@ -564,9 +658,51 @@
     let activeSatellites = [];
     let selectedSatIndex = -1;
     let cameraFocusMode = 'Earth';
+    let showAxesGlobal = true;
+    let showInterSatLineGlobal = true;
     const clock = new THREE.Clock();
     let simTime = 0.0;
     let lastExperimentCSV = null;
+
+    function updateBodyAxes() {
+        if (!showAxesGlobal) {
+            axesHelperEarth.visible = false;
+            axesHelperMoon.visible = false;
+            return;
+        }
+        if (cameraFocusMode === 'Earth') {
+            axesHelperEarth.visible = true;
+            axesHelperMoon.visible = false;
+        } else if (cameraFocusMode === 'Moon') {
+            axesHelperEarth.visible = false;
+            axesHelperMoon.visible = true;
+        } else if (cameraFocusMode === 'System') {
+            axesHelperEarth.visible = true;
+            axesHelperMoon.visible = true;
+        } else if (selectedSatIndex >= 0 && activeSatellites[selectedSatIndex]) {
+            const sat = activeSatellites[selectedSatIndex];
+            if (sat.parentBody === 'Moon') {
+                axesHelperEarth.visible = false;
+                axesHelperMoon.visible = true;
+            } else {
+                axesHelperEarth.visible = true;
+                axesHelperMoon.visible = false;
+            }
+        } else {
+            axesHelperEarth.visible = true;
+            axesHelperMoon.visible = false;
+        }
+    }
+
+    function toggleBodyAxes() {
+        showAxesGlobal = document.getElementById('show-body-axes').checked;
+        updateBodyAxes();
+    }
+
+    function toggleInterSatLine() {
+        showInterSatLineGlobal = document.getElementById('show-intersat-line').checked;
+        if (!showInterSatLineGlobal && interSatLine) interSatLine.visible = false;
+    }
 
     // ── Body Constraints Configuration ────────────────────────────────────────
     const BODY_DEFAULTS = {
@@ -637,6 +773,7 @@
                 document.getElementById('maneuver-panel').style.display = 'block';
             }
         }
+        updateBodyAxes();
         renderSidebar();
     }
     cameraTargetCtrl.onChange(handleFocusChange);
@@ -645,6 +782,43 @@
         simSettings.cameraTarget = modeName;
         handleFocusChange(modeName);
         if (cameraTargetCtrl) cameraTargetCtrl.setValue(modeName);
+    }
+
+    function updateInterSatDropdowns() {
+        const selA = document.getElementById('isat-a');
+        const selB = document.getElementById('isat-b');
+        if (!selA || !selB) return;
+        const curA = selA.value;
+        const curB = selB.value;
+        selA.innerHTML = '';
+        selB.innerHTML = '';
+        if (activeSatellites.length === 0) {
+            selA.innerHTML = '<option value="">No Satellites</option>';
+            selB.innerHTML = '<option value="">No Satellites</option>';
+            updateInterSatCalculation();
+            return;
+        }
+        activeSatellites.forEach((sat, idx) => {
+            const optA = document.createElement('option');
+            optA.value = idx;
+            optA.textContent = `${sat.parentBody==='Moon'?'🌕':'🌍'} ${sat.name}`;
+            selA.appendChild(optA);
+
+            const optB = document.createElement('option');
+            optB.value = idx;
+            optB.textContent = `${sat.parentBody==='Moon'?'🌕':'🌍'} ${sat.name}`;
+            selB.appendChild(optB);
+        });
+        if (curA !== '' && parseInt(curA) < activeSatellites.length) selA.value = curA;
+        else selA.value = '0';
+        if (curB !== '' && parseInt(curB) < activeSatellites.length && (curB !== selA.value || activeSatellites.length < 2)) {
+            selB.value = curB;
+        } else if (activeSatellites.length > 1) {
+            selB.value = selA.value === '0' ? '1' : '0';
+        } else {
+            selB.value = '0';
+        }
+        updateInterSatCalculation();
     }
 
     function updateCameraDropdown() {
@@ -661,6 +835,8 @@
                 cameraTargetCtrl.onChange(handleFocusChange);
             }
         }
+        updateInterSatDropdowns();
+        updateBodyAxes();
     }
 
     function getMoonPosition(t) {
@@ -1182,6 +1358,11 @@
                 }
                 maneuverPreviewLine.geometry.setFromPoints(pts);
                 maneuverPreviewLine.computeLineDistances();
+                if (sat.parentBody === 'Moon') {
+                    maneuverPreviewLine.position.copy(moon.position);
+                } else {
+                    maneuverPreviewLine.position.set(0, 0, 0);
+                }
                 maneuverPreviewLine.visible = true;
 
                 if (data.reentry) {
@@ -1767,6 +1948,197 @@
         document.getElementById('modal-overlay').style.display = 'none';
     }
 
+    // ── Inter-Satellite Kinematics Calculation ───────────────────────────────
+    function updateInterSatCalculation() {
+        const selA = document.getElementById('isat-a');
+        const selB = document.getElementById('isat-b');
+        const distEl = document.getElementById('isat-dist');
+        const relVEl = document.getElementById('isat-rel-v');
+        const rrEl = document.getElementById('isat-range-rate');
+        const losEl = document.getElementById('isat-los');
+
+        if (!selA || !selB || activeSatellites.length < 2) {
+            if (distEl) distEl.innerText = '— km (Need ≥ 2 sats)';
+            if (relVEl) relVEl.innerText = '— km/s';
+            if (rrEl) rrEl.innerText = '— km/s';
+            if (losEl) losEl.innerText = '—';
+            if (interSatLine) interSatLine.visible = false;
+            return;
+        }
+
+        const idxA = parseInt(selA.value);
+        const idxB = parseInt(selB.value);
+        if (isNaN(idxA) || isNaN(idxB) || !activeSatellites[idxA] || !activeSatellites[idxB]) {
+            if (interSatLine) interSatLine.visible = false;
+            return;
+        }
+
+        if (idxA === idxB) {
+            distEl.innerText = '0.00 km (Same sat)';
+            relVEl.innerText = '0.00 km/s';
+            rrEl.innerText = '0.00 km/s';
+            losEl.innerHTML = '<span style="color:#22c55e;">Direct Co-located</span>';
+            if (interSatLine) interSatLine.visible = false;
+            return;
+        }
+
+        const satA = activeSatellites[idxA];
+        const satB = activeSatellites[idxB];
+        const posA = satA.mesh.position.clone();
+        const posB = satB.mesh.position.clone();
+
+        const distKm = posA.distanceTo(posB);
+        distEl.innerText = `${distKm >= 1000 ? distKm.toLocaleString(undefined, {maximumFractionDigits: 1}) : distKm.toFixed(2)} km`;
+
+        // Velocities in world inertial frame
+        const interpA = interpAt(satA.buf, simTime);
+        const interpB = interpAt(satB.buf, simTime);
+        const iA = typeof interpA === 'number' ? interpA : interpA.lo;
+        const iB = typeof interpB === 'number' ? interpB : interpB.lo;
+        let velA = new THREE.Vector3((satA.buf.vx[iA]||0)/1000, (satA.buf.vy[iA]||0)/1000, (satA.buf.vz[iA]||0)/1000);
+        let velB = new THREE.Vector3((satB.buf.vx[iB]||0)/1000, (satB.buf.vy[iB]||0)/1000, (satB.buf.vz[iB]||0)/1000);
+
+        if (satA.parentBody === 'Moon') {
+            const vMoon = (2 * Math.PI * R_MOON_ORBIT_KM) / T_MOON_ORBIT_S;
+            const aT = (2 * Math.PI * simTime) / T_MOON_ORBIT_S;
+            velA.add(new THREE.Vector3(-Math.sin(aT)*vMoon, Math.cos(aT)*vMoon*Math.sin(MOON_INC_RAD), Math.cos(aT)*vMoon*Math.cos(MOON_INC_RAD)));
+        }
+        if (satB.parentBody === 'Moon') {
+            const vMoon = (2 * Math.PI * R_MOON_ORBIT_KM) / T_MOON_ORBIT_S;
+            const aT = (2 * Math.PI * simTime) / T_MOON_ORBIT_S;
+            velB.add(new THREE.Vector3(-Math.sin(aT)*vMoon, Math.cos(aT)*vMoon*Math.sin(MOON_INC_RAD), Math.cos(aT)*vMoon*Math.cos(MOON_INC_RAD)));
+        }
+
+        const relV = velA.clone().sub(velB);
+        const relVMag = relV.length();
+        relVEl.innerText = `${relVMag.toFixed(3)} km/s`;
+
+        const dVec = posB.clone().sub(posA);
+        const rangeRate = distKm > 1e-4 ? dVec.dot(relV) / distKm : 0.0;
+        rrEl.innerText = `${rangeRate > 0 ? '+' : ''}${rangeRate.toFixed(3)} km/s`;
+
+        // Check Line-of-Sight Occlusion by Earth and Moon
+        let occluded = false;
+        let blocker = '';
+        const dLen = dVec.length();
+        const dDir = dVec.clone().normalize();
+
+        const tEarth = -posA.dot(dDir);
+        if (tEarth > 0 && tEarth < dLen) {
+            const closestPt = posA.clone().add(dDir.clone().multiplyScalar(tEarth));
+            if (closestPt.length() < R_EARTH_KM) {
+                occluded = true;
+                blocker = 'Earth';
+            }
+        }
+
+        if (!occluded) {
+            const toMoon = moon.position.clone().sub(posA);
+            const tMoon = toMoon.dot(dDir);
+            if (tMoon > 0 && tMoon < dLen) {
+                const closestPt = posA.clone().add(dDir.clone().multiplyScalar(tMoon));
+                if (closestPt.distanceTo(moon.position) < R_MOON_KM) {
+                    occluded = true;
+                    blocker = 'Moon';
+                }
+            }
+        }
+
+        if (occluded) {
+            losEl.innerHTML = `<span style="color:#ef4444;">🔴 Occluded by ${blocker}</span>`;
+            if (interSatLine) {
+                interSatLine.material.color.setHex(0xef4444);
+                interSatLine.material.opacity = 0.5;
+            }
+        } else {
+            losEl.innerHTML = `<span style="color:#22c55e;">🟢 Clear LOS</span>`;
+            if (interSatLine) {
+                interSatLine.material.color.setHex(0x38bdf8);
+                interSatLine.material.opacity = 0.85;
+            }
+        }
+
+        if (interSatLine && showInterSatLineGlobal) {
+            const pts = [posA, posB];
+            interSatLine.geometry.setFromPoints(pts);
+            interSatLine.computeLineDistances();
+            interSatLine.visible = true;
+        } else if (interSatLine) {
+            interSatLine.visible = false;
+        }
+    }
+
+    // ── ML Surrogate Lab Handlers ─────────────────────────────────────────────
+    async function openMLModal() {
+        document.getElementById('ml-modal-overlay').style.display = 'flex';
+        await fetchMLStatus();
+    }
+
+    function closeMLModal() {
+        document.getElementById('ml-modal-overlay').style.display = 'none';
+    }
+
+    async function fetchMLStatus() {
+        const badge = document.getElementById('ml-status-badge');
+        try {
+            const res = await fetch('/ai/status');
+            const data = await res.json();
+            if (data.status === 'trained' || data.status === 'up-to-date') {
+                badge.innerText = `Ready (Trained @ ${data.data_hash || 'Latest'})`;
+                badge.style.color = '#4ade80';
+                document.getElementById('ml-pairs-val').innerText = `${(data.n_pairs || data.n_total_pairs || 0).toLocaleString()} pairs`;
+                const finalDrift = (data.final_drift_pct !== undefined ? data.final_drift_pct : (data.drift_pct ? data.drift_pct[data.drift_pct.length-1] : null));
+                document.getElementById('ml-drift-val').innerText = finalDrift !== null ? `${finalDrift.toFixed(2)}%` : '—';
+                const meanDrift = (data.mean_drift_pct !== undefined ? data.mean_drift_pct : (data.mean_drift ? data.mean_drift : null));
+                document.getElementById('ml-mean-drift-val').innerText = meanDrift !== null ? `${meanDrift.toFixed(2)}%` : '—';
+                document.getElementById('ml-ckpt-val').innerText = data.ckpt || 'ai/checkpoints/agent/transition.pt';
+            } else if (data.status === 'waiting') {
+                badge.innerText = `Waiting for data (${data.n_pairs || 0} pairs)`;
+                badge.style.color = '#f59e0b';
+                document.getElementById('ml-pairs-val').innerText = `${data.n_pairs || 0} pairs`;
+            } else {
+                badge.innerText = data.message || 'Idle / Not Trained';
+                badge.style.color = '#94a3b8';
+            }
+        } catch (e) {
+            badge.innerText = 'Error checking status';
+            badge.style.color = '#ef4444';
+        }
+    }
+
+    async function startMLTraining() {
+        const btn = document.getElementById('ml-train-btn');
+        const logBox = document.getElementById('ml-log-readout');
+        btn.disabled = true;
+        btn.innerText = 'Training Neural Surrogate...';
+        logBox.style.display = 'block';
+        logBox.innerText = '>>> Initiating ingest from simulation logs, saved scenarios, and CSV exports...\n>>> Fitting residual transition network (S_t -> S_t+dt)...\n';
+
+        try {
+            const payload = {
+                epochs: parseInt(document.getElementById('ml-epochs').value) || 300,
+                hidden: parseInt(document.getElementById('ml-hidden').value) || 32,
+                layers: 2,
+                force: document.getElementById('ml-force').value === 'true'
+            };
+            const res = await fetch('/ai/train', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || res.status);
+            const r = data.result || {};
+            logBox.innerText += `>>> Training complete!\n>>> Status: ${r.status}\n>>> Pairs trained: ${r.n_pairs || 'N/A'}\n>>> Final Rollout Drift: ${r.final_drift_pct ? r.final_drift_pct.toFixed(2)+'%' : 'N/A'}\n>>> Mean Drift: ${r.mean_drift_pct ? r.mean_drift_pct.toFixed(2)+'%' : 'N/A'}\n>>> Checkpoint saved to: ${r.ckpt || 'ai/checkpoints/agent/transition.pt'}\n`;
+            await fetchMLStatus();
+        } catch (err) {
+            logBox.innerText += `>>> Error during training: ${err.message}\n`;
+        } finally {
+            btn.disabled = false;
+            btn.innerText = '⚡ Train ML Surrogate';
+        }
+    }
+
     // ── Animation Loop ────────────────────────────────────────────────────────
     function animate() {
         requestAnimationFrame(animate);
@@ -1836,7 +2208,20 @@
             }
         });
 
-        // 4. Camera Focus Modes
+        // 4. Update Inter-Satellite Distance & Link
+        updateInterSatCalculation();
+
+        // 5. Update Maneuver preview anchor if lunar
+        if (activeManeuver.satIndex >= 0 && activeSatellites[activeManeuver.satIndex]) {
+            const mSat = activeSatellites[activeManeuver.satIndex];
+            if (mSat.parentBody === 'Moon') {
+                maneuverPreviewLine.position.copy(moon.position);
+            } else {
+                maneuverPreviewLine.position.set(0, 0, 0);
+            }
+        }
+
+        // 6. Camera Focus Modes
         if (selectedSatIndex >= 0 && activeSatellites[selectedSatIndex]) {
             const sat = activeSatellites[selectedSatIndex];
             if (controls) controls.target.copy(sat.mesh.position);
@@ -1855,7 +2240,7 @@
             updateTelemetry(null, 0);
         }
 
-        // 5. HUD Clock
+        // 7. HUD Clock
         document.getElementById('sim-clock').innerText = 
             `⏱ ${formatTime(simTime)} (${simSettings.playbackSpeed}×)`;
 

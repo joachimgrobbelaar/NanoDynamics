@@ -564,3 +564,54 @@ def get_moon_track(dt: float = 60.0, n: int = 1440):
         for i in range(n)
         for pos in [moon_position(i * dt)]
     ]
+
+
+class MLTrainRequest(BaseModel):
+    epochs: int = Field(100, ge=1, le=2000)
+    hidden: int = Field(32, ge=8, le=256)
+    layers: int = Field(2, ge=1, le=8)
+    lr: float = Field(1e-3, gt=0.0)
+    force: bool = Field(False)
+    alt_km: float = Field(420.0, ge=100.0, le=2000.0)
+    inc_deg: float = Field(60.0, ge=0.0, le=180.0)
+
+
+@app.post("/ai/train")
+async def api_train_ml(req: MLTrainRequest = MLTrainRequest()):
+    """Trigger training of local ML transition surrogate on accumulated simulation data."""
+    try:
+        from ai.agent import run_once
+        res = await asyncio.to_thread(
+            run_once,
+            epochs=req.epochs,
+            hidden=req.hidden,
+            layers=req.layers,
+            lr=req.lr,
+            alt_km=req.alt_km,
+            inc_deg=req.inc_deg,
+            force=req.force,
+        )
+        return {"status": "success", "result": res}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/ai/status")
+def api_get_ml_status():
+    """Return latest ML agent training and rollout evaluation status."""
+    agent_report_path = os.path.join(PROJECT_ROOT, "ai", "data", "agent_report.json")
+    if os.path.exists(agent_report_path):
+        try:
+            with open(agent_report_path, "r") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    state_path = os.path.join(PROJECT_ROOT, "ai", "data", "agent_state.json")
+    if os.path.exists(state_path):
+        try:
+            with open(state_path, "r") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"status": "idle", "message": "No model trained yet. Run simulations and click Train ML Surrogate."}
+
