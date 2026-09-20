@@ -13,10 +13,10 @@ from ai.train import normalize
 
 
 def test_generate_small_dataset_deterministic(tmp_path):
-    kwargs = dict(n_traj=2, orbits=0.2, dt=300.0, alt_min_km=400.0,
-                  alt_max_km=410.0, seed=7, out_dir=str(tmp_path))
+    kwargs = {"n_traj": 2, "orbits": 0.2, "dt": 300.0, "alt_min_km": 400.0,
+              "alt_max_km": 410.0, "seed": 7, "out_dir": str(tmp_path)}
     data1, stats1 = generate(**kwargs)
-    data2, stats2 = generate(**kwargs)
+    data2, _ = generate(**kwargs)
 
     for key in ("t", "init_state", "state"):
         assert data1[key].shape == data2[key].shape

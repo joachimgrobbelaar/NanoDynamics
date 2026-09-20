@@ -61,19 +61,37 @@
         #telemetry-panel .label { color: #64748b; }
         #telemetry-panel .val-highlight { color: #4ade80; }
         #telemetry-panel .val-warn { color: #f87171; }
+        #telemetry-panel .val-accent { color: #f59e0b; }
+        .coord-card {
+            margin-top: 6px; padding: 6px 8px; background: #1e293b; border-radius: 4px; border: 1px solid #334155; font-size: 10px;
+        }
+        .coord-card-title { font-weight: 600; color: #cbd5e1; margin-bottom: 2px; }
 
         #maneuver-panel {
             margin-top: 12px; padding: 12px; background: #1e293b;
-            border: 1px solid #475569; border-radius: 6px;
+            border: 1px solid #f59e0b; border-radius: 6px;
         }
         #maneuver-panel h4 { margin: 0 0 8px; font-size: 12px; color: #f59e0b; text-transform: uppercase; }
         .burn-group { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 11px; color: #cbd5e1; }
-        .burn-group input { width: 80px; padding: 3px 6px; border-radius: 3px; border: 1px solid #475569; background: #0f172a; color: white; font-size: 11px; }
+        .burn-group input[type="number"] { width: 70px; padding: 3px 6px; border-radius: 3px; border: 1px solid #475569; background: #0f172a; color: white; font-size: 11px; }
+        .burn-group input[type="range"] { flex: 1; margin: 0 8px; }
+        .maneuver-node-badge { background: #0f172a; padding: 6px; border-radius: 4px; font-family: monospace; font-size: 10px; color: #38bdf8; margin-bottom: 8px; border: 1px solid #334155; }
+        
+        .burn-btn-group { display: flex; gap: 6px; margin-top: 8px; }
         #exec-burn-btn {
-            width: 100%; margin-top: 8px; background: #f59e0b; color: black; font-weight: 600;
-            border: none; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 12px;
+            flex: 2; background: #f59e0b; color: black; font-weight: 600;
+            border: none; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 11px;
         }
         #exec-burn-btn:hover { background: #d97706; }
+        #cancel-burn-btn {
+            flex: 1; background: #475569; color: white;
+            border: none; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 11px;
+        }
+        #cancel-burn-btn:hover { background: #64748b; }
+
+        #burn-history-panel { margin-top: 10px; font-size: 11px; }
+        #burn-history-list { list-style: none; padding: 0; margin: 4px 0 0; font-family: monospace; font-size: 10px; }
+        #burn-history-list li { background: #0f172a; padding: 4px 6px; border-radius: 3px; margin-bottom: 3px; border: 1px solid #334155; color: #94a3b8; }
 
         #force-toggle { margin-top: 10px; font-size: 12px; }
         #force-toggle label { cursor: pointer; display: flex; align-items: center; gap: 6px; color: #cbd5e1; }
@@ -148,37 +166,81 @@
     <div id="gui-container"></div>
 
     <div id="sidebar">
+        <div style="font-size:10px;color:#38bdf8;margin-bottom:8px;padding:5px 8px;background:#0f172a;border-radius:4px;border:1px solid #334155;">
+            💡 <strong>Interactive Maneuver:</strong> Right-click any point along an orbit trajectory to add a burn node.
+        </div>
+
         <h3>Active Satellites</h3>
         <ul id="sat-list"></ul>
 
-        <h3>Telemetry & Orbit</h3>
+        <h3>Telemetry & Geodetic Coords</h3>
         <div id="telemetry-panel">
             <div><span class="label">Target: </span><span id="t-name">—</span></div>
             <div><span class="label">Body: </span><span id="t-body">—</span></div>
             <div><span class="label">Sim Time: </span><span id="t-time">0.0 s</span></div>
+            <div><span class="label">Latitude: </span><span id="t-lat" class="val-accent">—</span></div>
+            <div><span class="label">Longitude: </span><span id="t-lon" class="val-accent">—</span></div>
             <div><span class="label">Altitude: </span><span id="t-alt" class="val-highlight">— km</span></div>
             <div><span class="label">Velocity: </span><span id="t-vel">— km/s</span></div>
             <div><span class="label">Period: </span><span id="t-period">— min</span></div>
             <div><span class="label">Lifetime: </span><span id="t-life" class="val-warn">Active (Safe Orbit)</span></div>
             <div><span class="label">|F_drag|: </span><span id="t-drag">— mm/s²</span></div>
             <div><span class="label">|F_J2|: </span><span id="t-j2">— mm/s²</span></div>
+
+            <div id="coord-initial-card" class="coord-card" style="display:none;">
+                <div class="coord-card-title">🚀 Initial Insertion</div>
+                <div id="coord-initial-val">—</div>
+            </div>
+
+            <div id="coord-reentry-card" class="coord-card" style="display:none; border-color:#f59e0b;">
+                <div class="coord-card-title" style="color:#f59e0b;">🔥 Re-entry Interface (120 km)</div>
+                <div id="coord-reentry-val">—</div>
+            </div>
+
+            <div id="coord-impact-card" class="coord-card" style="display:none; border-color:#ef4444;">
+                <div class="coord-card-title" style="color:#ef4444;">💥 Ground Impact / Collision</div>
+                <div id="coord-impact-val">—</div>
+            </div>
         </div>
 
         <div id="maneuver-panel" style="display:none;">
-            <h4>🔥 Orbit Maneuver (Δv)</h4>
+            <h4>🔥 Interactive Burn Node</h4>
+            <div id="node-info-badge" class="maneuver-node-badge">
+                Epoch: <span id="node-epoch">0.0 s</span><br>
+                Pos: <span id="node-pos">—</span><br>
+                Lat/Lon: <span id="node-coords">—</span>
+            </div>
+            
             <div class="burn-group">
-                <label>Δv Prograde / Transverse:</label>
-                <input type="number" id="burn-prograde" value="10.0" step="1.0"> m/s
+                <label style="color:#4ade80;">Prograde (Δv_T):</label>
+                <input type="range" id="burn-prograde-slider" min="-200" max="200" step="1" value="10" oninput="syncBurnInputs('prograde')">
+                <input type="number" id="burn-prograde" value="10.0" step="1.0" oninput="syncBurnSliders('prograde')"> m/s
             </div>
             <div class="burn-group">
-                <label>Δv Normal / Inclination:</label>
-                <input type="number" id="burn-normal" value="0.0" step="1.0"> m/s
+                <label style="color:#38bdf8;">Radial Out (Δv_R):</label>
+                <input type="range" id="burn-radial-slider" min="-200" max="200" step="1" value="0" oninput="syncBurnInputs('radial')">
+                <input type="number" id="burn-radial" value="0.0" step="1.0" oninput="syncBurnSliders('radial')"> m/s
             </div>
             <div class="burn-group">
-                <label>Δv Radial:</label>
-                <input type="number" id="burn-radial" value="0.0" step="1.0"> m/s
+                <label style="color:#e879f9;">Normal (Δv_N):</label>
+                <input type="range" id="burn-normal-slider" min="-200" max="200" step="1" value="0" oninput="syncBurnInputs('normal')">
+                <input type="number" id="burn-normal" value="0.0" step="1.0" oninput="syncBurnSliders('normal')"> m/s
             </div>
-            <button id="exec-burn-btn" onclick="executeManeuver()">Execute Burn (Δv)</button>
+
+            <div style="font-size:11px; margin-top:4px; color:#cbd5e1; display:flex; justify-content:space-between;">
+                <span>Total |Δv|: <strong id="total-dv-val" style="color:#facc15;">10.00 m/s</strong></span>
+                <span id="preview-status" style="color:#38bdf8;">Predicted Orbit</span>
+            </div>
+
+            <div class="burn-btn-group">
+                <button id="cancel-burn-btn" onclick="cancelManeuverNode()">✕ Cancel</button>
+                <button id="exec-burn-btn" onclick="executeManeuver()">✓ Approve & Execute Burn</button>
+            </div>
+        </div>
+
+        <div id="burn-history-panel" style="display:none;">
+            <h4 style="margin:8px 0 4px;font-size:11px;color:#94a3b8;text-transform:uppercase;">Burn Log History</h4>
+            <ul id="burn-history-list"></ul>
         </div>
 
         <div id="force-toggle">
@@ -348,7 +410,7 @@
 
     // ── Three.js Scene Setup ──────────────────────────────────────────────────
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 10, 50000000);
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1.0, 50000000);
     let renderer, controls;
     try {
         renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -357,6 +419,7 @@
         controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.05;
+        controls.minDistance = 6388.0; // Support zoom down to ~10 km above Earth surface
         controls.maxDistance = 3000000;
     } catch (e) {
         console.error("WebGL failed:", e);
@@ -369,7 +432,7 @@
 
     const tl = new THREE.TextureLoader();
 
-    // ── Earth Mesh ──
+    // ── Earth Mesh & Detailed Lat/Lon Graticule ──
     const earth = new THREE.Mesh(
         new THREE.SphereGeometry(R_EARTH_KM, 64, 64),
         new THREE.MeshPhongMaterial({
@@ -380,6 +443,40 @@
     );
     scene.add(earth);
     scene.add(new THREE.AxesHelper(R_EARTH_KM * 2.0));
+
+    // High-Detail Latitude / Longitude Graticule Lines (Parallels & Meridians)
+    function buildEarthGraticule() {
+        const graticule = new THREE.Group();
+        const r = R_EARTH_KM + 1.2;
+        const latMat = new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.22 });
+        const eqMat = new THREE.LineBasicMaterial({ color: 0x06b6d4, transparent: true, opacity: 0.65, linewidth: 2 });
+        const lonMat = new THREE.LineBasicMaterial({ color: 0x64748b, transparent: true, opacity: 0.20 });
+        const primeMat = new THREE.LineBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.65, linewidth: 2 });
+
+        for (let lat = -75; lat <= 75; lat += 15) {
+            const phi = lat * Math.PI / 180.0;
+            const pts = [];
+            const cosP = Math.cos(phi), sinP = Math.sin(phi);
+            for (let lon = 0; lon <= 360; lon += 4) {
+                const lam = lon * Math.PI / 180.0;
+                pts.push(new THREE.Vector3(r * cosP * Math.cos(lam), r * sinP, r * cosP * Math.sin(lam)));
+            }
+            graticule.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lat === 0 ? eqMat : latMat));
+        }
+
+        for (let lon = 0; lon < 360; lon += 15) {
+            const lam = lon * Math.PI / 180.0;
+            const pts = [];
+            const cosL = Math.cos(lam), sinL = Math.sin(lam);
+            for (let lat = -90; lat <= 90; lat += 4) {
+                const phi = lat * Math.PI / 180.0;
+                pts.push(new THREE.Vector3(r * Math.cos(phi) * cosL, r * Math.sin(phi), r * Math.cos(phi) * sinL));
+            }
+            graticule.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), (lon === 0 || lon === 180) ? primeMat : lonMat));
+        }
+        return graticule;
+    }
+    earth.add(buildEarthGraticule());
 
     // ── Moon Mesh ──
     const moon = new THREE.Mesh(
@@ -404,6 +501,37 @@
         new THREE.LineBasicMaterial({ color: 0x64748b, transparent: true, opacity: 0.5 })
     );
     scene.add(moonOrbitLine);
+
+    // ── Interactive Maneuver Node 3D Gizmo & Preview Line ──
+    const nodeGizmoGroup = new THREE.Group();
+    nodeGizmoGroup.visible = false;
+    scene.add(nodeGizmoGroup);
+
+    const nodeMarker = new THREE.Mesh(
+        new THREE.SphereGeometry(140, 16, 16),
+        new THREE.MeshBasicMaterial({ color: 0xfacc15 })
+    );
+    nodeGizmoGroup.add(nodeMarker);
+
+    const nodeRing = new THREE.Mesh(
+        new THREE.RingGeometry(180, 240, 32),
+        new THREE.MeshBasicMaterial({ color: 0xf59e0b, side: THREE.DoubleSide })
+    );
+    nodeGizmoGroup.add(nodeRing);
+
+    const arrowPrograde = new THREE.ArrowHelper(new THREE.Vector3(1,0,0), new THREE.Vector3(), 300, 0x4ade80, 70, 35);
+    const arrowRadial   = new THREE.ArrowHelper(new THREE.Vector3(0,1,0), new THREE.Vector3(), 300, 0x38bdf8, 70, 35);
+    const arrowNormal   = new THREE.ArrowHelper(new THREE.Vector3(0,0,1), new THREE.Vector3(), 300, 0xe879f9, 70, 35);
+    nodeGizmoGroup.add(arrowPrograde);
+    nodeGizmoGroup.add(arrowRadial);
+    nodeGizmoGroup.add(arrowNormal);
+
+    const maneuverPreviewLine = new THREE.Line(
+        new THREE.BufferGeometry(),
+        new THREE.LineDashedMaterial({ color: 0xfacc15, dashSize: 200, gapSize: 100, linewidth: 2, transparent: true, opacity: 0.9 })
+    );
+    maneuverPreviewLine.visible = false;
+    scene.add(maneuverPreviewLine);
 
     camera.position.set(R_EARTH_KM * 3.5, R_EARTH_KM * 2.2, R_EARTH_KM * 3.5);
     if (controls) controls.target.set(0, 0, 0);
@@ -638,6 +766,7 @@
 
         const isReentry = satData.reentry || false;
         const reTime = satData.reentry_time || 0;
+        const evts = satData.events || (satData.trajectory && satData.trajectory.events) || null;
 
         const sat = {
             name: satData.name,
@@ -645,10 +774,12 @@
             params: satData.params,
             period_s: satData.period_s || 5400,
             color, mesh, line, trailPts: [],
-            buf: { t:[], x:[], y:[], z:[], vx:[], vy:[], vz:[], alt_km:[],
+            buf: { t:[], x:[], y:[], z:[], vx:[], vy:[], vz:[], alt_km:[], lat_deg:[], lon_deg:[],
                    forces:{ central:[], j2:[], drag:[], moon:[], total:[] } },
             lastState: satData.last_state,
             lastT: satData.last_t,
+            events: evts,
+            maneuvers: satData.maneuvers || [],
             fetching: false,
             reentry: isReentry,
             deorbitEpoch: isReentry ? reTime : null,
@@ -679,8 +810,8 @@
         
         activeSatellites.splice(idx, 1);
         if (selectedSatIndex === idx) {
+            cancelManeuverNode();
             selectedSatIndex = -1;
-            document.getElementById('maneuver-panel').style.display = 'none';
         } else if (selectedSatIndex > idx) {
             selectedSatIndex--;
         }
@@ -688,21 +819,223 @@
         renderSidebar();
     }
 
+    // ── Geodetic Coordinate Conversion ────────────────────────────────────────
+    function getGeodeticCoords(sat, simT, idx) {
+        if (!sat || !sat.buf || sat.buf.x.length === 0) return { lat: 0, lon: 0, alt_km: 0 };
+        const b = sat.buf;
+        const i = typeof idx === 'number' ? idx : (idx ? idx.lo : 0);
+        const x = b.x[i] || 0, y = b.y[i] || 0, z = b.z[i] || 0;
+        const t = (b.t && b.t[i] !== undefined) ? b.t[i] : simT;
+        const r = Math.sqrt(x*x + y*y + z*z);
+        if (r < 1.0) return { lat: 0, lon: 0, alt_km: 0 };
+
+        const omega = sat.parentBody === 'Earth' ? 7.292115e-5 : 2.6617e-6;
+        const theta = omega * t;
+        const cosT = Math.cos(theta), sinT = Math.sin(theta);
+        const x_ecef = x * cosT + y * sinT;
+        const y_ecef = -x * sinT + y * cosT;
+        const z_ecef = z;
+
+        const lat = Math.asin(Math.max(-1.0, Math.min(1.0, z_ecef / r))) * (180.0 / Math.PI);
+        let lon = Math.atan2(y_ecef, x_ecef) * (180.0 / Math.PI);
+        lon = ((lon + 180.0) % 360.0 + 360.0) % 360.0 - 180.0;
+        const radius_km = sat.parentBody === 'Earth' ? R_EARTH_KM : R_MOON_KM;
+        const alt_km = (r / 1000.0) - radius_km;
+        return { lat, lon, alt_km, time: t };
+    }
+
+    // ── Right-Click Interactive Trajectory Maneuver Raycaster ─────────────────
+    const activeManeuver = {
+        satIndex: -1,
+        epoch: 0.0,
+        state: null,
+        u_t: new THREE.Vector3(1,0,0),
+        u_r: new THREE.Vector3(0,1,0),
+        u_n: new THREE.Vector3(0,0,1),
+        lat: 0.0,
+        lon: 0.0,
+        alt_km: 0.0
+    };
+
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    if (raycaster.params.Line) raycaster.params.Line.threshold = 400;
+
+    function onRightClickScene(event) {
+        event.preventDefault();
+        if (activeSatellites.length === 0) return;
+
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+
+        let bestSatIdx = -1, bestPtIdx = -1, minRayDist = Infinity;
+
+        activeSatellites.forEach((sat, sIdx) => {
+            if (!sat.trailPts || sat.trailPts.length < 2) return;
+            const intersects = raycaster.intersectObject(sat.line);
+            if (intersects.length > 0) {
+                const hit = intersects[0];
+                if (hit.distance < minRayDist) {
+                    minRayDist = hit.distance;
+                    bestSatIdx = sIdx;
+                    let bestD2 = Infinity;
+                    for (let i = 0; i < sat.trailPts.length; i++) {
+                        const d2 = hit.point.distanceToSquared(sat.trailPts[i]);
+                        if (d2 < bestD2) { bestD2 = d2; bestPtIdx = i; }
+                    }
+                }
+            }
+        });
+
+        if (bestSatIdx >= 0 && bestPtIdx >= 0) {
+            setupManeuverNode(bestSatIdx, bestPtIdx);
+        }
+    }
+
+    if (renderer && renderer.domElement) {
+        renderer.domElement.addEventListener('contextmenu', onRightClickScene);
+    }
+
+    function setupManeuverNode(satIdx, ptIdx) {
+        selectedSatIndex = satIdx;
+        const sat = activeSatellites[satIdx];
+        const b = sat.buf;
+
+        activeManeuver.satIndex = satIdx;
+        activeManeuver.epoch = b.t[ptIdx];
+        activeManeuver.state = [b.x[ptIdx], b.y[ptIdx], b.z[ptIdx], b.vx[ptIdx], b.vy[ptIdx], b.vz[ptIdx]];
+
+        const r_vec = new THREE.Vector3(b.x[ptIdx], b.y[ptIdx], b.z[ptIdx]);
+        const v_vec = new THREE.Vector3(b.vx[ptIdx], b.vy[ptIdx], b.vz[ptIdx]);
+        const u_r = r_vec.clone().normalize();
+        const h_vec = new THREE.Vector3().crossVectors(r_vec, v_vec);
+        const u_n = h_vec.length() > 1e-6 ? h_vec.clone().normalize() : new THREE.Vector3(0,0,1);
+        const u_t = new THREE.Vector3().crossVectors(u_n, u_r);
+
+        activeManeuver.u_r = u_r;
+        activeManeuver.u_t = u_t;
+        activeManeuver.u_n = u_n;
+
+        const coords = getGeodeticCoords(sat, activeManeuver.epoch, ptIdx);
+        activeManeuver.lat = coords.lat;
+        activeManeuver.lon = coords.lon;
+        activeManeuver.alt_km = coords.alt_km;
+
+        // Position Gizmo
+        const worldPos = sat.trailPts[ptIdx].clone();
+        nodeGizmoGroup.position.copy(worldPos);
+        arrowPrograde.setDirection(u_t);
+        arrowRadial.setDirection(u_r);
+        arrowNormal.setDirection(u_n);
+        nodeGizmoGroup.visible = true;
+
+        // UI Update
+        document.getElementById('maneuver-panel').style.display = 'block';
+        document.getElementById('node-epoch').innerText = formatTime(activeManeuver.epoch);
+        document.getElementById('node-pos').innerText = `Alt: ${coords.alt_km.toFixed(1)} km`;
+        document.getElementById('node-coords').innerText = `${coords.lat >= 0 ? coords.lat.toFixed(2)+'°N' : Math.abs(coords.lat).toFixed(2)+'°S'}, ${coords.lon >= 0 ? coords.lon.toFixed(2)+'°E' : Math.abs(coords.lon).toFixed(2)+'°W'}`;
+
+        document.getElementById('burn-prograde').value = 10.0;
+        document.getElementById('burn-prograde-slider').value = 10;
+        document.getElementById('burn-radial').value = 0.0;
+        document.getElementById('burn-radial-slider').value = 0;
+        document.getElementById('burn-normal').value = 0.0;
+        document.getElementById('burn-normal-slider').value = 0;
+
+        updateBurnPreview();
+        renderSidebar();
+    }
+
+    function syncBurnInputs(type) {
+        const slider = document.getElementById(`burn-${type}-slider`);
+        const num = document.getElementById(`burn-${type}`);
+        num.value = slider.value;
+        updateBurnPreview();
+    }
+
+    function syncBurnSliders(type) {
+        const slider = document.getElementById(`burn-${type}-slider`);
+        const num = document.getElementById(`burn-${type}`);
+        slider.value = num.value;
+        updateBurnPreview();
+    }
+
+    let previewDebounce = null;
+    function updateBurnPreview() {
+        if (activeManeuver.satIndex < 0 || !activeSatellites[activeManeuver.satIndex]) return;
+        const sat = activeSatellites[activeManeuver.satIndex];
+
+        const dv_T = parseFloat(document.getElementById('burn-prograde').value) || 0.0;
+        const dv_R = parseFloat(document.getElementById('burn-radial').value) || 0.0;
+        const dv_N = parseFloat(document.getElementById('burn-normal').value) || 0.0;
+        const total_dv = Math.sqrt(dv_T*dv_T + dv_R*dv_R + dv_N*dv_N);
+        document.getElementById('total-dv-val').innerText = `${total_dv.toFixed(2)} m/s`;
+
+        clearTimeout(previewDebounce);
+        previewDebounce = setTimeout(async () => {
+            try {
+                const payload = {
+                    params: sat.params,
+                    t_burn: activeManeuver.epoch,
+                    current_state: activeManeuver.state,
+                    dv_prograde: dv_T,
+                    dv_radial: dv_R,
+                    dv_normal: dv_N
+                };
+                const res = await fetch('/burn/preview', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                const t = data.trajectory;
+                const pts = [];
+                for (let i = 0; i < t.x.length; i++) {
+                    pts.push(new THREE.Vector3(t.x[i] * M_TO_KM, t.y[i] * M_TO_KM, t.z[i] * M_TO_KM));
+                }
+                maneuverPreviewLine.geometry.setFromPoints(pts);
+                maneuverPreviewLine.computeLineDistances();
+                maneuverPreviewLine.visible = true;
+
+                if (data.reentry) {
+                    document.getElementById('preview-status').innerHTML = '<span style="color:#ef4444;">Predicted: DEORBIT</span>';
+                } else {
+                    document.getElementById('preview-status').innerHTML = '<span style="color:#22c55e;">Predicted: STABLE</span>';
+                }
+            } catch (err) {
+                console.error('Preview error:', err);
+            }
+        }, 120);
+    }
+
+    function cancelManeuverNode() {
+        activeManeuver.satIndex = -1;
+        nodeGizmoGroup.visible = false;
+        maneuverPreviewLine.visible = false;
+        document.getElementById('maneuver-panel').style.display = 'none';
+    }
+
     async function executeManeuver() {
-        if (selectedSatIndex < 0 || !activeSatellites[selectedSatIndex]) return;
-        const sat = activeSatellites[selectedSatIndex];
+        if (activeManeuver.satIndex < 0 || !activeSatellites[activeManeuver.satIndex]) return;
+        const sat = activeSatellites[activeManeuver.satIndex];
         const btn = document.getElementById('exec-burn-btn');
-        btn.innerText = 'Executing Burn...';
+        btn.innerText = 'Applying Burn...';
         btn.disabled = true;
 
         try {
+            const dv_T = parseFloat(document.getElementById('burn-prograde').value) || 0.0;
+            const dv_R = parseFloat(document.getElementById('burn-radial').value) || 0.0;
+            const dv_N = parseFloat(document.getElementById('burn-normal').value) || 0.0;
+
             const payload = {
                 params: sat.params,
-                t_burn: simTime,
-                current_state: sat.lastState,
-                dv_prograde: parseFloat(document.getElementById('burn-prograde').value) || 0.0,
-                dv_normal: parseFloat(document.getElementById('burn-normal').value) || 0.0,
-                dv_radial: parseFloat(document.getElementById('burn-radial').value) || 0.0
+                t_burn: activeManeuver.epoch,
+                current_state: activeManeuver.state,
+                dv_prograde: dv_T,
+                dv_radial: dv_R,
+                dv_normal: dv_N
             };
 
             const res = await fetch('/burn', {
@@ -713,22 +1046,47 @@
             const data = await res.json();
             if (!res.ok) { alert('Burn failed: ' + data.detail); return; }
 
-            sat.buf = { t:[], x:[], y:[], z:[], vx:[], vy:[], vz:[], alt_km:[],
-                        forces:{ central:[], j2:[], drag:[], moon:[], total:[] } };
+            // Truncate existing satellite buffer up to t_burn and append post-burn chunk
+            const b = sat.buf;
+            let cutIdx = 0;
+            while (cutIdx < b.t.length && b.t[cutIdx] < activeManeuver.epoch) cutIdx++;
+            ['t','x','y','z','vx','vy','vz','alt_km','lat_deg','lon_deg'].forEach(k => {
+                if (b[k]) b[k] = b[k].slice(0, cutIdx);
+            });
+            for (const fk of ['central','j2','drag','moon','total']) {
+                if (b.forces[fk]) b.forces[fk] = b.forces[fk].slice(0, cutIdx);
+            }
+
             appendChunk(sat, data.trajectory);
             sat.lastState = data.last_state;
             sat.lastT = data.last_t;
+            if (data.events) sat.events = data.events;
             if (data.reentry) {
                 sat.reentry = true;
                 sat.deorbitEpoch = data.reentry_time || sat.lastT;
                 sat.lifetimeSeconds = sat.deorbitEpoch;
                 sat.deorbitTime = formatTime(sat.lifetimeSeconds);
             }
+
+            // Log maneuver
+            if (!sat.maneuvers) sat.maneuvers = [];
+            sat.maneuvers.push({
+                id: sat.maneuvers.length + 1,
+                epoch: activeManeuver.epoch,
+                epochFmt: formatTime(activeManeuver.epoch),
+                dv_T, dv_R, dv_N,
+                total_dv: Math.sqrt(dv_T*dv_T + dv_R*dv_R + dv_N*dv_N),
+                lat: activeManeuver.lat,
+                lon: activeManeuver.lon,
+                alt_km: activeManeuver.alt_km
+            });
+
+            cancelManeuverNode();
             renderSidebar();
         } catch (e) {
             alert('Burn error: ' + e.message);
         } finally {
-            btn.innerText = 'Execute Burn (Δv)';
+            btn.innerText = '✓ Approve & Execute Burn';
             btn.disabled = false;
         }
     }
@@ -801,7 +1159,7 @@
         activeSatellites = [];
         selectedSatIndex = -1;
         simTime = 0.0;
-        document.getElementById('maneuver-panel').style.display = 'none';
+        cancelManeuverNode();
         updateCameraDropdown();
         renderSidebar();
     }
@@ -811,11 +1169,11 @@
         document.getElementById('save-name').value = '';
     }
 
-    // ── Export Monotonic Clean CSV ────────────────────────────────────────────
+    // ── Export Monotonic Clean CSV with Geodetic Coordinates ──────────────────
     function exportData() {
         if (!activeSatellites.length) { alert('No active satellites to export.'); return; }
         
-        let csv = 'Run_ID,Satellite_Name,Central_Body,Time_Seconds,Elapsed_Hours,X_Metres,Y_Metres,Z_Metres,VX_ms,VY_ms,VZ_ms,Altitude_km,Deorbit_Status,Total_Lifetime_Seconds,Lifetime_Formatted\n';
+        let csv = 'Run_ID,Satellite_Name,Central_Body,Time_Seconds,Elapsed_Hours,Latitude_deg,Longitude_deg,Altitude_km,X_Metres,Y_Metres,Z_Metres,VX_ms,VY_ms,VZ_ms,Deorbit_Status,Total_Lifetime_Seconds,Lifetime_Formatted,Initial_Lat,Initial_Lon,Reentry_Lat,Reentry_Lon,Impact_Lat,Impact_Lon,Burns_Executed\n';
         
         activeSatellites.forEach((sat, satIdx) => {
             const b = sat.buf;
@@ -827,15 +1185,26 @@
             const lifeSecStr = sat.reentry ? (sat.lifetimeSeconds || sat.deorbitEpoch || 0).toFixed(1) : (simTime).toFixed(1);
             const lifeFmtStr = sat.reentry ? (sat.deorbitTime || formatTime(sat.lifetimeSeconds)) : formatTime(simTime);
 
+            const ev = sat.events || {};
+            const initLat = ev.initial ? ev.initial.lat_deg.toFixed(3) : 'N/A';
+            const initLon = ev.initial ? ev.initial.lon_deg.toFixed(3) : 'N/A';
+            const reLat = ev.reentry ? ev.reentry.lat_deg.toFixed(3) : (sat.reentry ? 'Detected' : 'N/A');
+            const reLon = ev.reentry ? ev.reentry.lon_deg.toFixed(3) : (sat.reentry ? 'Detected' : 'N/A');
+            const impLat = ev.impact ? ev.impact.lat_deg.toFixed(3) : (sat.reentry ? 'Ground' : 'N/A');
+            const impLon = ev.impact ? ev.impact.lon_deg.toFixed(3) : (sat.reentry ? 'Ground' : 'N/A');
+            const burnCount = sat.maneuvers ? sat.maneuvers.length : 0;
+
             let lastTimeWritten = -1;
             for (let ct = t_start; ct <= t_end; ct += step) {
                 let lo = 0, hi = b.t.length - 1;
                 while (hi - lo > 1) { const m = (lo+hi)>>1; if (b.t[m] <= ct) lo=m; else hi=m; }
                 const currT = b.t[lo];
-                if (currT <= lastTimeWritten) continue; // Guarantee strictly monotonic increasing time
+                if (currT <= lastTimeWritten) continue;
                 lastTimeWritten = currT;
 
-                csv += `${satIdx + 1},${sat.name},${sat.parentBody},${currT.toFixed(1)},${(currT/3600.0).toFixed(3)},${b.x[lo].toFixed(1)},${b.y[lo].toFixed(1)},${b.z[lo].toFixed(1)},${b.vx[lo].toFixed(3)},${b.vy[lo].toFixed(3)},${b.vz[lo].toFixed(3)},${b.alt_km[lo].toFixed(2)},${statusStr},${lifeSecStr},"${lifeFmtStr}"\n`;
+                const geo = getGeodeticCoords(sat, currT, lo);
+
+                csv += `${satIdx + 1},${sat.name},${sat.parentBody},${currT.toFixed(1)},${(currT/3600.0).toFixed(3)},${geo.lat.toFixed(4)},${geo.lon.toFixed(4)},${b.alt_km[lo].toFixed(2)},${b.x[lo].toFixed(1)},${b.y[lo].toFixed(1)},${b.z[lo].toFixed(1)},${b.vx[lo].toFixed(3)},${b.vy[lo].toFixed(3)},${b.vz[lo].toFixed(3)},${statusStr},${lifeSecStr},"${lifeFmtStr}",${initLat},${initLon},${reLat},${reLon},${impLat},${impLon},${burnCount}\n`;
             }
         });
 
@@ -870,35 +1239,57 @@
                 selectedSatIndex = idx;
                 simSettings.cameraTarget = sat.name;
                 cameraFocusMode = sat.name;
-                document.getElementById('maneuver-panel').style.display = 'block';
                 document.getElementById('show-forces').checked = sat.showForces;
                 updateCameraDropdown();
                 renderSidebar();
             };
             list.appendChild(li);
         });
+
+        // Render Burn History
+        const histPanel = document.getElementById('burn-history-panel');
+        const histList = document.getElementById('burn-history-list');
+        histList.innerHTML = '';
+        if (selectedSatIndex >= 0 && activeSatellites[selectedSatIndex] && activeSatellites[selectedSatIndex].maneuvers && activeSatellites[selectedSatIndex].maneuvers.length > 0) {
+            histPanel.style.display = 'block';
+            activeSatellites[selectedSatIndex].maneuvers.forEach(m => {
+                const li = document.createElement('li');
+                li.innerHTML = `<strong>#${m.id} @ ${m.epochFmt}</strong>: Δv=${m.total_dv.toFixed(1)} m/s (T:${m.dv_T>0?'+':''}${m.dv_T}, R:${m.dv_R>0?'+':''}${m.dv_R}, N:${m.dv_N>0?'+':''}${m.dv_N})<br><span style="color:#64748b;">Pos: ${m.lat.toFixed(1)}°, ${m.lon.toFixed(1)}° (${m.alt_km.toFixed(0)} km)</span>`;
+                histList.appendChild(li);
+            });
+        } else {
+            histPanel.style.display = 'none';
+        }
     }
 
     function updateTelemetry(sat, idx) {
         if (!sat) {
-            ['t-name','t-body','t-time','t-alt','t-vel','t-period','t-life','t-drag','t-j2'].forEach(id => {
-                document.getElementById(id).innerText = '—';
+            ['t-name','t-body','t-time','t-lat','t-lon','t-alt','t-vel','t-period','t-life','t-drag','t-j2'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.innerText = '—';
             });
+            document.getElementById('coord-initial-card').style.display = 'none';
+            document.getElementById('coord-reentry-card').style.display = 'none';
+            document.getElementById('coord-impact-card').style.display = 'none';
             return;
         }
         const b = sat.buf;
-        const i = typeof idx === 'number' ? idx : idx.lo;
-        const alt = b.alt_km[i];
-        const v = Math.sqrt(b.vx[i]**2 + b.vy[i]**2 + b.vz[i]**2) / 1000;
+        const i = typeof idx === 'number' ? idx : (idx ? idx.lo : 0);
+        const alt = b.alt_km[i] || 0;
+        const v = Math.sqrt((b.vx[i]||0)**2 + (b.vy[i]||0)**2 + (b.vz[i]||0)**2) / 1000;
 
-        const dragF = b.forces.drag[i];
-        const j2F   = b.forces.j2[i];
+        const geo = getGeodeticCoords(sat, simTime, idx);
+
+        const dragF = b.forces && b.forces.drag ? b.forces.drag[i] : null;
+        const j2F   = b.forces && b.forces.j2 ? b.forces.j2[i] : null;
         const dragMag = dragF ? Math.sqrt(dragF.reduce((s,x)=>s+x*x,0))*1000 : 0;
         const j2Mag   = j2F   ? Math.sqrt(j2F.reduce((s,x)=>s+x*x,0))*1000   : 0;
 
         document.getElementById('t-name').innerText = sat.name;
         document.getElementById('t-body').innerText = `${sat.parentBody}`;
         document.getElementById('t-time').innerText = formatTime(simTime);
+        document.getElementById('t-lat').innerText  = `${geo.lat >= 0 ? geo.lat.toFixed(3)+'° N' : Math.abs(geo.lat).toFixed(3)+'° S'}`;
+        document.getElementById('t-lon').innerText  = `${geo.lon >= 0 ? geo.lon.toFixed(3)+'° E' : Math.abs(geo.lon).toFixed(3)+'° W'}`;
         document.getElementById('t-alt').innerText  = `${alt.toFixed(1)} km`;
         document.getElementById('t-vel').innerText  = `${v.toFixed(3)} km/s`;
         document.getElementById('t-period').innerText = `${(sat.period_s/60).toFixed(1)} min`;
@@ -911,6 +1302,37 @@
 
         document.getElementById('t-drag').innerText  = `${dragMag.toFixed(4)} mm/s²`;
         document.getElementById('t-j2').innerText    = `${j2Mag.toFixed(4)} mm/s²`;
+
+        // Key Coordinates Cards
+        const ev = sat.events || {};
+        const cInit = document.getElementById('coord-initial-card');
+        const cReentry = document.getElementById('coord-reentry-card');
+        const cImpact = document.getElementById('coord-impact-card');
+
+        if (ev.initial) {
+            cInit.style.display = 'block';
+            document.getElementById('coord-initial-val').innerText = `${ev.initial.lat_deg.toFixed(2)}°, ${ev.initial.lon_deg.toFixed(2)}° (Alt: ${ev.initial.alt_km.toFixed(1)} km)`;
+        } else {
+            cInit.style.display = 'none';
+        }
+
+        if (ev.reentry || sat.reentry) {
+            cReentry.style.display = 'block';
+            const rLat = ev.reentry ? `${ev.reentry.lat_deg.toFixed(2)}°, ${ev.reentry.lon_deg.toFixed(2)}°` : 'Lat/Lon Estimated';
+            const rT = ev.reentry ? formatTime(ev.reentry.time_s) : (sat.deorbitTime || 'Re-entered');
+            document.getElementById('coord-reentry-val').innerText = `${rLat} @ ${rT}`;
+        } else {
+            cReentry.style.display = 'none';
+        }
+
+        if (ev.impact || (sat.reentry && sat.lifetimeSeconds)) {
+            cImpact.style.display = 'block';
+            const iLat = ev.impact ? `${ev.impact.lat_deg.toFixed(2)}°, ${ev.impact.lon_deg.toFixed(2)}°` : `${geo.lat.toFixed(2)}°, ${geo.lon.toFixed(2)}°`;
+            const iT = ev.impact ? formatTime(ev.impact.time_s) : (sat.deorbitTime || 'Impacted');
+            document.getElementById('coord-impact-val').innerText = `${iLat} @ ${iT}`;
+        } else {
+            cImpact.style.display = 'none';
+        }
     }
 
     // ── Add Satellite API ─────────────────────────────────────────────────────

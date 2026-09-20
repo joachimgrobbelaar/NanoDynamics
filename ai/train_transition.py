@@ -14,7 +14,7 @@ import sys
 
 import numpy as np
 import torch
-import torch.optim as optim
+from torch import optim
 
 AI_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(AI_DIR)
@@ -22,7 +22,7 @@ for _path in (AI_DIR, PROJECT_ROOT):
     if _path not in sys.path:
         sys.path.insert(0, _path)
 
-from transition_model import TransitionMLP, param_count  # noqa: E402
+from transition_model import TransitionMLP, param_count
 
 
 def train(data_dir=None, out_dir=None, epochs=300, hidden=32, layers=2,

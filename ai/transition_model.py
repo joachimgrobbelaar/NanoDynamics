@@ -5,8 +5,7 @@ far better than absolute prediction and keeps the network small enough for
 TinyML deployment (a 2x32 net is ~9k params, ~36 KB as float32).
 """
 
-import torch
-import torch.nn as nn
+from torch import nn
 
 
 class TransitionMLP(nn.Module):

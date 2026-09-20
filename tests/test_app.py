@@ -495,3 +495,58 @@ class TestRootEndpoint:
         assert "text/html" in response.headers.get("content-type", "")
         content = response.text
         assert "Three.js" in content or "top-nav" in content or "modal-overlay" in content
+
+
+class TestGeodeticCoordinatesAndBurnEndpoints:
+    """Tests for geodetic coordinates (lat, lon) and burn preview/execution."""
+
+    def test_simulate_contains_geodetic_coordinates_and_events(self):
+        payload = {
+            "name": "Sat-GeoTest",
+            "mass": 5.0,
+            "drag_area": 0.02,
+            "cd": 2.2,
+            "altitude_km": 350.0,
+            "eccentricity": 0.001,
+            "inclination_deg": 45.0,
+            "raan_deg": 30.0,
+        }
+        res = client.post("/simulate", json=payload)
+        assert res.status_code == 200
+        data = res.json()
+        traj = data["trajectory"]
+        assert "lat_deg" in traj
+        assert "lon_deg" in traj
+        assert len(traj["lat_deg"]) == len(traj["t"])
+        assert len(traj["lon_deg"]) == len(traj["t"])
+        assert "events" in traj
+        assert "initial" in traj["events"]
+        assert traj["events"]["initial"]["lat_deg"] is not None
+
+    def test_burn_preview_endpoint(self):
+        payload = {
+            "params": {
+                "name": "Sat-BurnTest",
+                "mass": 5.0,
+                "drag_area": 0.02,
+                "cd": 2.2,
+                "altitude_km": 350.0,
+                "eccentricity": 0.001,
+                "inclination_deg": 45.0,
+                "raan_deg": 30.0,
+            },
+            "t_burn": 0.0,
+            "current_state": [6728137.0, 0.0, 0.0, 0.0, 7700.0, 0.0],
+            "dv_prograde": 15.0,
+            "dv_normal": 0.0,
+            "dv_radial": 5.0,
+        }
+        res = client.post("/burn/preview", json=payload)
+        assert res.status_code == 200
+        data = res.json()
+        assert data["status"] == "success"
+        assert "trajectory" in data
+        assert "lat_deg" in data["trajectory"]
+        assert "lon_deg" in data["trajectory"]
+        assert len(data["trajectory"]["t"]) > 0
+

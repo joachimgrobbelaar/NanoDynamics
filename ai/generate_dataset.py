@@ -22,8 +22,13 @@ for _path in (AI_DIR, PROJECT_ROOT):
     if _path not in sys.path:
         sys.path.insert(0, _path)
 
-from leo_simulator import (R_EARTH, ExponentialAtmosphere, OrbitalElements,  # noqa: E402
-                           OrbitPropagator, Satellite)
+from leo_simulator import (
+    R_EARTH,
+    ExponentialAtmosphere,
+    OrbitalElements,
+    OrbitPropagator,
+    Satellite,
+)
 
 # Fixed SI scales so raw meter/second values train stably.
 T_SCALE = 5400.0        # ~one LEO orbital period [s]

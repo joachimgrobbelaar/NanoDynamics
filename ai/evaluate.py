@@ -21,11 +21,16 @@ for _path in (AI_DIR, PROJECT_ROOT):
     if _path not in sys.path:
         sys.path.insert(0, _path)
 
-from pinn_model import OrbitalPINN  # noqa: E402
-from train import normalize  # noqa: E402
+from pinn_model import OrbitalPINN
+from train import normalize
 
-from leo_simulator import (R_EARTH, ExponentialAtmosphere, OrbitalElements,  # noqa: E402
-                           OrbitPropagator, Satellite)
+from leo_simulator import (
+    R_EARTH,
+    ExponentialAtmosphere,
+    OrbitalElements,
+    OrbitPropagator,
+    Satellite,
+)
 
 
 def evaluate(ckpt_path, alt_km=420.0, inc_deg=60.0, orbits=1.0, dt=60.0):
@@ -71,7 +76,7 @@ def evaluate(ckpt_path, alt_km=420.0, inc_deg=60.0, orbits=1.0, dt=60.0):
 
 def evaluate_rollout(ckpt_path, alt_km=420.0, inc_deg=60.0, orbits=1.0):
     """Roll out the transition net step-by-step vs solve_ivp ground truth."""
-    from transition_model import TransitionMLP  # noqa: E402
+    from transition_model import TransitionMLP
     ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
     stats = ckpt["stats"]
     cfg = ckpt["config"]

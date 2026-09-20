@@ -20,7 +20,7 @@ import sys
 
 import numpy as np
 import torch
-import torch.optim as optim
+from torch import optim
 
 # Allow running as `python3 ai/train.py` from the project root or as
 # `python3 train.py` from inside ai/.
@@ -30,9 +30,9 @@ for _path in (AI_DIR, PROJECT_ROOT):
     if _path not in sys.path:
         sys.path.insert(0, _path)
 
-from pinn_model import OrbitalPINN  # noqa: E402
+from pinn_model import OrbitalPINN
 
-from leo_simulator.constants import MU_EARTH  # noqa: E402
+from leo_simulator.constants import MU_EARTH
 
 DEFAULT_STATS = {"t_scale": 5400.0, "pos_scale": 6378137.0, "vel_scale": 8000.0}
 

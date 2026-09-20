@@ -23,6 +23,8 @@ from leo_simulator import (
     OrbitalElements,
     OrbitPropagator,
     Satellite,
+    eci_to_geodetic,
+    extract_trajectory_key_events,
 )
 from leo_simulator.experiment import (
     get_atmosphere_by_name,
@@ -216,11 +218,13 @@ def _propagate_chunk(prop: OrbitPropagator, initial_state, t_start: float,
 
 
 def _format_chunk(res, prop: OrbitPropagator, radius_m: float, include_forces: bool = True) -> dict:
-    """Convert PropagationResult to columnar JSON-serialisable dict."""
+    """Convert PropagationResult to columnar JSON-serialisable dict with geodetic coordinates."""
     t = res.t.tolist()
     r = res.r
     v = res.v
     altitudes = ((np.linalg.norm(r, axis=1) - radius_m) / 1000.0).tolist()
+    lat_deg, lon_deg, _ = eci_to_geodetic(r, res.t, radius_m=radius_m, omega_earth=prop.omega_earth)
+    events = extract_trajectory_key_events(res.t, r, radius_m=radius_m, omega_earth=prop.omega_earth)
     out = {
         "t": t,
         "x": r[:, 0].tolist(),
@@ -230,6 +234,9 @@ def _format_chunk(res, prop: OrbitPropagator, radius_m: float, include_forces: b
         "vy": v[:, 1].tolist(),
         "vz": v[:, 2].tolist(),
         "alt_km": altitudes,
+        "lat_deg": lat_deg.tolist(),
+        "lon_deg": lon_deg.tolist(),
+        "events": events,
         "reentry": bool(res.reentry_detected),
         "reentry_time": float(res.reentry_time) if res.reentry_time is not None else None,
     }
@@ -321,6 +328,51 @@ async def stream_chunk(req: StreamRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/burn/preview")
+async def preview_burn(req: BurnRequest, duration_s: float = 7200.0):
+    """Fast preview of perturbed/post-burn trajectory arc without committing state."""
+    try:
+        body = BODIES.get(req.params.parent_body, BODIES["Earth"])
+        r = np.array(req.current_state[:3], dtype=np.float64)
+        v = np.array(req.current_state[3:], dtype=np.float64)
+
+        r_norm = np.linalg.norm(r)
+        if r_norm <= 0.0:
+            raise ValueError("Position vector norm must be positive.")
+        u_r = r / r_norm
+
+        h = np.cross(r, v)
+        h_norm = np.linalg.norm(h)
+        u_n = h / h_norm if h_norm > 1e-12 else np.array([0.0, 0.0, 1.0])
+        u_t = np.cross(u_n, u_r)
+
+        dv_vec = req.dv_radial * u_r + req.dv_prograde * u_t + req.dv_normal * u_n
+        v_new = v + dv_vec
+        new_state = r.tolist() + v_new.tolist()
+
+        prop = _build_propagator(req.params)
+        preview_dur = min(duration_s, body["default_chunk_duration"])
+        dt_eval = max(20.0, body["dt_eval"])
+
+        res = await asyncio.to_thread(
+            _propagate_chunk, prop, new_state, req.t_burn, preview_dur, dt_eval
+        )
+        chunk = _format_chunk(res, prop, body["radius_m"], include_forces=False)
+
+        return {
+            "status": "success",
+            "new_state": new_state,
+            "trajectory": chunk,
+            "reentry": bool(res.reentry_detected),
+            "reentry_time": float(res.reentry_time) if res.reentry_time is not None else None,
+            "events": chunk.get("events"),
+        }
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/burn")
 async def execute_burn(req: BurnRequest):
     """Apply an instantaneous Delta-V in local RTN frame and propagate forward."""
@@ -359,6 +411,7 @@ async def execute_burn(req: BurnRequest):
             "trajectory": chunk,
             "last_state": last_state,
             "last_t": float(res.t[-1]),
+            "events": chunk.get("events"),
             "reentry": bool(res.reentry_detected),
             "reentry_time": float(res.reentry_time) if res.reentry_time is not None else None,
         }
