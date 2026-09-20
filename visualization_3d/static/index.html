@@ -690,14 +690,19 @@
         rebuildTrail(sat);
     }
 
+    const MAX_TRAIL_PTS = 3000;
+
     function updateSatelliteTrail(sat, currentSimTime) {
         const b = sat.buf;
-        if (!b || !b.t || b.t.length === 0) return;
+        if (!b || !b.t || b.t.length < 2) {
+            if (sat.line && sat.line.geometry) sat.line.geometry.setDrawRange(0, 0);
+            return;
+        }
 
         const period = sat.period_s || 5400;
         // Window of 1 full orbit trailing + 1 full orbit forward
-        const tTail = Math.max(0, currentSimTime - period);
-        const tHead = currentSimTime + period;
+        const tTail = Math.max(b.t[0], currentSimTime - period);
+        const tHead = Math.min(b.t[b.t.length - 1], currentSimTime + period);
 
         let startIdx = 0;
         while (startIdx < b.t.length && b.t[startIdx] < tTail) startIdx++;
@@ -707,24 +712,31 @@
         while (endIdx < b.t.length && b.t[endIdx] <= tHead) endIdx++;
         if (endIdx < b.t.length) endIdx++;
 
-        const sliceLen = Math.max(0, endIdx - startIdx);
+        let sliceLen = endIdx - startIdx;
+        if (sliceLen < 2) {
+            startIdx = Math.max(0, b.t.length - 100);
+            endIdx = b.t.length;
+            sliceLen = endIdx - startIdx;
+        }
+
         if (sliceLen < 2) return;
 
-        const positions = new Float32Array(sliceLen * 3);
-        const colors = new Float32Array(sliceLen * 3);
+        const stride = Math.max(1, Math.ceil(sliceLen / MAX_TRAIL_PTS));
+        const posAttr = sat.line.geometry.attributes.position;
+        const colAttr = sat.line.geometry.attributes.color;
         const baseColor = sat.colorObj || new THREE.Color(sat.color);
 
         const pts = [];
         let pIdx = 0;
-        for (let i = startIdx; i < endIdx; i++) {
+        for (let i = startIdx; i < endIdx && pIdx < MAX_TRAIL_PTS; i += stride) {
             const x = b.x[i] * M_TO_KM;
             const y = b.y[i] * M_TO_KM;
             const z = b.z[i] * M_TO_KM;
             pts.push(new THREE.Vector3(x, y, z));
 
-            positions[pIdx * 3] = x;
-            positions[pIdx * 3 + 1] = y;
-            positions[pIdx * 3 + 2] = z;
+            posAttr.array[pIdx * 3] = x;
+            posAttr.array[pIdx * 3 + 1] = y;
+            posAttr.array[pIdx * 3 + 2] = z;
 
             const t = b.t[i];
             let brightness = 1.0;
@@ -740,17 +752,16 @@
                 brightness = 0.25 + 0.45 * frac;
             }
 
-            colors[pIdx * 3] = baseColor.r * brightness;
-            colors[pIdx * 3 + 1] = baseColor.g * brightness;
-            colors[pIdx * 3 + 2] = baseColor.b * brightness;
+            colAttr.array[pIdx * 3] = baseColor.r * brightness;
+            colAttr.array[pIdx * 3 + 1] = baseColor.g * brightness;
+            colAttr.array[pIdx * 3 + 2] = baseColor.b * brightness;
             pIdx++;
         }
 
         sat.trailPts = pts;
-        sat.line.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        sat.line.geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-        sat.line.geometry.attributes.position.needsUpdate = true;
-        sat.line.geometry.attributes.color.needsUpdate = true;
+        sat.line.geometry.setDrawRange(0, pIdx);
+        posAttr.needsUpdate = true;
+        colAttr.needsUpdate = true;
     }
 
     function rebuildTrail(sat) {
@@ -822,10 +833,22 @@
         group.add(sprite);
         scene.add(group);
 
-        const line = new THREE.Line(
-            new THREE.BufferGeometry(),
-            new THREE.LineBasicMaterial({ vertexColors: true, linewidth: 2, transparent: true, opacity: 0.9 })
-        );
+        const lineGeo = new THREE.BufferGeometry();
+        const posAttr = new THREE.BufferAttribute(new Float32Array(MAX_TRAIL_PTS * 3), 3);
+        posAttr.setUsage(THREE.DynamicDrawUsage);
+        const colAttr = new THREE.BufferAttribute(new Float32Array(MAX_TRAIL_PTS * 3), 3);
+        colAttr.setUsage(THREE.DynamicDrawUsage);
+        lineGeo.setAttribute('position', posAttr);
+        lineGeo.setAttribute('color', colAttr);
+        lineGeo.setDrawRange(0, 0);
+
+        const lineMat = new THREE.LineBasicMaterial({
+            vertexColors: true,
+            linewidth: 2,
+            transparent: true,
+            opacity: 0.9
+        });
+        const line = new THREE.Line(lineGeo, lineMat);
         scene.add(line);
 
         const mkArrow = (c) => {
@@ -1479,6 +1502,7 @@
                 include_moon: document.getElementById('m-moon').checked,
                 color: document.getElementById('m-color').value || '#38bdf8',
                 icon: document.getElementById('m-icon').value || 'satellite',
+                t_start: simTime,
             };
             const res = await fetch('/simulate', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },

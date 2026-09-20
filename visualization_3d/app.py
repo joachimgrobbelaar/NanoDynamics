@@ -115,6 +115,7 @@ class SatelliteParams(BaseModel):
     # Visual representation
     color: str = Field("#38bdf8", description="Hex color for trajectory and indicator")
     icon: str = Field("satellite", description="Avatar icon type: satellite, rocket, astronaut, alien, ufo, sphere")
+    t_start: float = Field(0.0, ge=0.0, description="Initial simulation epoch in seconds")
 
     @model_validator(mode="after")
     def validate_orbit_safety(self) -> "SatelliteParams":
@@ -282,7 +283,7 @@ async def simulate_satellite(params: SatelliteParams):
         dt_eval = body["dt_eval"]
 
         res = await asyncio.to_thread(
-            prop.propagate, orbit, chunk_duration, 0.0, dt_eval
+            prop.propagate, orbit, chunk_duration, params.t_start, dt_eval
         )
         chunk = _format_chunk(res, prop, body["radius_m"], include_forces=True)
 
