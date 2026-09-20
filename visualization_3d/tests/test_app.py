@@ -1,7 +1,7 @@
-from fastapi.testclient import TestClient
-import pytest
 import os
 import sys
+
+from fastapi.testclient import TestClient
 
 # Ensure project root is in sys.path
 # Ensure project root and visualization directory are in sys.path
@@ -11,7 +11,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 sys.path.insert(0, os.path.dirname(vis_root))
 
-from app import app, SAVED_SIMS_DIR
+from app import SAVED_SIMS_DIR, app
 
 client = TestClient(app)
 
@@ -31,10 +31,16 @@ def test_simulate_valid_params():
     data = response.json()
     assert data["name"] == "TestSat"
     assert "trajectory" in data
-    assert len(data["trajectory"]) > 0
+    assert isinstance(data["trajectory"], dict)
+    expected_keys = {"t", "x", "y", "z", "vx", "vy", "vz"}
+    assert set(data["trajectory"].keys()) == expected_keys
+    n_points = len(data["trajectory"]["t"])
+    assert n_points > 0
+    for key in expected_keys:
+        assert len(data["trajectory"][key]) == n_points
 
 def test_simulate_invalid_params_returns_400():
-    # Negative altitude should trigger a ValueError in OrbitalElements / Satellite
+    # Negative altitude should trigger a validation error
     payload = {
         "name": "BadSat",
         "mass": 4.0,
@@ -46,8 +52,61 @@ def test_simulate_invalid_params_returns_400():
         "raan_deg": 45.0
     }
     response = client.post("/simulate", json=payload)
-    assert response.status_code == 400
+    assert response.status_code in (400, 422)
     assert "detail" in response.json()
+    assert isinstance(response.json()["detail"], str)
+
+def test_simulate_negative_mass_rejected():
+    payload = {
+        "name": "TestSat",
+        "mass": -1.0,
+        "drag_area": 0.03,
+        "cd": 2.2,
+        "altitude_km": 400.0,
+        "eccentricity": 0.001,
+        "inclination_deg": 51.6,
+        "raan_deg": 45.0
+    }
+    response = client.post("/simulate", json=payload)
+    assert response.status_code in (400, 422)
+    assert "mass" in response.json()["detail"]
+
+def test_simulate_eccentricity_bounds_rejected():
+    # Eccentricity >= 1.0 (parabolic/hyperbolic) rejected
+    payload = {
+        "name": "TestSat",
+        "mass": 4.0,
+        "drag_area": 0.03,
+        "cd": 2.2,
+        "altitude_km": 400.0,
+        "eccentricity": 1.0,
+        "inclination_deg": 51.6,
+        "raan_deg": 45.0
+    }
+    response = client.post("/simulate", json=payload)
+    assert response.status_code in (400, 422)
+
+    # Negative eccentricity rejected
+    payload["eccentricity"] = -0.05
+    response = client.post("/simulate", json=payload)
+    assert response.status_code in (400, 422)
+
+def test_simulate_perigee_collision_validator():
+    # High eccentricity at low altitude causes perigee below safe 50 km threshold
+    payload = {
+        "name": "CrashingSat",
+        "mass": 4.0,
+        "drag_area": 0.03,
+        "cd": 2.2,
+        "altitude_km": 200.0,
+        "eccentricity": 0.5,  # perigee would be subterranean
+        "inclination_deg": 51.6,
+        "raan_deg": 45.0
+    }
+    response = client.post("/simulate", json=payload)
+    assert response.status_code in (400, 422)
+    detail = response.json()["detail"].lower()
+    assert "perigee" in detail or "collision" in detail or "safe" in detail
 
 def test_save_load_roundtrip():
     # 1. Save
@@ -99,3 +158,82 @@ def test_list_saves():
     assert "test_list_sim" in data["files"]
     
     os.remove(os.path.join(SAVED_SIMS_DIR, "test_list_sim.json"))
+
+
+def test_simulate_bounds_validation():
+    base_valid = {
+        "name": "TestSat",
+        "mass": 4.0,
+        "drag_area": 0.03,
+        "cd": 2.2,
+        "altitude_km": 400.0,
+        "eccentricity": 0.001,
+        "inclination_deg": 51.6,
+        "raan_deg": 45.0,
+    }
+
+    # Empty name
+    p = {**base_valid, "name": ""}
+    res = client.post("/simulate", json=p)
+    assert res.status_code in (400, 422)
+
+    # Altitude too high (> 2000 km)
+    p = {**base_valid, "altitude_km": 2500.0}
+    res = client.post("/simulate", json=p)
+    assert res.status_code in (400, 422)
+
+    # CD too high (> 20.0)
+    p = {**base_valid, "cd": 25.0}
+    res = client.post("/simulate", json=p)
+    assert res.status_code in (400, 422)
+
+    # Negative drag area
+    p = {**base_valid, "drag_area": -0.1}
+    res = client.post("/simulate", json=p)
+    assert res.status_code in (400, 422)
+
+    # Inclination > 180 deg
+    p = {**base_valid, "inclination_deg": 185.0}
+    res = client.post("/simulate", json=p)
+    assert res.status_code in (400, 422)
+
+    # RAAN >= 360 deg
+    p = {**base_valid, "raan_deg": 360.0}
+    res = client.post("/simulate", json=p)
+    assert res.status_code in (400, 422)
+
+    # Missing required field
+    p = {k: v for k, v in base_valid.items() if k != "mass"}
+    res = client.post("/simulate", json=p)
+    assert res.status_code in (400, 422)
+
+
+def test_simulate_clean_error_message_format():
+    # Verify that error details are clean human-readable strings, not raw JSON blobs
+    res = client.post("/simulate", json={"name": "Sat", "mass": -10.0})
+    assert res.status_code in (400, 422)
+    data = res.json()
+    assert "detail" in data
+    assert isinstance(data["detail"], str)
+    assert "mass" in data["detail"]
+
+
+def test_simulate_trajectory_arrays_numeric():
+    payload = {
+        "name": "NumericSat",
+        "mass": 10.0,
+        "drag_area": 0.1,
+        "cd": 2.2,
+        "altitude_km": 500.0,
+        "eccentricity": 0.01,
+        "inclination_deg": 98.0,
+        "raan_deg": 120.0,
+    }
+    response = client.post("/simulate", json=payload)
+    assert response.status_code == 200
+    traj = response.json()["trajectory"]
+    for col in ("t", "x", "y", "z", "vx", "vy", "vz"):
+        assert col in traj
+        assert isinstance(traj[col], list)
+        assert len(traj[col]) > 0
+        assert all(isinstance(val, (int, float)) for val in traj[col][:10])

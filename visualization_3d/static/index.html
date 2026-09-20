@@ -126,8 +126,12 @@
         const earthRadius = 6378.137;
 
         // --- State Management ---
-        let activeSatellites = []; // { name, params, trajectory, mesh, line, points, times, color }
+        const clock = new THREE.Clock();
+        let simTime = 0.0;
+        let activeSatellites = []; // { name, params, trajectory, mesh, line, points, times, maxTime, color }
         let moonPoints = [];
+        let moonTimes = [];
+        let moonMaxTime = 0;
         let selectedSatIndex = -1;
         let globalTimeIdx = 0;
         let floatTimeIdx = 0;
@@ -225,18 +229,76 @@
         // --- Fetch Moon ---
         let moonOrbitLine = null;
         fetch(`/moon_track?dt=60&n=1440`).then(r => r.json()).then(data => {
-            if(data.error) return;
+            if(data.error || !Array.isArray(data)) return;
             moonPoints = data.map(p => new THREE.Vector3(p.x * M_TO_KM, p.y * M_TO_KM, p.z * M_TO_KM));
+            moonTimes = data.map(p => p.t);
+            moonMaxTime = moonTimes.length > 0 ? moonTimes[moonTimes.length - 1] : 86400;
             const geom = new THREE.BufferGeometry().setFromPoints(moonPoints);
             moonOrbitLine = new THREE.Line(geom, new THREE.LineBasicMaterial({ color: 0x888888, transparent: true, opacity: 0.5 }));
             scene.add(moonOrbitLine);
         });
 
         // --- Core Functions ---
+        /**
+         * Interpolates position along trajectory given continuous simulation time t.
+         * Writes directly into outVec using Vector3.prototype.lerpVectors without heap allocation.
+         * Returns { idx, alpha } bracket for telemetry.
+         */
+        function interpolateOrbitPosition(points, times, t, outVec) {
+            if (!points || points.length === 0) return { idx: 0, alpha: 0 };
+            const n = points.length;
+            if (n === 1 || !times || times.length <= 1 || t <= times[0]) {
+                outVec.copy(points[0]);
+                return { idx: 0, alpha: 0 };
+            }
+            const last = n - 1;
+            if (t >= times[last]) {
+                outVec.copy(points[last]);
+                return { idx: last, alpha: 0 };
+            }
+
+            // Binary search for bracket [mid, mid + 1] such that times[mid] <= t <= times[mid + 1]
+            let low = 0;
+            let high = last - 1;
+            while (low <= high) {
+                const mid = (low + high) >> 1;
+                if (times[mid] <= t && t <= times[mid + 1]) {
+                    const dt = times[mid + 1] - times[mid];
+                    const alpha = dt > 0 ? (t - times[mid]) / dt : 0;
+                    outVec.lerpVectors(points[mid], points[mid + 1], alpha);
+                    return { idx: mid, alpha };
+                }
+                if (times[mid] < t) {
+                    low = mid + 1;
+                } else {
+                    high = mid - 1;
+                }
+            }
+            outVec.copy(points[0]);
+            return { idx: 0, alpha: 0 };
+        }
+
         function addSatelliteToScene(satData) {
-            const pts = satData.trajectory.map(p => new THREE.Vector3(p.x * M_TO_KM, p.y * M_TO_KM, p.z * M_TO_KM));
-            const tms = satData.trajectory.map(p => p.t);
-            const color = satData.color || Math.random() * 0xffffff;
+            let pts = [];
+            let tms = [];
+            const traj = satData.trajectory;
+
+            if (traj && (traj.t || (traj.x && Array.isArray(traj.x)))) {
+                // Columnar dictionary format {"t": [...], "x": [...], ...}
+                const n = traj.t ? traj.t.length : (traj.x ? traj.x.length : 0);
+                pts = new Array(n);
+                for (let i = 0; i < n; i++) {
+                    pts[i] = new THREE.Vector3(traj.x[i] * M_TO_KM, traj.y[i] * M_TO_KM, traj.z[i] * M_TO_KM);
+                }
+                tms = traj.t || [];
+            } else if (Array.isArray(traj)) {
+                // Legacy array-of-objects format [{t, x, y, z, ...}, ...]
+                pts = traj.map(p => new THREE.Vector3(p.x * M_TO_KM, p.y * M_TO_KM, p.z * M_TO_KM));
+                tms = traj.map(p => p.t);
+            }
+
+            const maxTime = tms.length > 0 ? tms[tms.length - 1] : 86400;
+            const color = satData.color !== undefined ? satData.color : Math.random() * 0xffffff;
 
             const mesh = new THREE.Mesh(new THREE.SphereGeometry(150, 16, 16), new THREE.MeshBasicMaterial({ color }));
             scene.add(mesh);
@@ -248,9 +310,16 @@
             scene.add(line);
 
             activeSatellites.push({
-                name: satData.name, params: satData.params, trajectory: satData.trajectory,
+                name: satData.name,
+                params: satData.params,
+                trajectory: satData.trajectory,
                 period_s: satData.period_s || 5400, // default 90m if missing
-                mesh, line, points: pts, times: tms, color
+                mesh,
+                line,
+                points: pts,
+                times: tms,
+                maxTime: maxTime,
+                color
             });
 
             updateCameraDropdown();
@@ -268,6 +337,7 @@
         function newProject() {
             clearSatellites();
             document.getElementById('save-name').value = '';
+            simTime = 0.0;
             globalTimeIdx = 0;
             floatTimeIdx = 0;
         }
@@ -285,7 +355,7 @@
                 const step = T / 6.0;
                 
                 const times = sat.times;
-                if (times.length === 0) return;
+                if (!times || times.length === 0) return;
                 
                 const t_end = times[times.length - 1];
                 const t_start = Math.max(0, t_end - 10 * T);
@@ -304,8 +374,27 @@
                         }
                     }
                     
-                    const pt = sat.trajectory[closestIdx];
-                    csvContent += `${sat.name},${pt.t.toFixed(2)},${pt.x.toFixed(2)},${pt.y.toFixed(2)},${pt.z.toFixed(2)},${pt.vx.toFixed(4)},${pt.vy.toFixed(4)},${pt.vz.toFixed(4)}\n`;
+                    let tVal = 0, xVal = 0, yVal = 0, zVal = 0, vxVal = 0, vyVal = 0, vzVal = 0;
+                    if (Array.isArray(sat.trajectory)) {
+                        const pt = sat.trajectory[closestIdx] || {};
+                        tVal = pt.t !== undefined ? pt.t : 0;
+                        xVal = pt.x !== undefined ? pt.x : 0;
+                        yVal = pt.y !== undefined ? pt.y : 0;
+                        zVal = pt.z !== undefined ? pt.z : 0;
+                        vxVal = pt.vx !== undefined ? pt.vx : 0;
+                        vyVal = pt.vy !== undefined ? pt.vy : 0;
+                        vzVal = pt.vz !== undefined ? pt.vz : 0;
+                    } else if (sat.trajectory && sat.trajectory.t) {
+                        tVal = sat.trajectory.t[closestIdx] !== undefined ? sat.trajectory.t[closestIdx] : 0;
+                        xVal = sat.trajectory.x[closestIdx] !== undefined ? sat.trajectory.x[closestIdx] : 0;
+                        yVal = sat.trajectory.y[closestIdx] !== undefined ? sat.trajectory.y[closestIdx] : 0;
+                        zVal = sat.trajectory.z[closestIdx] !== undefined ? sat.trajectory.z[closestIdx] : 0;
+                        vxVal = (sat.trajectory.vx && sat.trajectory.vx[closestIdx] !== undefined) ? sat.trajectory.vx[closestIdx] : 0;
+                        vyVal = (sat.trajectory.vy && sat.trajectory.vy[closestIdx] !== undefined) ? sat.trajectory.vy[closestIdx] : 0;
+                        vzVal = (sat.trajectory.vz && sat.trajectory.vz[closestIdx] !== undefined) ? sat.trajectory.vz[closestIdx] : 0;
+                    }
+
+                    csvContent += `${sat.name},${tVal.toFixed(2)},${xVal.toFixed(2)},${yVal.toFixed(2)},${zVal.toFixed(2)},${vxVal.toFixed(4)},${vyVal.toFixed(4)},${vzVal.toFixed(4)}\n`;
                     
                     current_t += step;
                 }
@@ -430,52 +519,79 @@
         // --- Animation Loop ---
         function animate() {
             requestAnimationFrame(animate);
-            earth.rotation.y += 0.0002; 
 
-            // Time progression based on fastest array length approx
-            const maxLen = activeSatellites.reduce((max, s) => Math.max(max, s.points.length), 0) || (moonPoints.length ? moonPoints.length : 1440);
-            floatTimeIdx += (simSettings.playbackSpeed / 5); 
-            globalTimeIdx = Math.floor(floatTimeIdx) % maxLen;
+            const delta = Math.min(clock.getDelta(), 0.1);
+            const simDelta = delta * simSettings.playbackSpeed * 720.0;
+            simTime += simDelta;
+            globalTimeIdx = Math.floor(simTime / 60.0);
 
-            // Update Moon
-            if(moonPoints.length > 0) moon.position.copy(moonPoints[globalTimeIdx % moonPoints.length]);
+            // Synchronize Earth sidereal rotation to physical simulation time
+            earth.rotation.y += delta * simSettings.playbackSpeed * 720.0 * (2.0 * Math.PI / 86164.1);
 
-            // Update Satellites
+            // Update Moon position with continuous time interpolation
+            if (moonPoints.length > 0) {
+                const mMax = moonMaxTime || (moonTimes.length > 0 ? moonTimes[moonTimes.length - 1] : 86400);
+                const mCur = mMax > 0 ? (simTime % mMax) : 0;
+                if (moonTimes.length === moonPoints.length && moonTimes.length > 0) {
+                    interpolateOrbitPosition(moonPoints, moonTimes, mCur, moon.position);
+                } else {
+                    const idx = Math.floor(mCur / 60.0) % moonPoints.length;
+                    moon.position.copy(moonPoints[idx]);
+                }
+            }
+
+            // Update Satellites with in-place lerpVectors binary search bracket
             activeSatellites.forEach(sat => {
-                const idx = globalTimeIdx % sat.points.length;
-                sat.mesh.position.copy(sat.points[idx]);
+                if (!sat.points || sat.points.length === 0) return;
+                const maxT = sat.maxTime || (sat.times && sat.times.length > 0 ? sat.times[sat.times.length - 1] : 86400);
+                const tCur = maxT > 0 ? (simTime % maxT) : 0;
+                interpolateOrbitPosition(sat.points, sat.times, tCur, sat.mesh.position);
             });
 
             // Camera Target
-            if(selectedSatIndex === -2 && moonPoints.length > 0) {
+            if (selectedSatIndex === -2 && moonPoints.length > 0) {
                 // To keep the moon smoothly in view, apply an offset based on its position
                 if (controls) {
                     camera.position.add(moon.position.clone().sub(controls.target));
                     controls.target.copy(moon.position);
                 }
-            } else if(selectedSatIndex >= 0 && activeSatellites[selectedSatIndex]) {
+            } else if (selectedSatIndex >= 0 && activeSatellites[selectedSatIndex]) {
                 if (controls) controls.target.copy(activeSatellites[selectedSatIndex].mesh.position);
             } else {
-                if (controls) controls.target.set(0,0,0);
+                if (controls) controls.target.set(0, 0, 0);
             }
 
-            // Update Telemetry if focused
+            // Update Telemetry continuously
             if (selectedSatIndex === -2) {
                 document.getElementById('telemetry').innerHTML =
-                    `Focus: Moon<br>Time: ${(globalTimeIdx*60).toFixed(1)} s<br>Distance: ${(moon.position.length()).toFixed(1)} km<br>Velocity: -- km/s`;
+                    `Focus: Moon<br>Time: ${simTime.toFixed(1)} s<br>Distance: ${(moon.position.length()).toFixed(1)} km<br>Velocity: -- km/s`;
             } else if (selectedSatIndex >= 0 && activeSatellites[selectedSatIndex]) {
                 const sat = activeSatellites[selectedSatIndex];
-                const idx = globalTimeIdx % sat.points.length;
-                const pos = sat.points[idx];
-                const alt = (pos.length() - earthRadius).toFixed(2);
+                const maxT = sat.maxTime || (sat.times && sat.times.length > 0 ? sat.times[sat.times.length - 1] : 86400);
+                const tCur = maxT > 0 ? (simTime % maxT) : 0;
+                const interp = interpolateOrbitPosition(sat.points, sat.times, tCur, sat.mesh.position);
+                const alt = (sat.mesh.position.length() - earthRadius).toFixed(2);
                 
-                const ptData = sat.trajectory[idx];
-                const vMag = Math.sqrt(ptData.vx*ptData.vx + ptData.vy*ptData.vy + ptData.vz*ptData.vz) / 1000;
+                let vx = 0, vy = 0, vz = 0;
+                const traj = sat.trajectory;
+                const idx = interp.idx;
+                if (Array.isArray(traj)) {
+                    if (traj[idx]) {
+                        vx = traj[idx].vx !== undefined ? traj[idx].vx : 0;
+                        vy = traj[idx].vy !== undefined ? traj[idx].vy : 0;
+                        vz = traj[idx].vz !== undefined ? traj[idx].vz : 0;
+                    }
+                } else if (traj && traj.vx) {
+                    vx = traj.vx[idx] !== undefined ? traj.vx[idx] : 0;
+                    vy = traj.vy[idx] !== undefined ? traj.vy[idx] : 0;
+                    vz = traj.vz[idx] !== undefined ? traj.vz[idx] : 0;
+                }
+                const vMag = Math.sqrt(vx * vx + vy * vy + vz * vz) / 1000.0;
                 
                 document.getElementById('telemetry').innerHTML = 
-                    `Focus: ${sat.name}<br>Time: ${ptData.t.toFixed(1)} s<br>Altitude: ${alt} km<br>Velocity: ${vMag.toFixed(3)} km/s`;
+                    `Focus: ${sat.name}<br>Time: ${tCur.toFixed(1)} s<br>Altitude: ${alt} km<br>Velocity: ${vMag.toFixed(3)} km/s`;
             } else {
-                document.getElementById('telemetry').innerHTML = `Time: ${(globalTimeIdx*60).toFixed(1)} s<br>Altitude: -- km<br>Velocity: -- km/s`;
+                document.getElementById('telemetry').innerHTML = `Time: ${simTime.toFixed(1)} s<br>Altitude: -- km<br>Velocity: -- km/s`;
             }
 
             if (controls) controls.update();
