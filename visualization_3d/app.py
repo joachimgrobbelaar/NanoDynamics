@@ -40,15 +40,15 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         else:
             error_messages.append(msg)
     clean_detail = "; ".join(error_messages) if error_messages else "Validation error"
-    return JSONResponse(
-        status_code=422,
-        content={"detail": clean_detail}
-    )
+    return JSONResponse(status_code=422, content={"detail": clean_detail})
+
 
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 
 SAVED_SIMS_DIR = os.path.join(BASE_DIR, "saved_sims")
 os.makedirs(SAVED_SIMS_DIR, exist_ok=True)
+
+ATM = ExponentialAtmosphere(h0=350_000.0, rho0=9.5e-12, scale_height=53_200.0)
 
 
 class SatelliteParams(BaseModel):
@@ -56,26 +56,33 @@ class SatelliteParams(BaseModel):
     mass: float = Field(..., gt=0.0, le=100000.0, description="Mass in kg")
     drag_area: float = Field(..., ge=0.0, le=10000.0, description="Cross-section area in m^2")
     cd: float = Field(..., ge=0.0, le=20.0, description="Drag coefficient")
-    altitude_km: float = Field(..., ge=100.0, le=2000.0, description="Altitude in km")
+    altitude_km: float = Field(..., ge=100.0, le=2000.0, description="Perigee altitude in km")
     eccentricity: float = Field(..., ge=0.0, lt=1.0, description="Orbital eccentricity")
     inclination_deg: float = Field(..., ge=0.0, le=180.0, description="Inclination in degrees")
     raan_deg: float = Field(..., ge=0.0, lt=360.0, description="RAAN in degrees")
+    # Perturbation toggles
+    include_j2: bool = Field(True, description="Include J2 oblateness perturbation")
+    include_drag: bool = Field(True, description="Include atmospheric drag")
+    include_moon: bool = Field(False, description="Include lunar third-body gravity")
 
     @model_validator(mode="after")
     def validate_orbit_safety(self) -> "SatelliteParams":
-        # The satellite is launched at true anomaly nu=0 (perigee), so
-        # altitude_km is the perigee altitude directly. The Field constraint
-        # (ge=100.0) already guarantees this is safe. We only need to guard
-        # against a highly eccentric orbit whose perigee is below the surface.
-        # Semi-major axis: a = (R_EARTH + altitude_km*1000) / (1 - e)
-        # Perigee radius (at nu=0): r_p = R_EARTH + altitude_km * 1000
-        # (altitude_km IS the perigee altitude, not the semi-major axis)
-        perigee_alt_km = self.altitude_km  # nu=0 launch → perigee = input altitude
+        perigee_alt_km = self.altitude_km
         if perigee_alt_km < 50.0:
             raise ValueError(
                 f"Perigee altitude {perigee_alt_km:.1f} km is below minimum safe threshold of 50 km."
             )
         return self
+
+
+class StreamRequest(BaseModel):
+    """Request a rolling chunk of trajectory from a known Cartesian state."""
+    params: SatelliteParams
+    t_start: float = Field(..., ge=0.0, description="Simulation time at start of chunk (s)")
+    state: list[float] = Field(..., min_length=6, max_length=6,
+                               description="[x, y, z, vx, vy, vz] in metres / m/s")
+    chunk_duration: float = Field(600.0, ge=10.0, le=3600.0,
+                                  description="Duration of this chunk in seconds")
 
 
 class SavePayload(BaseModel):
@@ -84,10 +91,67 @@ class SavePayload(BaseModel):
 
 
 def sanitize_filename(filename: str) -> str:
-    # Allow only alphanumeric, dashes, and underscores
     if not re.match(r'^[\w\-]+$', filename):
-        raise HTTPException(status_code=400, detail="Invalid filename format. Use only alphanumeric characters, dashes, and underscores.")
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid filename format. Use only alphanumeric characters, dashes, and underscores."
+        )
     return filename
+
+
+def _build_propagator(params: SatelliteParams) -> OrbitPropagator:
+    sat = Satellite(name=params.name, mass=params.mass, drag_area=params.drag_area, cd=params.cd)
+    return OrbitPropagator(
+        satellite=sat,
+        atmosphere=ATM,
+        include_central_gravity=True,
+        include_j2=params.include_j2,
+        include_drag=params.include_drag,
+        include_moon=params.include_moon,
+    )
+
+
+def _compute_forces(prop: OrbitPropagator, t_arr, r_arr, v_arr):
+    """Compute force vectors along a trajectory. Returns dict of lists."""
+    forces = {"central": [], "j2": [], "drag": [], "moon": [], "total": []}
+    for i in range(len(t_arr)):
+        acc = prop.dynamics.compute_accelerations(r_arr[i], v_arr[i], t=float(t_arr[i]))
+        for k in forces:
+            forces[k].append(acc[k].tolist())
+    return forces
+
+
+def _propagate_chunk(prop: OrbitPropagator, initial_state, t_start: float,
+                     chunk_duration: float, dt_eval: float = 10.0):
+    """Propagate a chunk. Returns PropagationResult."""
+    return prop.propagate(
+        initial_state=np.asarray(initial_state, dtype=np.float64),
+        duration_seconds=chunk_duration,
+        t_start=t_start,
+        dt_eval=dt_eval,
+    )
+
+
+def _format_chunk(res, prop: OrbitPropagator, include_forces: bool = True) -> dict:
+    """Convert PropagationResult to columnar JSON-serialisable dict."""
+    t = res.t.tolist()
+    r = res.r
+    v = res.v
+    out = {
+        "t": t,
+        "x": r[:, 0].tolist(),
+        "y": r[:, 1].tolist(),
+        "z": r[:, 2].tolist(),
+        "vx": v[:, 0].tolist(),
+        "vy": v[:, 1].tolist(),
+        "vz": v[:, 2].tolist(),
+        "alt_km": ((np.linalg.norm(r, axis=1) - R_EARTH) / 1000.0).tolist(),
+        "reentry": bool(res.reentry_detected),
+    }
+    if include_forces:
+        out["forces"] = _compute_forces(prop, res.t, r, v)
+    return out
+
 
 @app.get("/")
 def read_root():
@@ -96,55 +160,62 @@ def read_root():
 
 @app.post("/simulate")
 async def simulate_satellite(params: SatelliteParams):
+    """Bootstrap: propagates the first chunk (600 s) and returns initial state + trajectory."""
     try:
-        # 1. Initialize objects (will raise ValueError on bad inputs)
-        sat = Satellite(name=params.name, mass=params.mass, drag_area=params.drag_area, cd=params.cd)
-        # altitude_km is the perigee altitude (satellite launched at nu=0 = perigee).
-        # Semi-major axis: a = r_perigee / (1 - e)
+        prop = _build_propagator(params)
         r_perigee_m = R_EARTH + params.altitude_km * 1000.0
         a_m = r_perigee_m / (1.0 - params.eccentricity) if params.eccentricity < 1.0 else r_perigee_m
         orbit = OrbitalElements(
             a=a_m,
-            e=params.eccentricity, 
-            i=np.radians(params.inclination_deg), 
-            raan=np.radians(params.raan_deg), 
-            arg_pe=0.0, 
-            nu=0.0
+            e=params.eccentricity,
+            i=np.radians(params.inclination_deg),
+            raan=np.radians(params.raan_deg),
+            arg_pe=0.0,
+            nu=0.0,
         )
-        atm = ExponentialAtmosphere(h0=350_000.0, rho0=9.5e-12, scale_height=53_200.0)
-        
-        # 2. Propagate (offload heavy integration to thread)
-        prop = OrbitPropagator(
-            satellite=sat, 
-            atmosphere=atm, 
-            include_central_gravity=True, 
-            include_j2=True, 
-            include_drag=True
+
+        res = await asyncio.to_thread(
+            prop.propagate, orbit, 600.0, 0.0, 10.0
         )
-        
-        res = await asyncio.to_thread(prop.propagate, orbit, duration_seconds=86400, dt_eval=60)
-        
-        # 3. Format & Return columnar trajectory dictionary
-        trajectory = {
-            "t": res.t.tolist(),
-            "x": res.r[:, 0].tolist(),
-            "y": res.r[:, 1].tolist(),
-            "z": res.r[:, 2].tolist(),
-            "vx": res.v[:, 0].tolist(),
-            "vy": res.v[:, 1].tolist(),
-            "vz": res.v[:, 2].tolist(),
-        }
-        
-        # Use model_dump() for Pydantic V2
+        chunk = _format_chunk(res, prop, include_forces=True)
+
+        # Return final Cartesian state for /stream continuity
+        last_state = res.r[-1].tolist() + res.v[-1].tolist()
+
         return {
-            "name": params.name, 
-            "params": params.model_dump() if hasattr(params, 'model_dump') else params.dict(),
+            "name": params.name,
+            "params": params.model_dump(),
             "period_s": float(orbit.period),
-            "trajectory": trajectory
+            "trajectory": chunk,
+            "last_state": last_state,
+            "last_t": float(res.t[-1]),
         }
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/stream")
+async def stream_chunk(req: StreamRequest):
+    """Rolling propagation: given last known state, propagate next chunk."""
+    try:
+        prop = _build_propagator(req.params)
+        res = await asyncio.to_thread(
+            _propagate_chunk, prop, req.state, req.t_start, req.chunk_duration, 10.0
+        )
+        chunk = _format_chunk(res, prop, include_forces=True)
+        last_state = res.r[-1].tolist() + res.v[-1].tolist()
+
+        return {
+            "trajectory": chunk,
+            "last_state": last_state,
+            "last_t": float(res.t[-1]),
+            "reentry": bool(res.reentry_detected),
+        }
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -156,7 +227,7 @@ def save_simulation(payload: SavePayload):
         with open(filepath, "w") as f:
             json.dump(payload.satellites, f)
         return {"status": "success", "message": f"Saved {safe_name}"}
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -170,7 +241,7 @@ def load_simulation(filename: str):
         with open(filepath, "r") as f:
             data = json.load(f)
         return {"satellites": data}
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -187,14 +258,8 @@ def get_moon_track(dt: float = 60.0, n: int = 1440):
         return {"error": "dt must be in (0, 86400] seconds"}
     if not 1 <= n <= 20000:
         return {"error": "n must be in [1, 20000]"}
-
     return [
-        {
-            "t": float(i * dt),
-            "x": float(pos[0]),
-            "y": float(pos[1]),
-            "z": float(pos[2]),
-        }
+        {"t": float(i * dt), "x": float(pos[0]), "y": float(pos[1]), "z": float(pos[2])}
         for i in range(n)
         for pos in [moon_position(i * dt)]
     ]
