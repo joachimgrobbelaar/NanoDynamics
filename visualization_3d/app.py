@@ -1,4 +1,5 @@
 import asyncio
+from dataclasses import asdict
 import json
 import os
 import re
@@ -22,6 +23,11 @@ from leo_simulator import (
     OrbitalElements,
     OrbitPropagator,
     Satellite,
+)
+from leo_simulator.experiment import (
+    get_atmosphere_by_name,
+    run_parametric_sweep,
+    run_single_simulation,
 )
 from leo_simulator.models.gravity import moon_position
 
@@ -48,7 +54,8 @@ app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), na
 SAVED_SIMS_DIR = os.path.join(BASE_DIR, "saved_sims")
 os.makedirs(SAVED_SIMS_DIR, exist_ok=True)
 
-ATM = ExponentialAtmosphere(h0=350_000.0, rho0=9.5e-12, scale_height=53_200.0)
+EXPERIMENTS_DIR = os.path.join(PROJECT_ROOT, "experiments")
+os.makedirs(EXPERIMENTS_DIR, exist_ok=True)
 
 BODIES = {
     "Earth": {
@@ -80,31 +87,15 @@ BODIES = {
         "default_ecc": 0.001,
         "default_inc": 90.0,
         "default_raan": 0.0,
-        "default_chunk_duration": 600.0,
-        "dt_eval": 10.0,
-    },
-    "Sun": {
-        "name": "Sun",
-        "mu": 1.32712440018e20,
-        "radius_m": 696340000.0,
-        "j2": 2.0e-7,
-        "omega": 2.865e-6,
-        "has_atmosphere": False,
-        "min_alt_km": 1000000.0,
-        "max_alt_km": 1000000000.0,
-        "default_alt_km": 149600000.0,
-        "default_ecc": 0.0167,
-        "default_inc": 0.0,
-        "default_raan": 0.0,
         "default_chunk_duration": 86400.0,
-        "dt_eval": 1800.0,
+        "dt_eval": 60.0,
     },
 }
 
 
 class SatelliteParams(BaseModel):
     name: str = Field(..., min_length=1, max_length=100, description="Satellite name")
-    parent_body: str = Field("Earth", description="Central body: Earth, Moon, or Sun")
+    parent_body: str = Field("Earth", description="Central body: Earth or Moon")
     mass: float = Field(..., gt=0.0, le=100000.0, description="Mass in kg")
     drag_area: float = Field(..., ge=0.0, le=10000.0, description="Cross-section area in m^2")
     cd: float = Field(..., ge=0.0, le=20.0, description="Drag coefficient")
@@ -112,6 +103,9 @@ class SatelliteParams(BaseModel):
     eccentricity: float = Field(..., ge=0.0, lt=1.0, description="Orbital eccentricity")
     inclination_deg: float = Field(..., ge=0.0, le=180.0, description="Inclination in degrees")
     raan_deg: float = Field(..., ge=0.0, lt=360.0, description="RAAN in degrees")
+    # Atmosphere configuration
+    atmosphere_type: str = Field("piecewise", description="Atmosphere model: piecewise, high_solar, low_solar, app_default")
+    density_scale: float = Field(1.0, ge=0.001, le=1000.0, description="Atmospheric density multiplier")
     # Perturbation toggles
     include_j2: bool = Field(True, description="Include J2 oblateness perturbation")
     include_drag: bool = Field(True, description="Include atmospheric drag")
@@ -155,6 +149,16 @@ class BurnRequest(BaseModel):
     dv_radial: float = Field(0.0, description="Delta-v in radial-outward direction (m/s)")
 
 
+class ExperimentRequest(BaseModel):
+    param_name: str = Field(..., description="Independent variable name to sweep")
+    values: list[float] = Field(..., min_length=1, max_length=100, description="List of parameter values")
+    base_params: SatelliteParams
+    atmosphere_type: str = Field("piecewise", description="Atmosphere model type")
+    density_scale: float = Field(1.0, ge=0.001, le=1000.0, description="Density scale multiplier")
+    max_duration_days: float = Field(30.0, ge=0.1, le=365.0, description="Max propagation duration in days")
+    quiet: bool = Field(True, description="True for fast metric sweep, False to include trajectory coordinates")
+
+
 class SavePayload(BaseModel):
     filename: str
     satellites: list
@@ -173,7 +177,7 @@ def _build_propagator(params: SatelliteParams) -> OrbitPropagator:
     body = BODIES.get(params.parent_body, BODIES["Earth"])
     sat = Satellite(name=params.name, mass=params.mass, drag_area=params.drag_area, cd=params.cd)
     use_drag = body["has_atmosphere"] and params.include_drag
-    atm = ATM if use_drag else None
+    atm = get_atmosphere_by_name(params.atmosphere_type, params.density_scale) if use_drag else None
 
     return OrbitPropagator(
         satellite=sat,
@@ -362,6 +366,56 @@ async def execute_burn(req: BurnRequest):
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/experiment/run")
+async def api_run_experiment(req: ExperimentRequest):
+    """Run server-side parametric sweep and record clean CSV results."""
+    try:
+        base_dict = req.base_params.model_dump()
+        max_duration_sec = req.max_duration_days * 86400.0
+
+        result = await asyncio.to_thread(
+            run_parametric_sweep,
+            param_name=req.param_name,
+            values=req.values,
+            base_params=base_dict,
+            atmosphere_type=req.atmosphere_type,
+            density_scale=req.density_scale,
+            max_duration_seconds=max_duration_sec,
+            quiet=req.quiet,
+            output_dir=EXPERIMENTS_DIR,
+        )
+
+        return {
+            "status": "success",
+            "experiment_id": result.experiment_id,
+            "param_name": result.param_name,
+            "timestamp": result.timestamp,
+            "csv_filename": f"{result.experiment_id}.csv",
+            "results": [asdict(r) for r in result.results],
+            "trajectories": result.trajectories if not req.quiet else None,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/experiment/download/{filename}")
+def api_download_experiment_csv(filename: str):
+    """Download a recorded experiment CSV dataset."""
+    safe_name = sanitize_filename(filename.replace(".csv", ""))
+    filepath = os.path.join(EXPERIMENTS_DIR, f"{safe_name}.csv")
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="Experiment CSV file not found")
+    return FileResponse(filepath, media_type="text/csv", filename=f"{safe_name}.csv")
+
+
+@app.get("/experiment/list")
+def api_list_experiments():
+    """List all recorded experiment CSV files."""
+    files = [f for f in os.listdir(EXPERIMENTS_DIR) if f.endswith(".csv")]
+    files.sort(reverse=True)
+    return {"experiments": files}
 
 
 @app.post("/save")

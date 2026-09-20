@@ -1,12 +1,15 @@
-# NanoDynamics: Real-Scale Earth-Moon Orbital Dynamics Simulator (v12-alpha)
+# NanoDynamics: Real-Scale Earth-Moon Orbital Dynamics & Experimentation Suite (v13-alpha)
 
-An interactive, high-fidelity numerical orbit propagator and mission analysis suite for satellites orbiting the Earth and Moon. NanoDynamics combines high-order Runge-Kutta numerical integration (`scipy.integrate.solve_ivp`), a PyTorch Physics-Informed Neural Network (PINN) surrogate model, and a real-scale Three.js / FastAPI full-stack 3D interactive web application with rolling trajectory streaming and live maneuver simulation.
+An interactive, high-fidelity numerical orbit propagator, mission analysis suite, and parametric experimentation engine for satellites orbiting the Earth and Moon. NanoDynamics combines high-order Runge-Kutta numerical integration (`scipy.integrate.solve_ivp`), a PyTorch Physics-Informed Neural Network (PINN) surrogate model, and a real-scale Three.js / FastAPI full-stack 3D interactive web application with rolling trajectory streaming, live maneuver simulation, and automated deorbit lifetime sweeps.
 
 ---
 
 ## 🚀 Key Features
 
-- **Real-Scale Earth-Moon System:** True-to-life physical dimensions ($R_\oplus = 6,378.137\text{ km}$, $R_{Moon} = 1,737.4\text{ km}$) and real orbital separation ($384,400\text{ km}$) with realistic $27.32\text{ day}$ lunar propagation and $5.145^\circ$ orbital inclination.
+- **🧪 Server-Side Parametric Experimentation Lab:** Automated parametric sweeps evaluating independent variables ($B = \frac{m}{C_D A}$, mass, drag area, $C_D$, altitude, eccentricity, atmospheric density scale) to measure and record satellite deorbit lifetime, energy loss, and orbital decay rates. Supports quiet high-speed headless evaluation and visual trajectory inspection.
+- **Atmospheric Model Reconciliation:** High-fidelity Piecewise US Standard Atmosphere 1976 model with tabular layered scale heights ($0\text{ to }1,000\text{ km}$), alongside configurable solar activity multipliers (Low, Moderate, High Solar Activity) and custom density scaling.
+- **Clean Monotonic CSV Export:** Strictly monotonic trajectory exports with individual `Run_ID`, `Satellite_Name`, physical coordinates, velocities, altitudes, and deorbit lifetimes without overlap or time resets.
+- **Real-Scale Earth-Moon System:** True-to-life physical dimensions ($R_\oplus = 6,378.137\text{ km}$, $R_{\text{Moon}} = 1,737.4\text{ km}$) and real orbital separation ($384,400\text{ km}$) with realistic $27.32\text{ day}$ lunar propagation and $5.145^\circ$ orbital inclination.
 - **Continuous Forward Time & Up to 10,000× Speedup:** Smooth, non-looping simulation driven by a true elapsed-time clock with speed multipliers from $1\times$ to $10,000\times$.
 - **Rolling `/stream` Architecture:** Trajectories are streamed in rolling chunks asynchronously from the FastAPI backend via `asyncio.to_thread()`, keeping the interface lightweight and responsive indefinitely.
 - **Multi-Body Satellite Placement:** Deploy satellites around **Earth** (LEO, MEO, GEO) or the **Moon** (Low Lunar Orbit) with dynamically guarded stable orbital parameter ranges.
@@ -14,9 +17,8 @@ An interactive, high-fidelity numerical orbit propagator and mission analysis su
 - **3D Force Vector Overlays:** Interactive `THREE.ArrowHelper` vectors showing instantaneous acceleration components:
   - 🟢 **Central Gravity** ($-\frac{\mu}{r^3}\mathbf{r}$)
   - 🟡 **$J_2$ Earth Oblateness**
-  - 🔴 **Atmospheric Drag** ($-\frac{1}{2}\rho \frac{C_D A}{m} v_{rel} \mathbf{v}_{rel}$)
+  - 🔴 **Atmospheric Drag** ($-\frac{1}{2}\rho \frac{C_D A}{m} v_{\text{rel}} \mathbf{v}_{\text{rel}}$)
 - **Orbital Decay & Deorbit Lifetime Tracking:** Continuous altitude monitoring captures the exact deorbit epoch when atmospheric drag forces re-entry ($h \le 0\text{ km}$), recording satellite lifetime in live telemetry and downloadable CSV exports.
-- **Individual Satellite Management:** Add, inspect, track, maneuver, and delete individual satellites on the fly.
 - **Scenario Persistence:** Save and load multi-satellite configurations as JSON scenarios.
 
 ---
@@ -26,9 +28,10 @@ An interactive, high-fidelity numerical orbit propagator and mission analysis su
 ```text
 leo_simulator/
 ├── constants.py                 # WGS-84 geodetic parameters, lunar constants, atmospheric defaults
+├── experiment.py                # Parametric sweep engine & deorbit lifetime analysis framework
 ├── models/
 │   ├── gravity.py               # Central two-body gravity, J2 oblateness, Lunar ephemeris & 3rd-body
-│   ├── drag.py                  # Exponential & piecewise density models, co-rotating atmospheric drag
+│   ├── drag.py                  # Exponential & piecewise US Standard 1976 density models, co-rotating drag
 │   └── dynamics.py              # Equations of motion: d/dt [r, v] = [v, a_total] & force decomposition
 ├── orbit/
 │   ├── elements.py              # Keplerian orbital elements conversions [a, e, i, Omega, omega, nu]
@@ -42,6 +45,7 @@ leo_simulator/
 │   ├── test_app.py              # E2E API tests (validation, async offload, streaming, burns)
 │   ├── test_challenger1_stress.py # Stress tests (concurrency, energy conservation, boundary knife-edges)
 │   ├── test_elements.py         # Keplerian elements round-trip conversion tests
+│   ├── test_experiment.py       # Parametric sweep and atmospheric density unit tests
 │   ├── test_models.py           # Gravity, J2, and atmospheric drag physical model tests
 │   ├── test_propagator.py       # Numerical convergence & event termination tests
 │   ├── test_simulation.py       # Physics assertions (drag decay & nodal precession rates)
@@ -49,11 +53,11 @@ leo_simulator/
 │   ├── test_ui_refactor.py      # Columnar payload and animation integrity tests
 │   └── test_visualization.py    # Telemetry and plotting unit tests
 └── visualization_3d/
-    ├── app.py                   # FastAPI async server (/simulate, /stream, /burn, /save, /load)
+    ├── app.py                   # FastAPI async server (/simulate, /stream, /burn, /experiment, /save, /load)
     ├── saved_sims/              # Saved multi-satellite JSON scenarios
     ├── tests/                   # Backend & UI automation test suites
     └── static/
-        └── index.html           # Three.js 3D WebGL real-scale Earth-Moon interactive simulator
+        └── index.html           # Three.js 3D WebGL real-scale Earth-Moon interactive simulator & Lab
 ```
 
 ---
@@ -76,17 +80,18 @@ $$\mathbf{a}_{J_2} = -\frac{3}{2} \frac{J_2 \mu R_\oplus^2}{r^5} \begin{bmatrix}
 
 where $J_{2,\oplus} = 1.08262668 \times 10^{-3}$.
 
-### 3. Aerodynamic Atmospheric Drag
+### 3. Aerodynamic Atmospheric Drag & Density Layers
 $$\mathbf{a}_{\text{drag}} = -\frac{1}{2} \rho(h) \left(\frac{C_D A}{m}\right) \|\mathbf{v}_{\text{rel}}\| \mathbf{v}_{\text{rel}}$$
 
 - **Atmospheric Co-rotation:** $\mathbf{v}_{\text{rel}} = \mathbf{v} - (\boldsymbol{\omega}_\oplus \times \mathbf{r})$, where $\omega_\oplus = 7.2921150 \times 10^{-5}\text{ rad/s}$.
-- **Exponential Density:** $\rho(h) = \rho_0 \exp\left(-\frac{h - h_0}{H}\right)$, where $h_0 = 350\text{ km}$, $\rho_0 = 9.5 \times 10^{-12}\text{ kg/m}^3$, and scale height $H = 53.2\text{ km}$.
+- **Piecewise US Standard 1976 Model:** Layered base density $\rho_{0,i}$ and localized scale height $H_i$ across altitudes from $0\text{ to }1,000\text{ km}$:
+  $$\rho(h) = \rho_{0,i} \exp\left(-\frac{h - h_{0,i}}{H_i}\right)$$
+- **Ballistic Coefficient:** $B = \frac{m}{C_D A}\text{ [kg/m}^2\text{]}$. Lifetime scales linearly with $B$ for circular orbits.
 
 ### 4. Lunar Third-Body Perturbation
 $$\mathbf{a}_{3\text{rd}} = \mu_{\text{moon}} \left( \frac{\mathbf{r}_{\text{moon}} - \mathbf{r}_{\text{sat}}}{\|\mathbf{r}_{\text{moon}} - \mathbf{r}_{\text{sat}}\|^3} - \frac{\mathbf{r}_{\text{moon}}}{\|\mathbf{r}_{\text{moon}}\|^3} \right)$$
 
 ### 5. In-Flight RTN Maneuver Formulation
-Maneuver burns are computed in the instantaneous orbital frame:
 - **Radial unit vector:** $\hat{\mathbf{u}}_r = \frac{\mathbf{r}}{\|\mathbf{r}\|}$
 - **Normal unit vector:** $\hat{\mathbf{u}}_n = \frac{\mathbf{r} \times \mathbf{v}}{\|\mathbf{r} \times \mathbf{v}\|}$
 - **Transverse / Prograde unit vector:** $\hat{\mathbf{u}}_t = \hat{\mathbf{u}}_n \times \hat{\mathbf{u}}_r$
@@ -96,32 +101,53 @@ Maneuver burns are computed in the instantaneous orbital frame:
 
 ## 🛠️ Quickstart Guide
 
-### 1. Run the 3D Interactive Web Simulator
+### 1. Run the 3D Interactive Web Simulator & Experiment Lab
 ```bash
 cd visualization_3d
 uvicorn app:app --reload --host 0.0.0.0 --port 8000
 ```
 - Open `http://localhost:8000` in your browser.
 - Click **+ New Satellite** to configure an Earth or Moon orbit.
+- Click **🧪 Experiment Lab** to run automated parametric sweeps over Ballistic Coefficient, Mass, Drag Area, or Altitude, viewing tabular results and downloading clean experiment CSV files.
 - Select any satellite to inspect real-time telemetry, toggle 3D force vectors, or execute $\Delta v$ burns.
 - Export all satellite trajectories and deorbit lifetimes with **Export CSV**.
 
-### 2. Train the Physics-Informed Neural Network (PINN)
+### 2. Run Headless Parametric Sweeps via Python
+```python
+from leo_simulator.experiment import run_parametric_sweep
+
+# Run a deorbit lifetime sweep over ballistic coefficient B from 10 to 100 kg/m^2
+res = run_parametric_sweep(
+    param_name="ballistic_coefficient",
+    values=[10.0, 20.0, 40.0, 80.0],
+    base_params={"mass": 4.0, "drag_area": 0.03, "cd": 2.2, "altitude_km": 250.0},
+    atmosphere_type="piecewise",
+    max_duration_seconds=30 * 86400.0,
+    quiet=True,
+    output_dir="experiments"
+)
+
+for r in res.results:
+    print(f"B = {r.ballistic_coeff_kg_m2:5.1f} kg/m² -> Lifetime = {r.lifetime_hours:6.1f} h ({r.lifetime_days:4.2f} days)")
+```
+
+### 3. Train the Physics-Informed Neural Network (PINN)
 ```bash
 cd ai
 python3 train.py
 ```
 Trains a PyTorch neural network that evaluates physical residual losses directly via `torch.autograd`, learning Newtonian gravity constraints without pure data overfitting.
 
-### 3. Run the Automated Test Suites
+### 4. Run the Automated Test Suites
 ```bash
 pytest -v
 ```
-Runs 190+ comprehensive unit, integration, numerical sanity, and adversarial stress tests.
+Runs 195+ comprehensive unit, integration, numerical sanity, atmospheric consistency, and adversarial stress tests.
 
 ---
 
 ## 📜 Version History
 
-- **`v12-alpha` (Current):** Real-scale isolated Earth-Moon system ($384,400\text{ km}$ separation), $10,000\times$ speedup, rolling `/stream` trajectory chunks, RTN burn maneuvers, 3D force vector overlays, and deorbit lifetime CSV tracking.
+- **`v13-alpha` (Current):** Server-side Parametric Experimentation Lab (`leo_simulator/experiment.py`), US Standard 1976 atmosphere model reconciliation, clean monotonic CSV export with Run_IDs, and lifetime vs ballistic coefficient data collection framework.
+- **`v12-alpha`:** Real-scale isolated Earth-Moon system ($384,400\text{ km}$ separation), $10,000\times$ speedup, rolling `/stream` trajectory chunks, RTN burn maneuvers, 3D force vector overlays, and deorbit lifetime tracking.
 - **`v11-alpha`:** Multi-satellite dynamic FastAPI architecture, Pydantic bounds validation, async offloading, and initial WebGL fallback safeguards.

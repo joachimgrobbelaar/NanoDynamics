@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Earth-Moon Real-Scale Orbital Dynamics Simulator</title>
+    <title>Earth-Moon Real-Scale Orbital Dynamics & Experimentation Simulator</title>
     <meta charset="utf-8">
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
@@ -24,6 +24,8 @@
         .nav-sep { width: 1px; background: #475569; height: 22px; margin: 0 4px; }
         .view-btn { background: #334155 !important; }
         .view-btn:hover { background: #475569 !important; }
+        .lab-btn { background: #7c3aed !important; }
+        .lab-btn:hover { background: #6d28d9 !important; }
 
         /* Sidebar */
         #sidebar {
@@ -78,16 +80,17 @@
 
         #gui-container { position: absolute; top: 54px; right: 10px; z-index: 90; }
 
-        /* Modal */
-        #modal-overlay {
+        /* Modals */
+        .modal-overlay {
             display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.75); z-index: 200; justify-content: center; align-items: center;
         }
-        #modal-content {
+        .modal-content {
             background: #0f172a; color: white; padding: 22px; border-radius: 8px;
-            width: 380px; border: 1px solid #334155; box-shadow: 0 8px 32px rgba(0,0,0,0.8);
+            width: 390px; border: 1px solid #334155; box-shadow: 0 8px 32px rgba(0,0,0,0.8); max-height: 90vh; overflow-y: auto;
         }
-        #modal-content h3 { margin: 0 0 12px; font-size: 15px; border-bottom: 1px solid #334155; padding-bottom: 8px; }
+        .modal-large { width: 750px; }
+        .modal-content h3 { margin: 0 0 12px; font-size: 15px; border-bottom: 1px solid #334155; padding-bottom: 8px; }
         .form-group { margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #cbd5e1; }
         .form-group select, .form-group input { 
             width: 140px; padding: 4px 6px; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: white; font-size: 12px;
@@ -97,10 +100,15 @@
         .perturb-toggles { display: flex; gap: 12px; flex-wrap: wrap; }
         .perturb-toggles label { font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: #cbd5e1; }
         .stable-hint { font-size: 10px; color: #38bdf8; margin-bottom: 6px; }
-        #modal-buttons { margin-top: 16px; text-align: right; display: flex; justify-content: flex-end; gap: 8px; }
-        #modal-buttons button { padding: 6px 14px; cursor: pointer; border-radius: 4px; border: none; font-size: 12px; font-weight: 500; }
-        #launch-btn { background: #2563eb; color: white; }
-        #cancel-btn { background: #475569; color: white; }
+        .modal-buttons { margin-top: 16px; text-align: right; display: flex; justify-content: flex-end; gap: 8px; }
+        .modal-buttons button { padding: 6px 14px; cursor: pointer; border-radius: 4px; border: none; font-size: 12px; font-weight: 500; }
+        
+        /* Experiment Table */
+        #exp-results-container { margin-top: 15px; max-height: 240px; overflow-y: auto; border: 1px solid #334155; border-radius: 5px; }
+        #exp-table { width: 100%; border-collapse: collapse; font-size: 11px; font-family: monospace; text-align: left; }
+        #exp-table th { background: #1e293b; padding: 6px 8px; color: #94a3b8; border-bottom: 1px solid #334155; position: sticky; top: 0; }
+        #exp-table td { padding: 5px 8px; border-bottom: 1px solid #1e293b; color: #f8fafc; }
+        #exp-table tr:hover { background: #1e293b; }
 
         /* Sim Clock & Legend */
         #sim-clock {
@@ -122,6 +130,7 @@
     <div id="top-nav">
         <button onclick="newProject()">New Project</button>
         <button onclick="openModal()">+ New Satellite</button>
+        <button class="lab-btn" onclick="openExperimentModal()">🧪 Experiment Lab</button>
         <button onclick="exportData()" style="background:#059669;">Export CSV</button>
         <div class="nav-sep"></div>
         <button class="view-btn" onclick="focusView('Earth')">🌍 Earth View</button>
@@ -186,8 +195,8 @@
     </div>
 
     <!-- Add Satellite Modal -->
-    <div id="modal-overlay">
-        <div id="modal-content">
+    <div id="modal-overlay" class="modal-overlay">
+        <div class="modal-content">
             <h3>Add New Satellite</h3>
             <div class="form-group">
                 <label>Central Body:</label>
@@ -209,6 +218,20 @@
                 <div class="form-group"><label>Inclination (°):</label><input type="number" id="m-inc" value="51.6" min="0" max="180"></div>
                 <div class="form-group"><label>RAAN (°):</label><input type="number" id="m-raan" value="45.0" min="0" max="360"></div>
             </div>
+
+            <div class="form-section">
+                <div class="form-section-title">Atmosphere Model</div>
+                <div class="form-group">
+                    <label>Atmosphere Model:</label>
+                    <select id="m-atm-type">
+                        <option value="piecewise" selected>US Standard 1976 (Piecewise)</option>
+                        <option value="high_solar">High Solar Activity</option>
+                        <option value="low_solar">Low Solar Activity</option>
+                        <option value="app_default">Exponential (350 km reference)</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Density Multiplier:</label><input type="number" id="m-density-scale" value="1.0" step="0.1" min="0.01"></div>
+            </div>
             
             <div class="form-section">
                 <div class="form-section-title">Perturbation Models</div>
@@ -219,9 +242,91 @@
                 </div>
             </div>
             
-            <div id="modal-buttons">
-                <button id="cancel-btn" onclick="closeModal()">Cancel</button>
-                <button id="launch-btn" onclick="submitNewSatellite()">Launch</button>
+            <div class="modal-buttons">
+                <button onclick="closeModal()" style="background:#475569;color:white;">Cancel</button>
+                <button id="launch-btn" onclick="submitNewSatellite()" style="background:#2563eb;color:white;">Launch</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Parametric Experimentation Modal -->
+    <div id="exp-modal-overlay" class="modal-overlay">
+        <div class="modal-content modal-large">
+            <h3>🧪 Parametric Experimentation & Deorbit Analysis Lab</h3>
+            <div style="display:flex; gap:20px;">
+                <!-- Sweep Config Left Column -->
+                <div style="flex:1;">
+                    <div class="form-section-title">Independent Variable to Sweep</div>
+                    <div class="form-group">
+                        <label>Sweep Parameter:</label>
+                        <select id="exp-param" onchange="updateExpParamDefaults()">
+                            <option value="ballistic_coefficient">Ballistic Coefficient B (kg/m²)</option>
+                            <option value="mass">Satellite Mass (kg)</option>
+                            <option value="drag_area">Cross-Section Drag Area (m²)</option>
+                            <option value="cd">Drag Coefficient (Cd)</option>
+                            <option value="altitude_km">Perigee Altitude (km)</option>
+                            <option value="eccentricity">Eccentricity (e)</option>
+                            <option value="density_scale">Atmospheric Density Multiplier (×)</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>Start Value:</label><input type="number" id="exp-val-start" value="10.0" step="any"></div>
+                    <div class="form-group"><label>End Value:</label><input type="number" id="exp-val-end" value="100.0" step="any"></div>
+                    <div class="form-group"><label>Evaluation Points:</label><input type="number" id="exp-val-steps" value="6" min="2" max="30"></div>
+                    
+                    <div class="form-section-title" style="margin-top:10px;">Atmosphere & Limits</div>
+                    <div class="form-group">
+                        <label>Atmosphere Model:</label>
+                        <select id="exp-atm-type">
+                            <option value="piecewise" selected>US Standard 1976 (Piecewise)</option>
+                            <option value="high_solar">High Solar Activity</option>
+                            <option value="low_solar">Low Solar Activity</option>
+                            <option value="app_default">Exponential (350 km reference)</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>Max Evaluation Days:</label><input type="number" id="exp-max-days" value="30.0" min="0.5" max="365"></div>
+                    <div class="form-group">
+                        <label><input type="checkbox" id="exp-quiet" checked> Fast Quiet Run (Metrics & CSV)</label>
+                    </div>
+                </div>
+
+                <!-- Baseline Satellite Right Column -->
+                <div style="flex:1; border-left:1px solid #334155; padding-left:20px;">
+                    <div class="form-section-title">Baseline Orbit & Spacecraft</div>
+                    <div class="form-group"><label>Base Altitude (km):</label><input type="number" id="exp-base-alt" value="250.0"></div>
+                    <div class="form-group"><label>Base Mass (kg):</label><input type="number" id="exp-base-mass" value="4.0"></div>
+                    <div class="form-group"><label>Base Area (m²):</label><input type="number" id="exp-base-area" value="0.03"></div>
+                    <div class="form-group"><label>Base Cd:</label><input type="number" id="exp-base-cd" value="2.2"></div>
+                    <div class="form-group"><label>Base Eccentricity:</label><input type="number" id="exp-base-ecc" value="0.001"></div>
+                    <div class="form-group"><label>Base Inclination (°):</label><input type="number" id="exp-base-inc" value="51.6"></div>
+                    
+                    <div style="margin-top:14px; display:flex; flex-direction:column; gap:8px;">
+                        <button id="run-exp-btn" onclick="executeParametricSweep()" style="background:#7c3aed;color:white;padding:8px;border-radius:4px;border:none;font-weight:600;cursor:pointer;">▶ Execute Parameter Sweep</button>
+                        <button id="download-exp-btn" onclick="downloadLastExperimentCSV()" style="display:none; background:#059669;color:white;padding:6px;border-radius:4px;border:none;font-size:12px;cursor:pointer;">⬇ Download Experiment CSV</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Experiment Results Table -->
+            <div id="exp-results-container" style="display:none;">
+                <table id="exp-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Param Value</th>
+                            <th>Ballistic (kg/m²)</th>
+                            <th>Initial Alt</th>
+                            <th>Final Alt</th>
+                            <th>Deorbit?</th>
+                            <th>Orbit Lifetime</th>
+                            <th>Decay Rate</th>
+                        </tr>
+                    </thead>
+                    <tbody id="exp-table-body"></tbody>
+                </table>
+            </div>
+
+            <div class="modal-buttons" style="margin-top:14px;">
+                <button onclick="closeExperimentModal()" style="background:#475569;color:white;">Close</button>
             </div>
         </div>
     </div>
@@ -235,11 +340,11 @@
     const M_TO_KM = 1 / 1000;
     
     // Real Physical Scale Constants (in km)
-    const R_EARTH_KM = 6378.137;     // Real Earth equatorial radius in km
-    const R_MOON_KM = 1737.4;        // Real Moon radius in km
-    const R_MOON_ORBIT_KM = 384400.0;// Real Moon distance from Earth in km
-    const T_MOON_ORBIT_S = 27.321661 * 86400; // 27.321661 days in seconds (~2,360,591 s)
-    const MOON_INC_RAD = 0.0898;     // 5.145 degrees orbital inclination
+    const R_EARTH_KM = 6378.137;
+    const R_MOON_KM = 1737.4;
+    const R_MOON_ORBIT_KM = 384400.0;
+    const T_MOON_ORBIT_S = 27.321661 * 86400;
+    const MOON_INC_RAD = 0.0898;
 
     // ── Three.js Scene Setup ──────────────────────────────────────────────────
     const scene = new THREE.Scene();
@@ -257,7 +362,6 @@
         console.error("WebGL failed:", e);
     }
 
-    // Directional Sunlight & Ambient Light
     const sunLight = new THREE.DirectionalLight(0xffffff, 1.4);
     sunLight.position.set(500000, 100000, 200000);
     scene.add(sunLight);
@@ -265,7 +369,7 @@
 
     const tl = new THREE.TextureLoader();
 
-    // ── Earth Mesh (Centered at Origin 0,0,0) ──
+    // ── Earth Mesh ──
     const earth = new THREE.Mesh(
         new THREE.SphereGeometry(R_EARTH_KM, 64, 64),
         new THREE.MeshPhongMaterial({
@@ -277,7 +381,7 @@
     scene.add(earth);
     scene.add(new THREE.AxesHelper(R_EARTH_KM * 2.0));
 
-    // ── Moon Mesh (Real Physical Radius 1,737.4 km) ──
+    // ── Moon Mesh ──
     const moon = new THREE.Mesh(
         new THREE.SphereGeometry(R_MOON_KM, 48, 48),
         new THREE.MeshPhongMaterial({
@@ -287,7 +391,7 @@
     );
     scene.add(moon);
 
-    // ── Full Closed Moon Orbit Path (Real Scale 384,400 km) ──
+    // ── Moon Orbit Path (Real Scale 384,400 km) ──
     const moonOrbitPts = [];
     for (let a = 0; a <= Math.PI * 2; a += 0.015) {
         const x = Math.cos(a) * R_MOON_ORBIT_KM;
@@ -301,16 +405,16 @@
     );
     scene.add(moonOrbitLine);
 
-    // Initial camera position (Earth View)
     camera.position.set(R_EARTH_KM * 3.5, R_EARTH_KM * 2.2, R_EARTH_KM * 3.5);
     if (controls) controls.target.set(0, 0, 0);
 
     // ── State Management ──────────────────────────────────────────────────────
     let activeSatellites = [];
     let selectedSatIndex = -1;
-    let cameraFocusMode = 'Earth'; // 'Earth' | 'Moon' | 'System' | sat.name
+    let cameraFocusMode = 'Earth';
     const clock = new THREE.Clock();
     let simTime = 0.0;
+    let lastExperimentCSV = null;
 
     // ── Body Constraints Configuration ────────────────────────────────────────
     const BODY_DEFAULTS = {
@@ -359,7 +463,7 @@
     // ── GUI Controls (Up to 10,000x Speedup) ───────────────────────────────────
     const gui = new lil.GUI({ title: 'Simulation Settings', container: document.getElementById('gui-container') });
     const simSettings = { playbackSpeed: 10, cameraTarget: 'Earth' };
-    gui.add(simSettings, 'playbackSpeed', 1, 10000, 1).name('Speed Multiplier (1x-10000x)');
+    gui.add(simSettings, 'playbackSpeed', 1, 10000, 1).name('Speed (1x-10000x)');
     let cameraTargetCtrl = gui.add(simSettings, 'cameraTarget', ['Earth', 'Moon', 'System']).name('Camera Focus');
 
     function handleFocusChange(v) {
@@ -407,7 +511,6 @@
         }
     }
 
-    // ── Real-Scale Moon Ephemeris Propagation ──────────────────────────────────
     function getMoonPosition(t) {
         const angle = (2 * Math.PI * t) / T_MOON_ORBIT_S;
         const x = Math.cos(angle) * R_MOON_ORBIT_KM;
@@ -418,10 +521,9 @@
 
     function getParentBodyWorldPos(bodyName, t) {
         if (bodyName === 'Moon') return getMoonPosition(t);
-        return new THREE.Vector3(0, 0, 0); // Earth at origin
+        return new THREE.Vector3(0, 0, 0);
     }
 
-    // ── Trajectory Buffer & Interpolation ──────────────────────────────────────
     function appendChunk(sat, chunk) {
         const b = sat.buf;
         const skip = (b.t.length > 0 && chunk.t[0] <= b.t[b.t.length - 1]) ? 1 : 0;
@@ -478,7 +580,6 @@
         return f ? new THREE.Vector3(f[0], f[1], f[2]) : new THREE.Vector3();
     }
 
-    // ── Rolling Stream Fetch ──────────────────────────────────────────────────
     async function fetchNextChunk(sat) {
         if (sat.fetching || sat.reentry) return;
         sat.fetching = true;
@@ -512,7 +613,6 @@
         }
     }
 
-    // ── Add Satellite ─────────────────────────────────────────────────────────
     function addSatelliteToScene(satData) {
         const color = Math.floor(Math.random() * 0xffffff);
         const radius = satData.parent_body === 'Moon' ? 120 : 180;
@@ -556,9 +656,9 @@
             deorbitTime: isReentry ? formatTime(reTime) : null,
             showForces: false,
             forceArrows: {
-                gravity: mkArrow(0x4ade80), // Green
-                j2:      mkArrow(0xfacc15), // Yellow
-                drag:    mkArrow(0xf87171)  // Red
+                gravity: mkArrow(0x4ade80),
+                j2:      mkArrow(0xfacc15),
+                drag:    mkArrow(0xf87171)
             }
         };
 
@@ -569,7 +669,6 @@
         return sat;
     }
 
-    // ── Remove Satellite ──────────────────────────────────────────────────────
     function removeSatellite(idx, evt) {
         if (evt) evt.stopPropagation();
         if (idx < 0 || idx >= activeSatellites.length) return;
@@ -589,7 +688,6 @@
         renderSidebar();
     }
 
-    // ── Execute Burn Maneuver ─────────────────────────────────────────────────
     async function executeManeuver() {
         if (selectedSatIndex < 0 || !activeSatellites[selectedSatIndex]) return;
         const sat = activeSatellites[selectedSatIndex];
@@ -635,7 +733,6 @@
         }
     }
 
-    // ── Force Vectors ─────────────────────────────────────────────────────────
     function toggleForceVectors() {
         const show = document.getElementById('show-forces').checked;
         if (selectedSatIndex >= 0 && activeSatellites[selectedSatIndex]) {
@@ -665,7 +762,6 @@
         }
     }
 
-    // ── Time Formatting Utilities ─────────────────────────────────────────────
     function formatTime(s) {
         if (!s || isNaN(s)) return '0s';
         const d = Math.floor(s / 86400), hh = Math.floor((s % 86400) / 3600),
@@ -692,12 +788,13 @@
         document.getElementById('save-name').value = '';
     }
 
-    // ── Export CSV with Deorbit Lifetime Stats ────────────────────────────────
+    // ── Export Monotonic Clean CSV ────────────────────────────────────────────
     function exportData() {
         if (!activeSatellites.length) { alert('No active satellites to export.'); return; }
-        let csv = 'Satellite,CentralBody,Time(s),X(m),Y(m),Z(m),VX(m/s),VY(m/s),VZ(m/s),Alt(km),DeorbitStatus,Lifetime_s,LifetimeFormatted\n';
         
-        activeSatellites.forEach(sat => {
+        let csv = 'Run_ID,Satellite_Name,Central_Body,Time_Seconds,Elapsed_Hours,X_Metres,Y_Metres,Z_Metres,VX_ms,VY_ms,VZ_ms,Altitude_km,Deorbit_Status,Total_Lifetime_Seconds,Lifetime_Formatted\n';
+        
+        activeSatellites.forEach((sat, satIdx) => {
             const b = sat.buf;
             const T = sat.period_s, step = Math.max(10, T / 6);
             const t_end = b.t[b.t.length - 1];
@@ -707,16 +804,21 @@
             const lifeSecStr = sat.reentry ? (sat.lifetimeSeconds || sat.deorbitEpoch || 0).toFixed(1) : (simTime).toFixed(1);
             const lifeFmtStr = sat.reentry ? (sat.deorbitTime || formatTime(sat.lifetimeSeconds)) : formatTime(simTime);
 
+            let lastTimeWritten = -1;
             for (let ct = t_start; ct <= t_end; ct += step) {
                 let lo = 0, hi = b.t.length - 1;
                 while (hi - lo > 1) { const m = (lo+hi)>>1; if (b.t[m] <= ct) lo=m; else hi=m; }
-                csv += `${sat.name},${sat.parentBody},${b.t[lo].toFixed(1)},${b.x[lo].toFixed(1)},${b.y[lo].toFixed(1)},${b.z[lo].toFixed(1)},${b.vx[lo].toFixed(3)},${b.vy[lo].toFixed(3)},${b.vz[lo].toFixed(3)},${b.alt_km[lo].toFixed(2)},${statusStr},${lifeSecStr},"${lifeFmtStr}"\n`;
+                const currT = b.t[lo];
+                if (currT <= lastTimeWritten) continue; // Guarantee strictly monotonic increasing time
+                lastTimeWritten = currT;
+
+                csv += `${satIdx + 1},${sat.name},${sat.parentBody},${currT.toFixed(1)},${(currT/3600.0).toFixed(3)},${b.x[lo].toFixed(1)},${b.y[lo].toFixed(1)},${b.z[lo].toFixed(1)},${b.vx[lo].toFixed(3)},${b.vy[lo].toFixed(3)},${b.vz[lo].toFixed(3)},${b.alt_km[lo].toFixed(2)},${statusStr},${lifeSecStr},"${lifeFmtStr}"\n`;
             }
         });
 
         const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
         const a = document.createElement('a');
-        a.href = url; a.download = 'earth_moon_satellite_trajectories.csv';
+        a.href = url; a.download = `trajectory_export_${Date.now()}.csv`;
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
     }
 
@@ -804,6 +906,8 @@
                 eccentricity: parseFloat(document.getElementById('m-ecc').value),
                 inclination_deg: parseFloat(document.getElementById('m-inc').value),
                 raan_deg: parseFloat(document.getElementById('m-raan').value),
+                atmosphere_type: document.getElementById('m-atm-type').value,
+                density_scale: parseFloat(document.getElementById('m-density-scale').value) || 1.0,
                 include_j2: document.getElementById('m-j2').checked,
                 include_drag: document.getElementById('m-drag').checked,
                 include_moon: document.getElementById('m-moon').checked,
@@ -822,6 +926,133 @@
             btn.disabled = false;
             closeModal();
         }
+    }
+
+    // ── Experimentation Lab Modal Logic ───────────────────────────────────────
+    function openExperimentModal() {
+        document.getElementById('exp-modal-overlay').style.display = 'flex';
+    }
+    function closeExperimentModal() {
+        document.getElementById('exp-modal-overlay').style.display = 'none';
+    }
+
+    function updateExpParamDefaults() {
+        const p = document.getElementById('exp-param').value;
+        const start = document.getElementById('exp-val-start');
+        const end = document.getElementById('exp-val-end');
+        if (p === 'ballistic_coefficient') { start.value = 10.0; end.value = 120.0; }
+        else if (p === 'mass') { start.value = 1.0; end.value = 10.0; }
+        else if (p === 'drag_area') { start.value = 0.01; end.value = 0.10; }
+        else if (p === 'cd') { start.value = 1.5; end.value = 3.0; }
+        else if (p === 'altitude_km') { start.value = 200.0; end.value = 400.0; }
+        else if (p === 'eccentricity') { start.value = 0.0; end.value = 0.15; }
+        else if (p === 'density_scale') { start.value = 0.5; end.value = 5.0; }
+    }
+
+    async function executeParametricSweep() {
+        const btn = document.getElementById('run-exp-btn');
+        btn.innerText = 'Evaluating Sweep in Server...';
+        btn.disabled = true;
+
+        try {
+            const param = document.getElementById('exp-param').value;
+            const startVal = parseFloat(document.getElementById('exp-val-start').value);
+            const endVal = parseFloat(document.getElementById('exp-val-end').value);
+            const steps = parseInt(document.getElementById('exp-val-steps').value) || 5;
+
+            const values = [];
+            for (let i = 0; i < steps; i++) {
+                values.push(startVal + (endVal - startVal) * (i / (steps - 1)));
+            }
+
+            const baseSat = {
+                name: 'SweepBase',
+                parent_body: 'Earth',
+                mass: parseFloat(document.getElementById('exp-base-mass').value),
+                drag_area: parseFloat(document.getElementById('exp-base-area').value),
+                cd: parseFloat(document.getElementById('exp-base-cd').value),
+                altitude_km: parseFloat(document.getElementById('exp-base-alt').value),
+                eccentricity: parseFloat(document.getElementById('exp-base-ecc').value),
+                inclination_deg: parseFloat(document.getElementById('exp-base-inc').value),
+                raan_deg: 45.0,
+                atmosphere_type: document.getElementById('exp-atm-type').value,
+                density_scale: 1.0,
+                include_j2: true,
+                include_drag: true,
+                include_moon: false
+            };
+
+            const payload = {
+                param_name: param,
+                values: values,
+                base_params: baseSat,
+                atmosphere_type: document.getElementById('exp-atm-type').value,
+                density_scale: 1.0,
+                max_duration_days: parseFloat(document.getElementById('exp-max-days').value),
+                quiet: document.getElementById('exp-quiet').checked
+            };
+
+            const res = await fetch('/experiment/run', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (!res.ok) { alert('Experiment failed: ' + data.detail); return; }
+
+            lastExperimentCSV = data.csv_filename;
+            document.getElementById('download-exp-btn').style.display = 'block';
+
+            // Populate table
+            const tbody = document.getElementById('exp-table-body');
+            tbody.innerHTML = '';
+            data.results.forEach(r => {
+                const tr = document.createElement('tr');
+                const deorbStr = r.deorbit_detected ? '<span style="color:#ef4444;">YES (Re-entry)</span>' : '<span style="color:#22c55e;">NO</span>';
+                const lifeStr = r.deorbit_detected ? `${r.lifetime_hours.toFixed(1)} h (${r.lifetime_days.toFixed(2)} d)` : `> ${r.lifetime_days.toFixed(1)} d`;
+                tr.innerHTML = `
+                    <td>${r.run_id}</td>
+                    <td><strong>${r.param_value.toFixed(3)}</strong></td>
+                    <td>${r.ballistic_coeff_kg_m2.toFixed(1)}</td>
+                    <td>${r.initial_altitude_km.toFixed(1)} km</td>
+                    <td>${r.final_altitude_km.toFixed(1)} km</td>
+                    <td>${deorbStr}</td>
+                    <td><strong>${lifeStr}</strong></td>
+                    <td>${r.mean_decay_rate_km_day.toFixed(2)} km/d</td>
+                `;
+                tbody.appendChild(tr);
+            });
+            document.getElementById('exp-results-container').style.display = 'block';
+
+            // If not quiet, inject trajectories into 3D scene
+            if (data.trajectories && data.trajectories.length > 0) {
+                clearSatellites();
+                data.trajectories.forEach(t => {
+                    addSatelliteToScene({
+                        name: t.name,
+                        parent_body: 'Earth',
+                        params: baseSat,
+                        period_s: 5500,
+                        last_state: [t.x[t.x.length-1], t.y[t.y.length-1], t.z[t.z.length-1], t.vx[t.vx.length-1], t.vy[t.vy.length-1], t.vz[t.vz.length-1]],
+                        last_t: t.t[t.t.length-1],
+                        reentry: t.reentry,
+                        trajectory: t
+                    });
+                });
+                closeExperimentModal();
+            }
+
+        } catch (e) {
+            alert('Experiment execution error: ' + e.message);
+        } finally {
+            btn.innerText = '▶ Execute Parameter Sweep';
+            btn.disabled = false;
+        }
+    }
+
+    function downloadLastExperimentCSV() {
+        if (!lastExperimentCSV) return;
+        window.open(`/experiment/download/${lastExperimentCSV}`, '_blank');
     }
 
     // ── Save / Load ──────────────────────────────────────────────────────────
@@ -885,7 +1116,7 @@
         // 2. Moon Orbit Propagation (Real 384,400 km scale)
         const moonPos = getMoonPosition(simTime);
         moon.position.copy(moonPos);
-        moon.rotation.y += (2 * Math.PI / T_MOON_ORBIT_S) * dt; // Tidally locked rotation
+        moon.rotation.y += (2 * Math.PI / T_MOON_ORBIT_S) * dt;
 
         // 3. Satellite Tracking & Positions
         activeSatellites.forEach(sat => {
