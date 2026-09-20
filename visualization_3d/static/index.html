@@ -630,7 +630,7 @@
         scene.add(line);
 
         const mkArrow = (c) => {
-            const a = new THREE.ArrowHelper(new THREE.Vector3(1,0,0), new THREE.Vector3(), 1000, c, 200, 100);
+            const a = new THREE.ArrowHelper(new THREE.Vector3(1,0,0), new THREE.Vector3(), 200, c, 50, 25);
             a.visible = false;
             scene.add(a);
             return a;
@@ -743,18 +743,41 @@
 
     function updateForceArrows(sat, idx, worldPos) {
         if (!sat.showForces) return;
-        const scale = 4e5;
+        
+        const b = sat.buf;
+        const i = typeof idx === 'number' ? idx : idx.lo;
+        const alt_km = b.alt_km[i] || 400;
+        
+        // Scale vectors proportionally so they are easy to see but NEVER phase into the Earth surface
+        const maxLen = Math.min(Math.max(100, alt_km * 0.45), 350);
 
         const fTypes = { gravity: 'central', j2: 'j2', drag: 'drag' };
+        
+        const gVec = getForce(sat.buf, idx, 'central');
+        const gMag = Math.max(1e-6, gVec.length());
+        
         for (const [key, bufKey] of Object.entries(fTypes)) {
             const arrow = sat.forceArrows[key];
             const fVec = getForce(sat.buf, idx, bufKey);
             const mag = fVec.length();
+            
             if (mag > 0) {
                 const dir = fVec.clone().normalize();
                 arrow.position.copy(worldPos);
                 arrow.setDirection(dir);
-                arrow.setLength(Math.max(250, mag * scale), 200, 80);
+                
+                let arrowLen;
+                if (key === 'gravity') {
+                    arrowLen = maxLen;
+                } else if (key === 'j2') {
+                    arrowLen = Math.min(maxLen * 0.75, Math.max(80, maxLen * Math.min(1.0, (mag / gMag) * 30.0)));
+                } else {
+                    arrowLen = Math.min(maxLen * 0.85, Math.max(90, maxLen * Math.min(1.0, (mag / gMag) * 50.0)));
+                }
+                
+                const headLen = Math.min(arrowLen * 0.25, 45);
+                const headWidth = headLen * 0.5;
+                arrow.setLength(arrowLen, headLen, headWidth);
                 arrow.visible = true;
             } else {
                 arrow.visible = false;
@@ -1094,7 +1117,15 @@
         });
     }
 
+    function getNextSatelliteName() {
+        let n = 1;
+        const names = new Set(activeSatellites.map(s => s.name));
+        while (names.has(`Sat-${n}`)) n++;
+        return `Sat-${n}`;
+    }
+
     function openModal() {
+        document.getElementById('m-name').value = getNextSatelliteName();
         updateBodyConstraints();
         document.getElementById('modal-overlay').style.display = 'flex';
     }
