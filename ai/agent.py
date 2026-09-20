@@ -39,7 +39,7 @@ def _file_hash(path):
 
 def run_once(data_dir=None, ckpt_dir=None, csv_paths=(), dt=60.0, min_pairs=50,
              epochs=300, hidden=32, layers=2, lr=1e-3,
-             alt_km=420.0, inc_deg=60.0, force=False):
+             alt_km=420.0, inc_deg=60.0, force=False, resume=True):
     data_dir = data_dir or os.path.join(AI_DIR, "data")
     ckpt_dir = ckpt_dir or os.path.join(AI_DIR, "checkpoints", "agent")
     state_path = os.path.join(data_dir, "agent_state.json")
@@ -95,7 +95,8 @@ def run_once(data_dir=None, ckpt_dir=None, csv_paths=(), dt=60.0, min_pairs=50,
                    "physics": "central+J2+drag (see sim_manifest.json)"}, f, indent=2)
 
     _, _ckpt = train_transition(data_dir=combined, out_dir=ckpt_dir,
-                                  epochs=epochs, hidden=hidden, layers=layers, lr=lr)
+                                  epochs=epochs, hidden=hidden, layers=layers, lr=lr,
+                                  resume=resume)
     res = evaluate_rollout(ckpt_path, alt_km=alt_km, inc_deg=inc_deg, orbits=1.0)
     final_drift = float(res["drift_pct"][-1])
     report = {"status": "trained", "data_hash": data_hash,

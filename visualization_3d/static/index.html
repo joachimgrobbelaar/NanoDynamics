@@ -454,29 +454,45 @@
 
             <div class="form-section">
                 <div class="form-section-title">Training Parameters</div>
-                <div style="display:flex; gap:10px;">
-                    <div class="form-group" style="flex:1;">
+                <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                    <div class="form-group" style="flex:1; min-width:130px;">
                         <label>Epochs:</label>
-                        <select id="ml-epochs">
-                            <option value="100">100 (Fast Smoke)</option>
-                            <option value="300" selected>300 (Standard)</option>
-                            <option value="600">600 (High Precision)</option>
-                        </select>
+                        <input type="number" id="ml-epochs" value="600" min="10" max="50000" step="50" style="width:100%; background:#1e293b; color:white; border:1px solid #475569; padding:4px 6px; border-radius:4px;">
                     </div>
-                    <div class="form-group" style="flex:1;">
+                    <div class="form-group" style="flex:1; min-width:130px;">
                         <label>Hidden Units:</label>
                         <select id="ml-hidden">
                             <option value="32" selected>32 (TinyML / ESP32 ~36KB)</option>
                             <option value="64">64 (Standard Surrogate)</option>
+                            <option value="128">128 (Deep High-Capacity)</option>
                         </select>
                     </div>
-                    <div class="form-group" style="flex:1;">
-                        <label>Force Retrain:</label>
-                        <select id="ml-force">
-                            <option value="true" selected>Yes (Fresh Train)</option>
-                            <option value="false">No (Cache Hash)</option>
+                    <div class="form-group" style="flex:1; min-width:130px;">
+                        <label>Quick Presets:</label>
+                        <select onchange="if(this.value){document.getElementById('ml-epochs').value=this.value;}">
+                            <option value="">Select preset...</option>
+                            <option value="300">300 (Standard)</option>
+                            <option value="600" selected>600 (High Precision)</option>
+                            <option value="1500">1,500 (Deep Convergence)</option>
+                            <option value="5000">5,000 (Extended)</option>
+                            <option value="10000">10,000 (Overnight / Maximum)</option>
                         </select>
                     </div>
+                </div>
+                <div style="margin-top:8px; display:flex; flex-direction:column; gap:4px; font-size:11px; color:#cbd5e1;">
+                    <label><input type="checkbox" id="ml-resume" checked> 🔄 <strong>Resume Training:</strong> Accumulate & refine existing checkpoint weights (don't reset)</label>
+                    <label><input type="checkbox" id="ml-force" checked> ⚡ <strong>Force Retrain:</strong> Re-ingest all latest simulation logs and CSV exports</label>
+                </div>
+            </div>
+
+            <!-- Live Progress Bar -->
+            <div id="ml-progress-container" style="display:none; margin-bottom:10px;">
+                <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:3px; color:#cbd5e1;">
+                    <span id="ml-progress-text">Training: 0 / 0 Epochs</span>
+                    <span id="ml-loss-text">MSE: —</span>
+                </div>
+                <div style="width:100%; height:8px; background:#1e293b; border-radius:4px; overflow:hidden;">
+                    <div id="ml-progress-bar-fill" style="width:0%; height:100%; background:linear-gradient(90deg, #7c3aed, #38bdf8); transition:width 0.15s ease;"></div>
                 </div>
             </div>
 
@@ -2109,17 +2125,51 @@
     async function startMLTraining() {
         const btn = document.getElementById('ml-train-btn');
         const logBox = document.getElementById('ml-log-readout');
+        const progressContainer = document.getElementById('ml-progress-container');
+        const progressFill = document.getElementById('ml-progress-bar-fill');
+        const progressText = document.getElementById('ml-progress-text');
+        const lossText = document.getElementById('ml-loss-text');
+
         btn.disabled = true;
         btn.innerText = 'Training Neural Surrogate...';
         logBox.style.display = 'block';
         logBox.innerText = '>>> Initiating ingest from simulation logs, saved scenarios, and CSV exports...\n>>> Fitting residual transition network (S_t -> S_t+dt)...\n';
+        progressContainer.style.display = 'block';
+        progressFill.style.width = '0%';
+        progressText.innerText = 'Initializing training loop...';
+        lossText.innerText = 'MSE: —';
+
+        let progressInterval = null;
 
         try {
+            const epochsRequested = parseInt(document.getElementById('ml-epochs').value) || 300;
+            const resumeChecked = document.getElementById('ml-resume') ? document.getElementById('ml-resume').checked : true;
+            const forceChecked = document.getElementById('ml-force') ? document.getElementById('ml-force').checked : false;
+
+            // Start live progress polling
+            progressInterval = setInterval(async () => {
+                try {
+                    const pRes = await fetch('/ai/progress');
+                    if (pRes.ok) {
+                        const pData = await pRes.json();
+                        if (pData.status === 'training' || pData.status === 'in_progress') {
+                            const pct = Math.min(100, Math.max(0, pData.progress_pct || 0));
+                            progressFill.style.width = `${pct.toFixed(1)}%`;
+                            progressText.innerText = `Training: ${pData.epoch || 0} / ${pData.total_epochs || epochsRequested} Epochs (${pct.toFixed(0)}%)`;
+                            if (pData.current_loss !== undefined) {
+                                lossText.innerText = `MSE: ${pData.current_loss.toExponential(4)}`;
+                            }
+                        }
+                    }
+                } catch (e) {}
+            }, 250);
+
             const payload = {
-                epochs: parseInt(document.getElementById('ml-epochs').value) || 300,
+                epochs: epochsRequested,
                 hidden: parseInt(document.getElementById('ml-hidden').value) || 32,
                 layers: 2,
-                force: document.getElementById('ml-force').value === 'true'
+                force: forceChecked,
+                resume: resumeChecked
             };
             const res = await fetch('/ai/train', {
                 method: 'POST',
@@ -2129,11 +2179,15 @@
             const data = await res.json();
             if (!res.ok) throw new Error(data.detail || res.status);
             const r = data.result || {};
+            progressFill.style.width = '100%';
+            progressText.innerText = `Training Complete (${epochsRequested}/${epochsRequested} Epochs)`;
+            if (r.best_loss) lossText.innerText = `Best Loss: ${r.best_loss.toExponential(4)}`;
             logBox.innerText += `>>> Training complete!\n>>> Status: ${r.status}\n>>> Pairs trained: ${r.n_pairs || 'N/A'}\n>>> Final Rollout Drift: ${r.final_drift_pct ? r.final_drift_pct.toFixed(2)+'%' : 'N/A'}\n>>> Mean Drift: ${r.mean_drift_pct ? r.mean_drift_pct.toFixed(2)+'%' : 'N/A'}\n>>> Checkpoint saved to: ${r.ckpt || 'ai/checkpoints/agent/transition.pt'}\n`;
             await fetchMLStatus();
         } catch (err) {
             logBox.innerText += `>>> Error during training: ${err.message}\n`;
         } finally {
+            if (progressInterval) clearInterval(progressInterval);
             btn.disabled = false;
             btn.innerText = '⚡ Train ML Surrogate';
         }

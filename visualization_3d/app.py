@@ -567,11 +567,12 @@ def get_moon_track(dt: float = 60.0, n: int = 1440):
 
 
 class MLTrainRequest(BaseModel):
-    epochs: int = Field(100, ge=1, le=2000)
+    epochs: int = Field(300, ge=1, le=50000, description="Training epochs (up to 50,000)")
     hidden: int = Field(32, ge=8, le=256)
     layers: int = Field(2, ge=1, le=8)
     lr: float = Field(1e-3, gt=0.0)
     force: bool = Field(False)
+    resume: bool = Field(True, description="Resume training from previous checkpoint weights")
     alt_km: float = Field(420.0, ge=100.0, le=2000.0)
     inc_deg: float = Field(60.0, ge=0.0, le=180.0)
 
@@ -590,10 +591,24 @@ async def api_train_ml(req: MLTrainRequest = MLTrainRequest()):
             alt_km=req.alt_km,
             inc_deg=req.inc_deg,
             force=req.force,
+            resume=req.resume,
         )
         return {"status": "success", "result": res}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/ai/progress")
+def api_get_ml_progress():
+    """Return live training iteration progress."""
+    live_path = os.path.join(PROJECT_ROOT, "ai", "data", "training_live.json")
+    if os.path.exists(live_path):
+        try:
+            with open(live_path, "r") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"status": "idle", "epoch": 0, "total_epochs": 0, "progress_pct": 0.0}
 
 
 @app.get("/ai/status")
@@ -614,4 +629,5 @@ def api_get_ml_status():
         except Exception:
             pass
     return {"status": "idle", "message": "No model trained yet. Run simulations and click Train ML Surrogate."}
+
 
