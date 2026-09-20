@@ -275,6 +275,23 @@
                 </select>
             </div>
             <div class="form-group"><label>Name:</label><input type="text" id="m-name" value="Sat-1"></div>
+            <div class="form-group" style="display:flex; gap:10px; align-items:center;">
+                <div style="flex:1;">
+                    <label>Satellite Color:</label>
+                    <input type="color" id="m-color" value="#38bdf8" style="width:100%; height:32px; padding:2px; border:1px solid #475569; border-radius:4px; cursor:pointer; background:#1e293b;">
+                </div>
+                <div style="flex:1;">
+                    <label>Avatar / Icon:</label>
+                    <select id="m-icon" style="width:100%; height:32px; padding:4px; border:1px solid #475569; border-radius:4px; background:#1e293b; color:white;">
+                        <option value="satellite" selected>🛰️ Satellite</option>
+                        <option value="rocket">🚀 Rocket</option>
+                        <option value="astronaut">👨‍🚀 Astronaut</option>
+                        <option value="alien">👽 Alien</option>
+                        <option value="ufo">🛸 UFO</option>
+                        <option value="sphere">⚪ Pure Sphere</option>
+                    </select>
+                </div>
+            </div>
             <div class="form-group"><label>Mass (kg):</label><input type="number" id="m-mass" value="4.0" min="0.1"></div>
             <div class="form-group"><label>Drag Area (m²):</label><input type="number" id="m-area" value="0.03" min="0"></div>
             <div class="form-group"><label>Drag Coef (Cd):</label><input type="number" id="m-cd" value="2.2" min="0"></div>
@@ -673,94 +690,141 @@
         rebuildTrail(sat);
     }
 
-    function rebuildTrail(sat) {
+    function updateSatelliteTrail(sat, currentSimTime) {
         const b = sat.buf;
+        if (!b || !b.t || b.t.length === 0) return;
+
+        const period = sat.period_s || 5400;
+        // Window of 1 full orbit trailing + 1 full orbit forward
+        const tTail = Math.max(0, currentSimTime - period);
+        const tHead = currentSimTime + period;
+
+        let startIdx = 0;
+        while (startIdx < b.t.length && b.t[startIdx] < tTail) startIdx++;
+        if (startIdx > 0) startIdx--;
+
+        let endIdx = startIdx;
+        while (endIdx < b.t.length && b.t[endIdx] <= tHead) endIdx++;
+        if (endIdx < b.t.length) endIdx++;
+
+        const sliceLen = Math.max(0, endIdx - startIdx);
+        if (sliceLen < 2) return;
+
+        const positions = new Float32Array(sliceLen * 3);
+        const colors = new Float32Array(sliceLen * 3);
+        const baseColor = sat.colorObj || new THREE.Color(sat.color);
+
         const pts = [];
-        for (let i = 0; i < b.x.length; i++) {
-            pts.push(new THREE.Vector3(b.x[i] * M_TO_KM, b.y[i] * M_TO_KM, b.z[i] * M_TO_KM));
-        }
-        sat.trailPts = pts;
-        sat.line.geometry.setFromPoints(pts);
-        sat.line.geometry.needsUpdate = true;
-    }
+        let pIdx = 0;
+        for (let i = startIdx; i < endIdx; i++) {
+            const x = b.x[i] * M_TO_KM;
+            const y = b.y[i] * M_TO_KM;
+            const z = b.z[i] * M_TO_KM;
+            pts.push(new THREE.Vector3(x, y, z));
 
-    function interpAt(buf, t) {
-        let lo = 0, hi = buf.t.length - 1;
-        if (t <= buf.t[lo]) return lo;
-        if (t >= buf.t[hi]) return hi;
-        while (hi - lo > 1) {
-            const mid = (lo + hi) >> 1;
-            if (buf.t[mid] <= t) lo = mid; else hi = mid;
-        }
-        const frac = (t - buf.t[lo]) / (buf.t[hi] - buf.t[lo]);
-        return { lo, hi, frac };
-    }
+            positions[pIdx * 3] = x;
+            positions[pIdx * 3 + 1] = y;
+            positions[pIdx * 3 + 2] = z;
 
-    function getLocalPos(buf, idx) {
-        if (typeof idx === 'number') {
-            return new THREE.Vector3(buf.x[idx] * M_TO_KM, buf.y[idx] * M_TO_KM, buf.z[idx] * M_TO_KM);
-        }
-        const { lo, hi, frac } = idx;
-        return new THREE.Vector3(
-            (buf.x[lo] + frac * (buf.x[hi] - buf.x[lo])) * M_TO_KM,
-            (buf.y[lo] + frac * (buf.y[hi] - buf.y[lo])) * M_TO_KM,
-            (buf.z[lo] + frac * (buf.z[hi] - buf.z[lo])) * M_TO_KM
-        );
-    }
-
-    function getForce(buf, idx, key) {
-        if (!buf.forces[key] || buf.forces[key].length === 0) return new THREE.Vector3();
-        const i = typeof idx === 'number' ? idx : idx.lo;
-        const f = buf.forces[key][i];
-        return f ? new THREE.Vector3(f[0], f[1], f[2]) : new THREE.Vector3();
-    }
-
-    async function fetchNextChunk(sat) {
-        if (sat.fetching || sat.reentry) return;
-        sat.fetching = true;
-        try {
-            const res = await fetch('/stream', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    params: sat.params,
-                    t_start: sat.lastT,
-                    state: sat.lastState,
-                    chunk_duration: 86400
-                })
-            });
-            const data = await res.json();
-            if (!res.ok) { console.error('Stream error:', data.detail); return; }
-            appendChunk(sat, data.trajectory);
-            sat.lastState = data.last_state;
-            sat.lastT = data.last_t;
-            if (data.reentry && !sat.reentry) {
-                sat.reentry = true;
-                sat.deorbitEpoch = data.reentry_time || sat.lastT;
-                sat.lifetimeSeconds = sat.deorbitEpoch;
-                sat.deorbitTime = formatTime(sat.lifetimeSeconds);
-                renderSidebar();
+            const t = b.t[i];
+            let brightness = 1.0;
+            if (t <= currentSimTime) {
+                // Fade trailing orbit behind the satellite from 0 to 1
+                const span = Math.max(1.0, currentSimTime - tTail);
+                const frac = Math.max(0.0, Math.min(1.0, (t - tTail) / span));
+                brightness = Math.pow(frac, 1.4);
+            } else {
+                // Forward predicted arc
+                const span = Math.max(1.0, tHead - currentSimTime);
+                const frac = Math.max(0.0, Math.min(1.0, 1.0 - (t - currentSimTime) / span));
+                brightness = 0.25 + 0.45 * frac;
             }
-        } catch (e) {
-            console.error('fetchNextChunk error:', e);
-        } finally {
-            sat.fetching = false;
+
+            colors[pIdx * 3] = baseColor.r * brightness;
+            colors[pIdx * 3 + 1] = baseColor.g * brightness;
+            colors[pIdx * 3 + 2] = baseColor.b * brightness;
+            pIdx++;
         }
+
+        sat.trailPts = pts;
+        sat.line.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        sat.line.geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        sat.line.geometry.attributes.position.needsUpdate = true;
+        sat.line.geometry.attributes.color.needsUpdate = true;
+    }
+
+    function rebuildTrail(sat) {
+        updateSatelliteTrail(sat, simTime);
+    }
+
+    function createAvatarSprite(iconType, hexColor) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 128;
+        canvas.height = 128;
+        const ctx = canvas.getContext('2d');
+
+        const glyphMap = {
+            satellite: '🛰️',
+            rocket: '🚀',
+            astronaut: '👨‍🚀',
+            alien: '👽',
+            ufo: '🛸',
+            sphere: '⚪'
+        };
+        const glyph = glyphMap[iconType] || '🛰️';
+
+        const c = new THREE.Color(hexColor);
+        const rgbStr = `${Math.floor(c.r * 255)}, ${Math.floor(c.g * 255)}, ${Math.floor(c.b * 255)}`;
+
+        // Glowing radial aura
+        const grad = ctx.createRadialGradient(64, 64, 8, 64, 64, 58);
+        grad.addColorStop(0, `rgba(${rgbStr}, 0.85)`);
+        grad.addColorStop(0.5, `rgba(${rgbStr}, 0.25)`);
+        grad.addColorStop(1, `rgba(${rgbStr}, 0.0)`);
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(64, 64, 58, 0, Math.PI * 2);
+        ctx.fill();
+
+        // High-res emoji glyph
+        ctx.font = '60px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = `rgba(${rgbStr}, 0.9)`;
+        ctx.shadowBlur = 10;
+        ctx.fillText(glyph, 64, 64);
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.needsUpdate = true;
+        const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
+        const sprite = new THREE.Sprite(spriteMat);
+        const scale = 750;
+        sprite.scale.set(scale, scale, 1.0);
+        return { sprite, glyph };
     }
 
     function addSatelliteToScene(satData) {
-        const color = Math.floor(Math.random() * 0xffffff);
-        const radius = satData.parent_body === 'Moon' ? 120 : 180;
+        const rawColor = (satData.params && satData.params.color) || satData.color || '#38bdf8';
+        const colorNum = typeof rawColor === 'number' ? rawColor : parseInt(rawColor.replace('#', '0x'), 16);
+        const colorHex = '#' + (typeof rawColor === 'number' ? rawColor.toString(16).padStart(6, '0') : rawColor.replace('#', ''));
+        const colorObj = new THREE.Color(colorNum);
 
-        const mesh = new THREE.Mesh(
+        const iconType = (satData.params && satData.params.icon) || satData.icon || 'satellite';
+        const { sprite, glyph } = createAvatarSprite(iconType, colorHex);
+
+        const radius = satData.parent_body === 'Moon' ? 80 : 120;
+        const coreMesh = new THREE.Mesh(
             new THREE.SphereGeometry(radius, 16, 16),
-            new THREE.MeshBasicMaterial({ color })
+            new THREE.MeshBasicMaterial({ color: colorNum })
         );
-        scene.add(mesh);
+        const group = new THREE.Group();
+        group.add(coreMesh);
+        group.add(sprite);
+        scene.add(group);
 
         const line = new THREE.Line(
             new THREE.BufferGeometry(),
-            new THREE.LineBasicMaterial({ color, linewidth: 2, transparent: true, opacity: 0.85 })
+            new THREE.LineBasicMaterial({ vertexColors: true, linewidth: 2, transparent: true, opacity: 0.9 })
         );
         scene.add(line);
 
@@ -780,7 +844,15 @@
             parentBody: satData.parent_body || (satData.params && satData.params.parent_body) || 'Earth',
             params: satData.params,
             period_s: satData.period_s || 5400,
-            color, mesh, line, trailPts: [], ghostTrails: [],
+            color: colorNum,
+            colorHex,
+            colorObj,
+            iconType,
+            iconGlyph: glyph,
+            mesh: group,
+            line,
+            trailPts: [],
+            ghostTrails: [],
             buf: { t:[], x:[], y:[], z:[], vx:[], vy:[], vz:[], alt_km:[], lat_deg:[], lon_deg:[],
                    forces:{ central:[], j2:[], drag:[], moon:[], total:[] } },
             lastState: satData.last_state,
@@ -1270,14 +1342,15 @@
             const li = document.createElement('li');
             if (idx === selectedSatIndex) li.classList.add('active');
             if (sat.reentry) li.classList.add('deorbited');
-            li.style.borderLeftColor = '#' + sat.color.toString(16).padStart(6,'0');
+            li.style.borderLeftColor = sat.colorHex || ('#' + sat.color.toString(16).padStart(6,'0'));
 
             const bodyIcon = sat.parentBody === 'Moon' ? '🌕' : '🌍';
+            const avatarIcon = sat.iconGlyph || '🛰️';
             const statusIcon = sat.reentry ? ` 🔴 [Deorbited @ ${sat.deorbitTime || 'Re-entered'}]` : '';
 
             li.innerHTML = `
                 <div class="sat-info-badge">
-                    <span>${bodyIcon}</span>
+                    <span>${bodyIcon} ${avatarIcon}</span>
                     <span><strong>${sat.name}</strong>${statusIcon}</span>
                 </div>
                 <button class="del-sat-btn" title="Remove satellite" onclick="removeSatellite(${idx}, event)">✕</button>
@@ -1404,6 +1477,8 @@
                 include_j2: document.getElementById('m-j2').checked,
                 include_drag: document.getElementById('m-drag').checked,
                 include_moon: document.getElementById('m-moon').checked,
+                color: document.getElementById('m-color').value || '#38bdf8',
+                icon: document.getElementById('m-icon').value || 'satellite',
             };
             const res = await fetch('/simulate', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1639,6 +1714,9 @@
             const worldPos = bodyWorldPos.clone().add(localPos);
 
             sat.mesh.position.copy(worldPos);
+
+            // Dynamically update single-orbit trail window with fading behind satellite
+            updateSatelliteTrail(sat, simTime);
 
             // Stream next chunk near buffer edge
             const bufEnd = buf.t[buf.t.length - 1];

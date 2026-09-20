@@ -112,6 +112,9 @@ class SatelliteParams(BaseModel):
     include_j2: bool = Field(True, description="Include J2 oblateness perturbation")
     include_drag: bool = Field(True, description="Include atmospheric drag")
     include_moon: bool = Field(False, description="Include lunar third-body gravity")
+    # Visual representation
+    color: str = Field("#38bdf8", description="Hex color for trajectory and indicator")
+    icon: str = Field("satellite", description="Avatar icon type: satellite, rocket, astronaut, alien, ufo, sphere")
 
     @model_validator(mode="after")
     def validate_orbit_safety(self) -> "SatelliteParams":
