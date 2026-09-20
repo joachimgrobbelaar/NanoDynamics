@@ -99,9 +99,12 @@ async def simulate_satellite(params: SatelliteParams):
     try:
         # 1. Initialize objects (will raise ValueError on bad inputs)
         sat = Satellite(name=params.name, mass=params.mass, drag_area=params.drag_area, cd=params.cd)
-        r_initial_m = R_EARTH + params.altitude_km * 1000.0
+        # altitude_km is the perigee altitude (satellite launched at nu=0 = perigee).
+        # Semi-major axis: a = r_perigee / (1 - e)
+        r_perigee_m = R_EARTH + params.altitude_km * 1000.0
+        a_m = r_perigee_m / (1.0 - params.eccentricity) if params.eccentricity < 1.0 else r_perigee_m
         orbit = OrbitalElements(
-            a=r_initial_m, 
+            a=a_m,
             e=params.eccentricity, 
             i=np.radians(params.inclination_deg), 
             raan=np.radians(params.raan_deg), 
