@@ -105,6 +105,8 @@ class SatelliteParams(BaseModel):
     eccentricity: float = Field(..., ge=0.0, lt=1.0, description="Orbital eccentricity")
     inclination_deg: float = Field(..., ge=0.0, le=180.0, description="Inclination in degrees")
     raan_deg: float = Field(..., ge=0.0, lt=360.0, description="RAAN in degrees")
+    arg_periapsis_deg: float = Field(0.0, ge=0.0, lt=360.0, description="Argument of Periapsis in degrees")
+    true_anomaly_deg: float = Field(0.0, ge=0.0, lt=360.0, description="True Anomaly (Phase) in degrees")
     # Atmosphere configuration
     atmosphere_type: str = Field("piecewise", description="Atmosphere model: piecewise, high_solar, low_solar, app_default")
     density_scale: float = Field(1.0, ge=0.001, le=1000.0, description="Atmospheric density multiplier")
@@ -295,8 +297,8 @@ async def simulate_satellite(params: SatelliteParams):
             e=params.eccentricity,
             i=np.radians(params.inclination_deg),
             raan=np.radians(params.raan_deg),
-            arg_pe=0.0,
-            nu=0.0,
+            arg_pe=np.radians(params.arg_periapsis_deg),
+            nu=np.radians(params.true_anomaly_deg),
         )
 
         chunk_duration = body["default_chunk_duration"]
