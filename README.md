@@ -1,6 +1,6 @@
-# NanoDynamics: Real-Scale Earth-Moon Orbital Dynamics & Experimentation Suite (v13-alpha)
+# NanoDynamics: Real-Scale Earth-Moon Orbital Dynamics & Experimentation Suite (v16-alpha)
 
-An interactive, high-fidelity numerical orbit propagator, mission analysis suite, and parametric experimentation engine for satellites orbiting the Earth and Moon. NanoDynamics combines high-order Runge-Kutta numerical integration (`scipy.integrate.solve_ivp`), a PyTorch Physics-Informed Neural Network (PINN) surrogate model, and a real-scale Three.js / FastAPI full-stack 3D interactive web application with rolling trajectory streaming, live maneuver simulation, and automated deorbit lifetime sweeps.
+An interactive, high-fidelity numerical orbit propagator, mission analysis suite, and parametric experimentation engine for satellites orbiting the Earth and Moon. NanoDynamics combines high-order Runge-Kutta numerical integration (`scipy.integrate.solve_ivp`), a PyTorch Physics-Informed Neural Network (PINN) surrogate model, and a real-scale Three.js / FastAPI full-stack 3D interactive web application with rolling trajectory streaming, live maneuver simulation, progressive trajectory blending, and automated deorbit lifetime sweeps.
 
 ---
 
@@ -9,11 +9,13 @@ An interactive, high-fidelity numerical orbit propagator, mission analysis suite
 - **🧪 Server-Side Parametric Experimentation Lab:** Automated parametric sweeps evaluating independent variables ($B = \frac{m}{C_D A}$, mass, drag area, $C_D$, altitude, eccentricity, atmospheric density scale) to measure and record satellite deorbit lifetime, energy loss, and orbital decay rates. Supports quiet high-speed headless evaluation and visual trajectory inspection.
 - **Atmospheric Model Reconciliation:** High-fidelity Piecewise US Standard Atmosphere 1976 model with tabular layered scale heights ($0\text{ to }1,000\text{ km}$), alongside configurable solar activity multipliers (Low, Moderate, High Solar Activity) and custom density scaling.
 - **Clean Monotonic CSV Export:** Strictly monotonic trajectory exports with individual `Run_ID`, `Satellite_Name`, physical coordinates, velocities, altitudes, and deorbit lifetimes without overlap or time resets.
-- **Real-Scale Earth-Moon System:** True-to-life physical dimensions ($R_\oplus = 6,378.137\text{ km}$, $R_{\text{Moon}} = 1,737.4\text{ km}$) and real orbital separation ($384,400\text{ km}$) with realistic $27.32\text{ day}$ lunar propagation and $5.145^\circ$ orbital inclination.
+- **Full Cislunar System & Trans-Lunar Injection (TLI):** Real-scale Earth-Moon dynamics spanning $100\text{ km}$ LEO up to $400,000\text{ km}$ cislunar space ($R_\oplus = 6,378.137\text{ km}$, $R_{\text{Moon}} = 1,737.4\text{ km}$, separation $384,400\text{ km}$). Supports high-energy maneuvers ($\pm 5,000\text{ m/s}$ to $\pm 10,000\text{ m/s}$) for Trans-Lunar Injection ($\Delta v \approx 3,100\text{ m/s}$) and Lunar Orbit Insertion.
+- **Seamless Trajectory Bleeding & Ghost Trail Fading:** When a burn maneuver is executed, the new trajectory branches seamlessly into the orbit path while the pre-burn ghost trail progressively fades out over time.
+- **Geodetic Coordinates & Key Event Tracking:** Real-time calculation and display of WGS-84 sub-satellite latitude/longitude ($\phi, \lambda$), initial orbital insertion coordinates, re-entry interface coordinates ($120\text{ km}$), and ground collision points.
 - **Continuous Forward Time & Up to 10,000× Speedup:** Smooth, non-looping simulation driven by a true elapsed-time clock with speed multipliers from $1\times$ to $10,000\times$.
 - **Rolling `/stream` Architecture:** Trajectories are streamed in rolling chunks asynchronously from the FastAPI backend via `asyncio.to_thread()`, keeping the interface lightweight and responsive indefinitely.
-- **Multi-Body Satellite Placement:** Deploy satellites around **Earth** (LEO, MEO, GEO) or the **Moon** (Low Lunar Orbit) with dynamically guarded stable orbital parameter ranges.
-- **In-Flight $\Delta v$ Orbit Maneuvers:** Perform orbital burns in the local RTN (Radial, Transverse/Prograde, Normal) reference frame to execute orbit raising, circularization, Hohmann transfers, and plane changes in real time.
+- **Multi-Body Satellite Placement:** Deploy satellites around **Earth** (LEO, MEO, GEO, Cislunar) or the **Moon** (Low Lunar Orbit) with dynamically guarded stable orbital parameter ranges.
+- **Interactive $\Delta v$ Maneuver Nodes & Previews:** Right-click any point along an orbit trajectory to add a maneuver node, drag or tune prograde/radial/normal $\Delta v$ with live orbit preview and quick presets (TLI, LOI, Deorbit).
 - **3D Force Vector Overlays:** Interactive `THREE.ArrowHelper` vectors showing instantaneous acceleration components:
   - 🟢 **Central Gravity** ($-\frac{\mu}{r^3}\mathbf{r}$)
   - 🟡 **$J_2$ Earth Oblateness**

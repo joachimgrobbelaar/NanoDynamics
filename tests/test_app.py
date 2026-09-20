@@ -187,9 +187,9 @@ class TestSimulateEndpointInvalid:
         assert detail, "Error response must contain 'detail'"
         assert "eccentricity" in str(detail).lower(), f"Detail should mention 'eccentricity', got: {detail}"
 
-    @pytest.mark.parametrize("bad_alt", [-500.0, -100.0, 0.0, 50.0, 99.9, 2000.1, 5000.0, 35786.0])
+    @pytest.mark.parametrize("bad_alt", [-500.0, -100.0, 0.0, 50.0, 99.9, 400000.1, 500000.0, 1000000.0])
     def test_simulate_invalid_altitude(self, bad_alt):
-        """Assert altitude_km < 100.0 or > 2000.0 returns HTTP 422."""
+        """Assert altitude_km < 100.0 or > 400000.0 returns HTTP 422."""
         payload = {
             "name": "BadAltSat",
             "mass": 4.0,

@@ -225,9 +225,9 @@ class TestBoundaryValues:
         traj = res.json()["trajectory"]
         assert len(traj["t"]) == 1441
 
-    @pytest.mark.parametrize("bad_alt", [99.9999, -10.0, 2000.0001, 36000.0])
+    @pytest.mark.parametrize("bad_alt", [99.9999, -10.0, 400000.0001, 500000.0])
     def test_altitude_outside_bounds_rejected(self, bad_alt):
-        """Altitude < 100 or > 2000 km must return HTTP 422."""
+        """Altitude < 100 or > 400000 km must return HTTP 422."""
         payload = {
             "name": "BadAltSat",
             "mass": 4.0,

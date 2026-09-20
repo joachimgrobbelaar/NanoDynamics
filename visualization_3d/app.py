@@ -68,7 +68,7 @@ BODIES = {
         "omega": 7.2921150e-5,
         "has_atmosphere": True,
         "min_alt_km": 100.0,
-        "max_alt_km": 2000.0,
+        "max_alt_km": 400000.0,
         "default_alt_km": 400.0,
         "default_ecc": 0.001,
         "default_inc": 51.6,
@@ -193,6 +193,8 @@ def _build_propagator(params: SatelliteParams) -> OrbitPropagator:
         r_earth=body["radius_m"],
         j2=body["j2"],
         omega_earth=body["omega"],
+        rtol=1e-8,
+        atol=1e-9,
     )
 
 
@@ -351,8 +353,19 @@ async def preview_burn(req: BurnRequest, duration_s: float = 7200.0):
         new_state = r.tolist() + v_new.tolist()
 
         prop = _build_propagator(req.params)
-        preview_dur = min(duration_s, body["default_chunk_duration"])
-        dt_eval = max(20.0, body["dt_eval"])
+        
+        # Adaptive preview duration for cislunar / high-energy orbits
+        v_mag_sq = np.dot(v_new, v_new)
+        spec_energy = 0.5 * v_mag_sq - (body["mu"] / r_norm)
+        if spec_energy < -1e-5:
+            a_post = -body["mu"] / (2.0 * spec_energy)
+            period_post = 2.0 * np.pi * np.sqrt((a_post**3) / body["mu"])
+            preview_dur = min(max(duration_s, period_post * 0.6), 345600.0)
+        else:
+            # Parabolic / hyperbolic cislunar trajectory
+            preview_dur = 259200.0  # 3 days
+        
+        dt_eval = max(20.0, min(300.0, preview_dur / 300.0))
 
         res = await asyncio.to_thread(
             _propagate_chunk, prop, new_state, req.t_burn, preview_dur, dt_eval
@@ -396,8 +409,18 @@ async def execute_burn(req: BurnRequest):
         new_state = r.tolist() + v_new.tolist()
 
         prop = _build_propagator(req.params)
-        chunk_duration = body["default_chunk_duration"]
-        dt_eval = body["dt_eval"]
+
+        # Adaptive cislunar transfer chunk duration
+        v_mag_sq = np.dot(v_new, v_new)
+        spec_energy = 0.5 * v_mag_sq - (body["mu"] / r_norm)
+        if spec_energy < -1e-5:
+            a_post = -body["mu"] / (2.0 * spec_energy)
+            period_post = 2.0 * np.pi * np.sqrt((a_post**3) / body["mu"])
+            chunk_duration = min(max(body["default_chunk_duration"], period_post * 0.75), 432000.0)
+        else:
+            chunk_duration = 345600.0  # 4 days
+        
+        dt_eval = max(body["dt_eval"], min(300.0, chunk_duration / 400.0))
 
         res = await asyncio.to_thread(
             _propagate_chunk, prop, new_state, req.t_burn, chunk_duration, dt_eval

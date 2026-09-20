@@ -127,8 +127,8 @@ class OrbitPropagator:
         omega_earth: float = OMEGA_EARTH,
         mu_moon: float = MU_MOON,
         solver_method: str = "DOP853",
-        rtol: float = 1e-10,
-        atol: float = 1e-12,
+        rtol: float = 1e-8,
+        atol: float = 1e-9,
         min_altitude_reentry: float = 0.0,
     ) -> None:
         self.satellite = satellite if satellite is not None else Satellite.cubesat_3u()

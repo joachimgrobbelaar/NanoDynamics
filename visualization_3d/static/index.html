@@ -175,6 +175,7 @@
 
         <h3>Telemetry & Geodetic Coords</h3>
         <div id="telemetry-panel">
+            <div id="telemetry" style="display:none;"></div>
             <div><span class="label">Target: </span><span id="t-name">—</span></div>
             <div><span class="label">Body: </span><span id="t-body">—</span></div>
             <div><span class="label">Sim Time: </span><span id="t-time">0.0 s</span></div>
@@ -213,18 +214,24 @@
             
             <div class="burn-group">
                 <label style="color:#4ade80;">Prograde (Δv_T):</label>
-                <input type="range" id="burn-prograde-slider" min="-200" max="200" step="1" value="10" oninput="syncBurnInputs('prograde')">
+                <input type="range" id="burn-prograde-slider" min="-5000" max="5000" step="5" value="10" oninput="syncBurnInputs('prograde')">
                 <input type="number" id="burn-prograde" value="10.0" step="1.0" oninput="syncBurnSliders('prograde')"> m/s
             </div>
             <div class="burn-group">
                 <label style="color:#38bdf8;">Radial Out (Δv_R):</label>
-                <input type="range" id="burn-radial-slider" min="-200" max="200" step="1" value="0" oninput="syncBurnInputs('radial')">
+                <input type="range" id="burn-radial-slider" min="-5000" max="5000" step="5" value="0" oninput="syncBurnInputs('radial')">
                 <input type="number" id="burn-radial" value="0.0" step="1.0" oninput="syncBurnSliders('radial')"> m/s
             </div>
             <div class="burn-group">
                 <label style="color:#e879f9;">Normal (Δv_N):</label>
-                <input type="range" id="burn-normal-slider" min="-200" max="200" step="1" value="0" oninput="syncBurnInputs('normal')">
+                <input type="range" id="burn-normal-slider" min="-5000" max="5000" step="5" value="0" oninput="syncBurnInputs('normal')">
                 <input type="number" id="burn-normal" value="0.0" step="1.0" oninput="syncBurnSliders('normal')"> m/s
+            </div>
+
+            <div style="display:flex; gap:6px; margin: 6px 0; flex-wrap:wrap;">
+                <button type="button" class="preset-btn" onclick="applyBurnPreset(3100, 0, 0)" style="flex:1; font-size:10px; padding:3px 4px; background:#1e293b; border:1px solid #3b82f6; color:#93c5fd; border-radius:4px; cursor:pointer;">TLI (+3100 m/s)</button>
+                <button type="button" class="preset-btn" onclick="applyBurnPreset(-850, 0, 0)" style="flex:1; font-size:10px; padding:3px 4px; background:#1e293b; border:1px solid #ec4899; color:#f472b6; border-radius:4px; cursor:pointer;">LOI (-850 m/s)</button>
+                <button type="button" class="preset-btn" onclick="applyBurnPreset(-150, 0, 0)" style="flex:1; font-size:10px; padding:3px 4px; background:#1e293b; border:1px solid #ef4444; color:#fca5a5; border-radius:4px; cursor:pointer;">Deorbit (-150 m/s)</button>
             </div>
 
             <div style="font-size:11px; margin-top:4px; color:#cbd5e1; display:flex; justify-content:space-between;">
@@ -274,9 +281,9 @@
             
             <div class="form-section">
                 <div class="form-section-title">Orbital Elements</div>
-                <div id="stable-range-hint" class="stable-hint">Stable Range: 100 km – 2,000 km</div>
+                <div id="stable-range-hint" class="stable-hint">Stable Range: 100 km – 400,000 km</div>
                 <div class="form-group"><label>Perigee Alt (km):</label><input type="number" id="m-alt" value="400"></div>
-                <div class="form-group"><label>Eccentricity (e):</label><input type="number" id="m-ecc" value="0.001" step="0.001" min="0" max="0.95"></div>
+                <div class="form-group"><label>Eccentricity (e):</label><input type="number" id="m-ecc" value="0.001" step="0.001" min="0" max="0.999"></div>
                 <div class="form-group"><label>Inclination (°):</label><input type="number" id="m-inc" value="51.6" min="0" max="180"></div>
                 <div class="form-group"><label>RAAN (°):</label><input type="number" id="m-raan" value="45.0" min="0" max="360"></div>
             </div>
@@ -546,7 +553,7 @@
 
     // ── Body Constraints Configuration ────────────────────────────────────────
     const BODY_DEFAULTS = {
-        Earth: { minAlt: 100, maxAlt: 2000, defAlt: 400, maxEcc: 0.95, defInc: 51.6, defRaan: 45, hasAtm: true, hasMoon: true },
+        Earth: { minAlt: 100, maxAlt: 400000, defAlt: 400, maxEcc: 0.999, defInc: 51.6, defRaan: 45, hasAtm: true, hasMoon: true },
         Moon:  { minAlt: 20,  maxAlt: 10000, defAlt: 100, maxEcc: 0.90, defInc: 90.0, defRaan: 0,  hasAtm: false, hasMoon: false }
     };
 
@@ -773,7 +780,7 @@
             parentBody: satData.parent_body || (satData.params && satData.params.parent_body) || 'Earth',
             params: satData.params,
             period_s: satData.period_s || 5400,
-            color, mesh, line, trailPts: [],
+            color, mesh, line, trailPts: [], ghostTrails: [],
             buf: { t:[], x:[], y:[], z:[], vx:[], vy:[], vz:[], alt_km:[], lat_deg:[], lon_deg:[],
                    forces:{ central:[], j2:[], drag:[], moon:[], total:[] } },
             lastState: satData.last_state,
@@ -806,6 +813,14 @@
         const sat = activeSatellites[idx];
         scene.remove(sat.mesh);
         scene.remove(sat.line);
+        if (sat.ghostTrails) {
+            sat.ghostTrails.forEach(gt => {
+                scene.remove(gt.line);
+                gt.line.geometry.dispose();
+                gt.line.material.dispose();
+            });
+            sat.ghostTrails = [];
+        }
         Object.values(sat.forceArrows).forEach(a => scene.remove(a));
         
         activeSatellites.splice(idx, 1);
@@ -961,6 +976,16 @@
         updateBurnPreview();
     }
 
+    function applyBurnPreset(t, r, n) {
+        document.getElementById('burn-prograde').value = t;
+        document.getElementById('burn-prograde-slider').value = t;
+        document.getElementById('burn-radial').value = r;
+        document.getElementById('burn-radial-slider').value = r;
+        document.getElementById('burn-normal').value = n;
+        document.getElementById('burn-normal-slider').value = n;
+        updateBurnPreview();
+    }
+
     let previewDebounce = null;
     function updateBurnPreview() {
         if (activeManeuver.satIndex < 0 || !activeSatellites[activeManeuver.satIndex]) return;
@@ -1045,6 +1070,22 @@
             });
             const data = await res.json();
             if (!res.ok) { alert('Burn failed: ' + data.detail); return; }
+
+            // Create ghost trail of the old trajectory to blend smoothly and fade out progressively
+            if (sat.line && sat.trailPts && sat.trailPts.length > 1) {
+                const ghostGeo = new THREE.BufferGeometry().setFromPoints(sat.trailPts);
+                const ghostMat = new THREE.LineBasicMaterial({
+                    color: sat.color,
+                    linewidth: 2,
+                    transparent: true,
+                    opacity: 0.85
+                });
+                const ghostLine = new THREE.Line(ghostGeo, ghostMat);
+                ghostLine.position.copy(sat.line.position);
+                scene.add(ghostLine);
+                if (!sat.ghostTrails) sat.ghostTrails = [];
+                sat.ghostTrails.push({ line: ghostLine, opacity: 0.85, fadeSpeed: 0.04 });
+            }
 
             // Truncate existing satellite buffer up to t_burn and append post-burn chunk
             const b = sat.buf;
@@ -1154,6 +1195,13 @@
         activeSatellites.forEach(sat => {
             scene.remove(sat.mesh);
             scene.remove(sat.line);
+            if (sat.ghostTrails) {
+                sat.ghostTrails.forEach(gt => {
+                    scene.remove(gt.line);
+                    gt.line.geometry.dispose();
+                    gt.line.material.dispose();
+                });
+            }
             Object.values(sat.forceArrows).forEach(a => scene.remove(a));
         });
         activeSatellites = [];
@@ -1601,6 +1649,23 @@
             // Force vector arrows
             if (sat.showForces) {
                 updateForceArrows(sat, idx, worldPos);
+            }
+
+            // Handle progressive fading for ghost trails
+            if (sat.ghostTrails && sat.ghostTrails.length > 0) {
+                for (let g = sat.ghostTrails.length - 1; g >= 0; g--) {
+                    const gt = sat.ghostTrails[g];
+                    gt.line.position.copy(bodyWorldPos);
+                    gt.opacity -= gt.fadeSpeed * Math.min(wallDt * 2.0, 0.05);
+                    if (gt.opacity <= 0) {
+                        scene.remove(gt.line);
+                        gt.line.geometry.dispose();
+                        gt.line.material.dispose();
+                        sat.ghostTrails.splice(g, 1);
+                    } else {
+                        gt.line.material.opacity = gt.opacity;
+                    }
+                }
             }
         });
 
