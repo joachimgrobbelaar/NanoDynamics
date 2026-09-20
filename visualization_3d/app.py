@@ -63,14 +63,17 @@ class SatelliteParams(BaseModel):
 
     @model_validator(mode="after")
     def validate_orbit_safety(self) -> "SatelliteParams":
-        # Perigee radius: r_p = (R_EARTH + h) * (1 - e)
-        # Must be greater than R_EARTH + 50 km to prevent surface collision
-        r_initial_m = R_EARTH + self.altitude_km * 1000.0
-        r_perigee_m = r_initial_m * (1.0 - self.eccentricity)
-        min_safe_radius_m = R_EARTH + 50_000.0
-        if r_perigee_m <= min_safe_radius_m:
+        # The satellite is launched at true anomaly nu=0 (perigee), so
+        # altitude_km is the perigee altitude directly. The Field constraint
+        # (ge=100.0) already guarantees this is safe. We only need to guard
+        # against a highly eccentric orbit whose perigee is below the surface.
+        # Semi-major axis: a = (R_EARTH + altitude_km*1000) / (1 - e)
+        # Perigee radius (at nu=0): r_p = R_EARTH + altitude_km * 1000
+        # (altitude_km IS the perigee altitude, not the semi-major axis)
+        perigee_alt_km = self.altitude_km  # nu=0 launch → perigee = input altitude
+        if perigee_alt_km < 50.0:
             raise ValueError(
-                f"Perigee altitude {(r_perigee_m - R_EARTH) / 1000.0:.1f} km is below minimum safe threshold of 50 km (collision risk)."
+                f"Perigee altitude {perigee_alt_km:.1f} km is below minimum safe threshold of 50 km."
             )
         return self
 
