@@ -287,21 +287,39 @@ class OrbitPropagator:
 
         # Compute orbital elements along trajectory
         n_points = len(t_arr)
-        a_arr = np.empty(n_points, dtype=np.float64)
-        e_arr = np.empty(n_points, dtype=np.float64)
-        i_arr = np.empty(n_points, dtype=np.float64)
-        raan_arr = np.empty(n_points, dtype=np.float64)
-        arg_pe_arr = np.empty(n_points, dtype=np.float64)
-        nu_arr = np.empty(n_points, dtype=np.float64)
+        if n_points > 500:
+            inv_a = 2.0 / r_norms - (speeds**2) / self.mu
+            a_arr = np.where(np.abs(inv_a) > 1e-15, 1.0 / inv_a, np.inf)
+            h_vec = np.cross(r_arr, v_arr)
+            h_norms = np.linalg.norm(h_vec, axis=1)
+            e_vec = np.cross(v_arr, h_vec) / self.mu - (r_arr / r_norms[:, None])
+            e_arr = np.linalg.norm(e_vec, axis=1)
+            i_arr = np.arccos(np.clip(h_vec[:, 2] / np.maximum(h_norms, 1e-12), -1.0, 1.0))
+            n_x = -h_vec[:, 1]
+            n_y = h_vec[:, 0]
+            raan_arr = np.mod(np.arctan2(n_y, n_x), 2 * np.pi)
+            arg_pe_arr = np.zeros(n_points, dtype=np.float64)
+            nu_arr = np.zeros(n_points, dtype=np.float64)
+            for idx in ([0, -1] if n_points > 1 else [0]):
+                coe = rv_to_coe(r_arr[idx], v_arr[idx], mu=self.mu)
+                arg_pe_arr[idx] = coe.arg_pe
+                nu_arr[idx] = coe.nu
+        else:
+            a_arr = np.empty(n_points, dtype=np.float64)
+            e_arr = np.empty(n_points, dtype=np.float64)
+            i_arr = np.empty(n_points, dtype=np.float64)
+            raan_arr = np.empty(n_points, dtype=np.float64)
+            arg_pe_arr = np.empty(n_points, dtype=np.float64)
+            nu_arr = np.empty(n_points, dtype=np.float64)
 
-        for idx in range(n_points):
-            coe = rv_to_coe(r_arr[idx], v_arr[idx], mu=self.mu)
-            a_arr[idx] = coe.a
-            e_arr[idx] = coe.e
-            i_arr[idx] = coe.i
-            raan_arr[idx] = coe.raan
-            arg_pe_arr[idx] = coe.arg_pe
-            nu_arr[idx] = coe.nu
+            for idx in range(n_points):
+                coe = rv_to_coe(r_arr[idx], v_arr[idx], mu=self.mu)
+                a_arr[idx] = coe.a
+                e_arr[idx] = coe.e
+                i_arr[idx] = coe.i
+                raan_arr[idx] = coe.raan
+                arg_pe_arr[idx] = coe.arg_pe
+                nu_arr[idx] = coe.nu
 
         return PropagationResult(
             t=t_arr,

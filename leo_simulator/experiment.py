@@ -1,12 +1,13 @@
 """Parametric experimentation and orbital lifetime analysis suite.
 
-Provides automated parameter sweeps over orbital and spacecraft parameters
+Provides automated, multi-threaded parameter sweeps over orbital and spacecraft parameters
 (mass, drag area, ballistic coefficient, altitude, eccentricity, atmospheric models)
 measuring deorbit lifetime, energy dissipation, and perturbation rates.
 """
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 import csv
 import datetime
 import os
@@ -90,16 +91,12 @@ def get_atmosphere_by_name(name: str = "piecewise", density_scale: float = 1.0) 
     if "piecewise" in name_lower or "us_standard" in name_lower:
         base = PiecewiseExponentialAtmosphere()
     elif "high_solar" in name_lower:
-        # High solar activity reference (h0=400km, rho0=5.0e-12, H=65km)
         base = ExponentialAtmosphere(h0=400_000.0, rho0=5.0e-12, scale_height=65_000.0)
     elif "low_solar" in name_lower:
-        # Low solar activity reference (h0=400km, rho0=1.2e-12, H=50km)
         base = ExponentialAtmosphere(h0=400_000.0, rho0=1.2e-12, scale_height=50_000.0)
     elif "app_default" in name_lower:
-        # Legacy app default (h0=350km, rho0=9.5e-12, H=53.2km)
         base = ExponentialAtmosphere(h0=350_000.0, rho0=9.5e-12, scale_height=53_200.0)
     else:
-        # Default to piecewise exponential
         base = PiecewiseExponentialAtmosphere()
 
     if abs(density_scale - 1.0) > 1e-6:
@@ -121,8 +118,8 @@ def run_single_simulation(
     include_j2: bool = True,
     include_drag: bool = True,
     include_moon: bool = False,
-    max_duration_seconds: float = 30 * 86400.0,  # default 30 days max
-    dt_eval: float | None = None,  # None for adaptive step event-only solving (fast)
+    max_duration_seconds: float = 30 * 86400.0,
+    dt_eval: float | None = None,
     include_trajectory: bool = False,
 ) -> tuple[dict[str, Any], dict[str, Any] | None]:
     """Execute a single orbital simulation and extract decay and deorbit lifetime metrics."""
@@ -131,6 +128,10 @@ def run_single_simulation(
     atm = get_atmosphere_by_name(atmosphere_type, density_scale) if include_drag else None
     sat = Satellite(name=name, mass=mass, drag_area=drag_area, cd=cd)
 
+    # Fast tolerances for sweeps
+    rtol = 1e-7 if not include_trajectory else 1e-8
+    atol = 1e-8 if not include_trajectory else 1e-9
+
     prop = OrbitPropagator(
         satellite=sat,
         atmosphere=atm,
@@ -138,6 +139,9 @@ def run_single_simulation(
         include_j2=include_j2,
         include_drag=include_drag,
         include_moon=include_moon,
+        solver_method="DOP853",
+        rtol=rtol,
+        atol=atol,
     )
 
     a_m = R_EARTH + altitude_km * 1000.0
@@ -167,7 +171,6 @@ def run_single_simulation(
     r0_norm = float(np.linalg.norm(res.r[0]))
     v0_norm = float(np.linalg.norm(res.v[0]))
 
-    # Specific mechanical energy E = v^2 / 2 - mu / r + phi_J2
     phi_j2_0 = (MU_EARTH * J2_EARTH * (R_EARTH**2) / (2.0 * r0_norm**3)) * (3.0 * (res.r[0][2] / r0_norm) ** 2 - 1.0)
     e0 = 0.5 * v0_norm**2 - MU_EARTH / r0_norm + phi_j2_0
 
@@ -177,7 +180,6 @@ def run_single_simulation(
     lifetime_sec = float(res.reentry_time) if res.reentry_detected and res.reentry_time is not None else float(res.t[-1])
     lifetime_days = lifetime_sec / 86400.0
 
-    # Mean decay rate
     alt_drop_km = altitude_km - final_alt_km
     decay_rate = (alt_drop_km / lifetime_days) if lifetime_days > 1e-4 else 0.0
 
@@ -225,6 +227,79 @@ def run_single_simulation(
     return metrics, traj_dict
 
 
+def _evaluate_sweep_point(args: tuple[int, str, float, dict[str, Any], str, float, float, bool]) -> tuple[SweepPointResult, dict[str, Any] | None]:
+    idx, param_name, val, base_params, atmosphere_type, density_scale, max_duration_seconds, quiet = args
+    run_params = dict(base_params)
+    curr_density_scale = density_scale
+
+    if param_name == "altitude_km":
+        run_params["altitude_km"] = float(val)
+    elif param_name == "mass":
+        run_params["mass"] = float(val)
+    elif param_name == "drag_area":
+        run_params["drag_area"] = float(val)
+    elif param_name == "cd":
+        run_params["cd"] = float(val)
+    elif param_name == "ballistic_coefficient":
+        cd = float(run_params.get("cd", 2.2))
+        area = float(run_params.get("drag_area", 0.03))
+        run_params["mass"] = float(val * cd * area)
+    elif param_name == "eccentricity":
+        run_params["eccentricity"] = float(val)
+    elif param_name == "inclination_deg":
+        run_params["inclination_deg"] = float(val)
+    elif param_name == "density_scale":
+        curr_density_scale = float(val)
+    else:
+        run_params[param_name] = float(val)
+
+    run_name = f"{param_name}_{val:.4g}"
+    metrics, traj = run_single_simulation(
+        name=run_name,
+        mass=float(run_params["mass"]),
+        drag_area=float(run_params["drag_area"]),
+        cd=float(run_params["cd"]),
+        altitude_km=float(run_params["altitude_km"]),
+        eccentricity=float(run_params["eccentricity"]),
+        inclination_deg=float(run_params["inclination_deg"]),
+        raan_deg=float(run_params.get("raan_deg", 0.0)),
+        atmosphere_type=atmosphere_type,
+        density_scale=curr_density_scale,
+        include_j2=bool(run_params.get("include_j2", True)),
+        include_drag=bool(run_params.get("include_drag", True)),
+        include_moon=bool(run_params.get("include_moon", False)),
+        max_duration_seconds=max_duration_seconds,
+        include_trajectory=not quiet,
+    )
+
+    res_obj = SweepPointResult(
+        run_id=idx + 1,
+        param_name=param_name,
+        param_value=float(val),
+        mass_kg=metrics["mass_kg"],
+        drag_area_m2=metrics["drag_area_m2"],
+        cd=metrics["cd"],
+        ballistic_coeff_kg_m2=metrics["ballistic_coeff_kg_m2"],
+        ballistic_factor_m2_kg=metrics["ballistic_factor_m2_kg"],
+        initial_altitude_km=metrics["initial_altitude_km"],
+        initial_eccentricity=metrics["initial_eccentricity"],
+        initial_inclination_deg=metrics["initial_inclination_deg"],
+        initial_raan_deg=metrics["initial_raan_deg"],
+        final_altitude_km=metrics["final_altitude_km"],
+        final_eccentricity=metrics["final_eccentricity"],
+        deorbit_detected=metrics["deorbit_detected"],
+        lifetime_seconds=metrics["lifetime_seconds"],
+        lifetime_hours=metrics["lifetime_hours"],
+        lifetime_days=metrics["lifetime_days"],
+        initial_energy_j_kg=metrics["initial_energy_j_kg"],
+        final_energy_j_kg=metrics["final_energy_j_kg"],
+        energy_loss_j_kg=metrics["energy_loss_j_kg"],
+        mean_decay_rate_km_day=metrics["mean_decay_rate_km_day"],
+        computation_time_ms=metrics["computation_time_ms"],
+    )
+    return res_obj, traj
+
+
 def run_parametric_sweep(
     param_name: str,
     values: list[float],
@@ -235,18 +310,7 @@ def run_parametric_sweep(
     quiet: bool = True,
     output_dir: str | None = None,
 ) -> ExperimentResult:
-    """Run an automated parameter sweep over any independent variable and save clean CSV results.
-
-    Supported param_names:
-        - 'altitude_km'
-        - 'mass'
-        - 'drag_area'
-        - 'cd'
-        - 'ballistic_coefficient'  (sweeps mass holding area/cd constant)
-        - 'eccentricity'
-        - 'inclination_deg'
-        - 'density_scale'
-    """
+    """Run an automated multi-threaded parameter sweep and save clean CSV results."""
     if base_params is None:
         base_params = {
             "name": "SweepSat",
@@ -265,82 +329,21 @@ def run_parametric_sweep(
     timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%S")
     experiment_id = f"sweep_{param_name}_{timestamp}"
 
-    results: list[SweepPointResult] = []
-    trajectories: list[dict[str, Any]] = []
+    tasks = [
+        (idx, param_name, val, base_params, atmosphere_type, density_scale, max_duration_seconds, quiet)
+        for idx, val in enumerate(values)
+    ]
 
-    for idx, val in enumerate(values):
-        run_params = dict(base_params)
-        curr_density_scale = density_scale
+    # Execute points concurrently in parallel threads
+    num_workers = min(len(values), 8)
+    with ThreadPoolExecutor(max_workers=num_workers) as executor:
+        results_and_trajs = list(executor.map(_evaluate_sweep_point, tasks))
 
-        if param_name == "altitude_km":
-            run_params["altitude_km"] = float(val)
-        elif param_name == "mass":
-            run_params["mass"] = float(val)
-        elif param_name == "drag_area":
-            run_params["drag_area"] = float(val)
-        elif param_name == "cd":
-            run_params["cd"] = float(val)
-        elif param_name == "ballistic_coefficient":
-            # B = m / (cd * area) -> m = B * (cd * area)
-            cd = float(run_params.get("cd", 2.2))
-            area = float(run_params.get("drag_area", 0.03))
-            run_params["mass"] = float(val * cd * area)
-        elif param_name == "eccentricity":
-            run_params["eccentricity"] = float(val)
-        elif param_name == "inclination_deg":
-            run_params["inclination_deg"] = float(val)
-        elif param_name == "density_scale":
-            curr_density_scale = float(val)
-        else:
-            run_params[param_name] = float(val)
+    results = [r[0] for r in results_and_trajs]
+    trajectories = [r[1] for r in results_and_trajs if r[1] is not None]
 
-        run_name = f"{param_name}_{val:.4g}"
-        metrics, traj = run_single_simulation(
-            name=run_name,
-            mass=float(run_params["mass"]),
-            drag_area=float(run_params["drag_area"]),
-            cd=float(run_params["cd"]),
-            altitude_km=float(run_params["altitude_km"]),
-            eccentricity=float(run_params["eccentricity"]),
-            inclination_deg=float(run_params["inclination_deg"]),
-            raan_deg=float(run_params.get("raan_deg", 0.0)),
-            atmosphere_type=atmosphere_type,
-            density_scale=curr_density_scale,
-            include_j2=bool(run_params.get("include_j2", True)),
-            include_drag=bool(run_params.get("include_drag", True)),
-            include_moon=bool(run_params.get("include_moon", False)),
-            max_duration_seconds=max_duration_seconds,
-            include_trajectory=not quiet,
-        )
-
-        res_obj = SweepPointResult(
-            run_id=idx + 1,
-            param_name=param_name,
-            param_value=float(val),
-            mass_kg=metrics["mass_kg"],
-            drag_area_m2=metrics["drag_area_m2"],
-            cd=metrics["cd"],
-            ballistic_coeff_kg_m2=metrics["ballistic_coeff_kg_m2"],
-            ballistic_factor_m2_kg=metrics["ballistic_factor_m2_kg"],
-            initial_altitude_km=metrics["initial_altitude_km"],
-            initial_eccentricity=metrics["initial_eccentricity"],
-            initial_inclination_deg=metrics["initial_inclination_deg"],
-            initial_raan_deg=metrics["initial_raan_deg"],
-            final_altitude_km=metrics["final_altitude_km"],
-            final_eccentricity=metrics["final_eccentricity"],
-            deorbit_detected=metrics["deorbit_detected"],
-            lifetime_seconds=metrics["lifetime_seconds"],
-            lifetime_hours=metrics["lifetime_hours"],
-            lifetime_days=metrics["lifetime_days"],
-            initial_energy_j_kg=metrics["initial_energy_j_kg"],
-            final_energy_j_kg=metrics["final_energy_j_kg"],
-            energy_loss_j_kg=metrics["energy_loss_j_kg"],
-            mean_decay_rate_km_day=metrics["mean_decay_rate_km_day"],
-            computation_time_ms=metrics["computation_time_ms"],
-        )
-        results.append(res_obj)
-        if traj is not None:
-            trajectories.append(traj)
+    # Sort results by run_id
+    results.sort(key=lambda x: x.run_id)
 
     # Export to CSV
     csv_file = None

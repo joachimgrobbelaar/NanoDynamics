@@ -26,6 +26,21 @@ def test_generate_small_dataset_deterministic(tmp_path):
     assert json.loads((tmp_path / "stats.json").read_text())["seed"] == 7
 
 
+def test_generate_one_step_mode(tmp_path):
+    data, stats = generate(n_traj=2, orbits=0.2, dt=300.0, seed=3,
+                           out_dir=str(tmp_path), mode="one_step")
+    assert stats["mode"] == "one_step"
+    assert data["x"].shape == data["y"].shape
+    assert data["x"].shape[1] == 6
+    assert data["x"].shape[0] > 0
+    # consecutive pairs: y[i] is the state after x[i]
+    assert np.all(np.isfinite(data["x"])) and np.all(np.isfinite(data["y"]))
+    assert os.path.exists(tmp_path / "dataset_onestep.npz")
+    with pytest.raises(ValueError):
+        generate(n_traj=1, orbits=0.1, dt=300.0, seed=0, out_dir=None,
+                 mode="bogus")
+
+
 def test_dataset_shapes_and_scales(tmp_path):
     data, stats = generate(n_traj=2, orbits=0.2, dt=300.0, seed=1,
                            out_dir=str(tmp_path))

@@ -38,9 +38,12 @@ DEFAULT_STATS = {"t_scale": 5400.0, "pos_scale": 6378137.0, "vel_scale": 8000.0}
 
 
 def normalize(t, init_state, state, stats):
-    """Scale raw SI tensors to O(1) training units."""
+    """Scale raw SI tensors to O(1) training units (dtype-preserving)."""
     ts, ps, vs = stats["t_scale"], stats["pos_scale"], stats["vel_scale"]
-    sc = np.array([ps, ps, ps, vs, vs, vs], dtype=np.float32)
+    if torch.is_tensor(init_state):
+        sc = torch.tensor([ps, ps, ps, vs, vs, vs], dtype=torch.float32)
+    else:
+        sc = np.array([ps, ps, ps, vs, vs, vs], dtype=np.float32)
     return (t / ts, init_state / sc, state / sc)
 
 
@@ -121,7 +124,13 @@ def train(data_dir=None, out_dir=None, epochs=100, hidden=64, layers=4,
         optimizer.zero_grad()
         pred_state = model(t, init_state)
         data_loss = mse(pred_state, true_state)
-        physics_loss = compute_physics_loss(t, init_state, model, mu)
+        # Physics term is skipped when disabled, and dropped for any step
+        # where it goes non-finite, so 0*inf can never NaN-poison the weights.
+        physics_loss = torch.zeros((), dtype=torch.float32)
+        if physics_weight > 0:
+            candidate = compute_physics_loss(t, init_state, model, mu)
+            if torch.isfinite(candidate):
+                physics_loss = candidate
         total_loss = data_loss + physics_weight * physics_loss
         total_loss.backward()
         optimizer.step()

@@ -44,49 +44,67 @@ def sample_initial_orbit(rng, alt_min_m, alt_max_m):
     )
 
 
-def generate(n_traj=20, orbits=1.0, dt=60.0, alt_min_km=300.0, alt_max_km=600.0,
-             seed=0, out_dir=None):
-    """Propagate n_traj random orbits; return (t, init_state, state) arrays.
-
-    Rows follow the (t, initial_state) -> state formulation used by
-    ai/pinn_model.py. Times are absolute seconds from each trajectory start.
-    """
+def _propagate_many(n_traj, orbits, dt, alt_min_km, alt_max_km, seed):
+    """Propagate n_traj random orbits; yield (t, r, v) per trajectory."""
     rng = np.random.default_rng(seed)
     sat = Satellite.cubesat_3u()
     atm = ExponentialAtmosphere()
     prop = OrbitPropagator(satellite=sat, atmosphere=atm,
                            include_central_gravity=True, include_j2=True,
                            include_drag=True)
-
-    t_list, init_list, state_list = [], [], []
     for k in range(n_traj):
         oe = sample_initial_orbit(rng, alt_min_km * 1000.0, alt_max_km * 1000.0)
         duration = float(orbits * oe.period)
         res = prop.propagate(oe, duration_seconds=duration, dt_eval=dt)
-        y0 = np.concatenate([res.r[0], res.v[0]])
-        n = len(res.t)
-        t_list.append(res.t.reshape(n, 1))
-        init_list.append(np.tile(y0, (n, 1)))
-        state_list.append(np.hstack([res.r, res.v]))
         print(f"  traj {k + 1}/{n_traj}: alt0={res.initial_altitude / 1000:.1f}km "
-              f"pts={n} decay={res.altitude_decay:.1f}m")
+              f"pts={len(res.t)} decay={res.altitude_decay:.1f}m")
+        yield res
 
-    data = {
-        "t": np.vstack(t_list),
-        "init_state": np.vstack(init_list),
-        "state": np.vstack(state_list),
-    }
+
+def generate(n_traj=20, orbits=1.0, dt=60.0, alt_min_km=300.0, alt_max_km=600.0,
+             seed=0, out_dir=None, mode="trajectory"):
+    """Build a training dataset from propagated random orbits.
+
+    mode="trajectory": rows follow (t, initial_state) -> state (pinn_model).
+    mode="one_step": rows follow state_t -> state_{t+dt} with fixed dt
+        (transition model: smooth local map, generalizes across orbits and
+        fits TinyML budgets).
+    """
     stats = {"t_scale": T_SCALE, "pos_scale": POS_SCALE, "vel_scale": VEL_SCALE,
              "n_traj": n_traj, "orbits": orbits, "dt": dt, "seed": seed,
              "alt_min_km": alt_min_km, "alt_max_km": alt_max_km,
-             "physics": "central+J2+drag"}
+             "physics": "central+J2+drag", "mode": mode}
+
+    if mode == "one_step":
+        x_list, y_list = [], []
+        for res in _propagate_many(n_traj, orbits, dt, alt_min_km, alt_max_km, seed):
+            y = np.hstack([res.r, res.v])
+            x_list.append(y[:-1])
+            y_list.append(y[1:])
+        data = {"x": np.vstack(x_list), "y": np.vstack(y_list)}
+    elif mode == "trajectory":
+        t_list, init_list, state_list = [], [], []
+        for res in _propagate_many(n_traj, orbits, dt, alt_min_km, alt_max_km, seed):
+            y0 = np.concatenate([res.r[0], res.v[0]])
+            n = len(res.t)
+            t_list.append(res.t.reshape(n, 1))
+            init_list.append(np.tile(y0, (n, 1)))
+            state_list.append(np.hstack([res.r, res.v]))
+        data = {"t": np.vstack(t_list),
+                "init_state": np.vstack(init_list),
+                "state": np.vstack(state_list)}
+    else:
+        raise ValueError(f"Unknown mode {mode!r}; want 'trajectory' or 'one_step'")
 
     if out_dir is not None:
         os.makedirs(out_dir, exist_ok=True)
-        np.savez_compressed(os.path.join(out_dir, "dataset.npz"), **data)
-        with open(os.path.join(out_dir, "stats.json"), "w") as f:
+        name = "dataset.npz" if mode == "trajectory" else "dataset_onestep.npz"
+        sname = "stats.json" if mode == "trajectory" else "stats_onestep.json"
+        np.savez_compressed(os.path.join(out_dir, name), **data)
+        with open(os.path.join(out_dir, sname), "w") as f:
             json.dump(stats, f, indent=2)
-        print(f"Saved {sum(len(v) for v in [data['t']])} samples -> {out_dir}/")
+        rows = len(next(iter(data.values())))
+        print(f"Saved {rows} samples -> {out_dir}/{name}")
 
     return data, stats
 
@@ -99,11 +117,12 @@ def main():
     ap.add_argument("--alt-min-km", type=float, default=300.0)
     ap.add_argument("--alt-max-km", type=float, default=600.0)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--mode", choices=("trajectory", "one_step"), default="trajectory")
     ap.add_argument("--out", default=os.path.join(AI_DIR, "data"))
     args = ap.parse_args()
     generate(n_traj=args.n_traj, orbits=args.orbits, dt=args.dt,
              alt_min_km=args.alt_min_km, alt_max_km=args.alt_max_km,
-             seed=args.seed, out_dir=args.out)
+             seed=args.seed, out_dir=args.out, mode=args.mode)
 
 
 if __name__ == "__main__":
