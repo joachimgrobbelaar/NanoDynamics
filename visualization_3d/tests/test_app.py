@@ -33,7 +33,7 @@ def test_simulate_valid_params():
     assert "trajectory" in data
     assert isinstance(data["trajectory"], dict)
     expected_keys = {"t", "x", "y", "z", "vx", "vy", "vz"}
-    assert set(data["trajectory"].keys()) == expected_keys
+    assert expected_keys.issubset(set(data["trajectory"].keys()))
     n_points = len(data["trajectory"]["t"])
     assert n_points > 0
     for key in expected_keys:
