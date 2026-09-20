@@ -38,8 +38,9 @@ def _file_hash(path):
 
 
 def run_once(data_dir=None, ckpt_dir=None, csv_paths=(), dt=60.0, min_pairs=50,
-             epochs=300, hidden=32, layers=2, lr=1e-3,
-             alt_km=420.0, inc_deg=60.0, force=False, resume=True):
+             epochs=300, hidden=32, layers=2, lr=1e-3, batch_size=1024,
+             patience=20, alt_km=420.0, inc_deg=60.0, force=False,
+             resume=True):
     data_dir = data_dir or os.path.join(AI_DIR, "data")
     ckpt_dir = ckpt_dir or os.path.join(AI_DIR, "checkpoints", "agent")
     state_path = os.path.join(data_dir, "agent_state.json")
@@ -96,6 +97,7 @@ def run_once(data_dir=None, ckpt_dir=None, csv_paths=(), dt=60.0, min_pairs=50,
 
     _, _ckpt = train_transition(data_dir=combined, out_dir=ckpt_dir,
                                   epochs=epochs, hidden=hidden, layers=layers, lr=lr,
+                                  batch_size=batch_size, patience=patience,
                                   resume=resume)
     res = evaluate_rollout(ckpt_path, alt_km=alt_km, inc_deg=inc_deg, orbits=1.0)
     final_drift = float(res["drift_pct"][-1])
@@ -117,6 +119,8 @@ def run_once(data_dir=None, ckpt_dir=None, csv_paths=(), dt=60.0, min_pairs=50,
         "eval_orbit": {"alt_km": alt_km, "inc_deg": inc_deg, "orbits": 1.0, "dt": dt},
         "resumed": bool(resume),
         "epochs": epochs,
+        "batch_size": batch_size,
+        "patience": patience,
     }
     with open(state_path, "w") as f:
         json.dump(report, f, indent=2)
@@ -148,6 +152,10 @@ def main():
     ap.add_argument("--hidden", type=int, default=32)
     ap.add_argument("--layers", type=int, default=2)
     ap.add_argument("--lr", type=float, default=1e-3)
+    ap.add_argument("--batch-size", type=int, default=1024)
+    ap.add_argument("--patience", type=int, default=20,
+                    help="early-stop after N epochs without relative gain "
+                         "(0 disables)")
     ap.add_argument("--alt-km", type=float, default=420.0)
     ap.add_argument("--inc-deg", type=float, default=60.0)
     ap.add_argument("--force", action="store_true")
@@ -159,8 +167,9 @@ def main():
             try:
                 run_once(csv_paths=args.csv, dt=args.dt, min_pairs=args.min_pairs,
                          epochs=args.epochs, hidden=args.hidden, layers=args.layers,
-                         lr=args.lr, alt_km=args.alt_km, inc_deg=args.inc_deg,
-                         force=args.force)
+                         lr=args.lr, batch_size=args.batch_size,
+                         patience=args.patience, alt_km=args.alt_km,
+                         inc_deg=args.inc_deg, force=args.force)
             except Exception as e:  # noqa: BLE001 — a bad cycle must not kill the watch
                 print(f"cycle failed: {e}")
             try:
@@ -171,8 +180,9 @@ def main():
     else:  # default: single cycle
         run_once(csv_paths=args.csv, dt=args.dt, min_pairs=args.min_pairs,
                  epochs=args.epochs, hidden=args.hidden, layers=args.layers,
-                 lr=args.lr, alt_km=args.alt_km, inc_deg=args.inc_deg,
-                 force=args.force)
+                 lr=args.lr, batch_size=args.batch_size,
+                 patience=args.patience, alt_km=args.alt_km,
+                 inc_deg=args.inc_deg, force=args.force)
 
 
 if __name__ == "__main__":

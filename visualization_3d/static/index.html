@@ -2465,8 +2465,9 @@
     const uxRaycaster = new THREE.Raycaster();
     const uxMouse = new THREE.Vector2();
     let draggingHandle = null;
-    let dragStartMouse = new THREE.Vector2();
     let dragStartValue = 0;
+    let dragPlane = null;
+    let dragStartPoint3D = null;
     
     window.toggleDragOrbitMode = function() {
         dragOrbitMode = !dragOrbitMode;
@@ -2499,11 +2500,18 @@
             if (intersects.length > 0) {
                 controls.enabled = false; // Disable camera orbit
                 draggingHandle = intersects[0].object;
-                dragStartMouse.set(event.clientX, event.clientY);
-                
                 const axis = draggingHandle.userData.axis;
                 dragStartValue = parseFloat(document.getElementById(`burn-${axis}`).value) || 0;
                 draggingHandle.material.opacity = 0.8;
+                
+                // Set up drag plane facing camera at handle pos
+                dragPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(
+                    camera.getWorldDirection(new THREE.Vector3()).negate(),
+                    intersects[0].point
+                );
+                const pt = new THREE.Vector3();
+                uxRaycaster.ray.intersectPlane(dragPlane, pt);
+                dragStartPoint3D = pt.clone();
                 return;
             }
         }
@@ -2532,7 +2540,7 @@
             
             // Map screen movement to delta V
             // Pushing mouse up/right increases, down/left decreases
-            const delta = (-dy + dx) * 0.5; // Sensitivity factor
+            const delta = (-dy + dx) * 2.0; // Increased sensitivity
             
             let newVal = dragStartValue + delta;
             const axis = draggingHandle.userData.axis;
@@ -2559,7 +2567,7 @@
             uxRaycaster.setFromCamera(uxMouse, camera);
             
             // Intersect with a plane at Earth's center facing camera
-            const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(camera.getWorldDirection(new THREE.Vector3()), new THREE.Vector3(0,0,0));
+            const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(camera.getWorldDirection(new THREE.Vector3()).negate(), dragOrbitStartPos);
             const intersectPoint = new THREE.Vector3();
             uxRaycaster.ray.intersectPlane(plane, intersectPoint);
             

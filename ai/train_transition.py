@@ -26,10 +26,15 @@ from transition_model import TransitionMLP, param_count
 
 
 def train(data_dir=None, out_dir=None, epochs=300, hidden=32, layers=2,
-          lr=1e-3, batch_size=256, seed=0, resume=True, save_every=50,
-          callback=None):
+          lr=1e-3, batch_size=1024, seed=0, resume=True, save_every=50,
+          patience=20, min_delta=1e-3, callback=None):
     data_dir = data_dir or os.path.join(AI_DIR, "data")
     out_dir = out_dir or os.path.join(AI_DIR, "checkpoints")
+    try:
+        import multiprocessing
+        torch.set_num_threads(max(1, multiprocessing.cpu_count()))
+    except Exception:
+        pass
     blob = np.load(os.path.join(data_dir, "dataset_onestep.npz"))
     with open(os.path.join(data_dir, "stats_onestep.json")) as f:
         stats = json.load(f)
@@ -50,12 +55,15 @@ def train(data_dir=None, out_dir=None, epochs=300, hidden=32, layers=2,
             prior = torch.load(ckpt_path, map_location="cpu", weights_only=False)
             if prior.get("config", {}).get("hidden_dim") == hidden and prior.get("config", {}).get("hidden_layers") == layers:
                 model.load_state_dict(prior["state_dict"])
-                print(f"Resumed model weights from {ckpt_path}")
+                if "optimizer_state" in prior:
+                    opt.load_state_dict(prior["optimizer_state"])
+                print(f"Resumed model and optimizer state from {ckpt_path}")
         except Exception as e:
             print(f"Could not resume checkpoint ({e}), initializing fresh weights.")
 
     n = len(x)
     best_loss = float("inf")
+    stale = 0
     live_path = os.path.join(data_dir, "training_live.json")
 
     for epoch in range(1, epochs + 1):
@@ -72,8 +80,16 @@ def train(data_dir=None, out_dir=None, epochs=300, hidden=32, layers=2,
         current_loss = tot / n
         if epoch == 1:
             initial_loss = current_loss
-        if current_loss < best_loss:
+        if best_loss == float("inf") or best_loss - current_loss > min_delta * best_loss:
             best_loss = current_loss
+            stale = 0
+        else:
+            stale += 1
+        if patience and stale >= patience:
+            print(f"Early stop at epoch {epoch}/{epochs}: "
+                  f"MSE={current_loss:.4e} (Best={best_loss:.4e}, "
+                  f"no >{min_delta:.0e} relative gain in {patience} epochs)")
+            break
 
         live_info = {
             "epoch": epoch,
@@ -97,19 +113,12 @@ def train(data_dir=None, out_dir=None, epochs=300, hidden=32, layers=2,
             print(f"Epoch {epoch}/{epochs}: MSE={current_loss:.4e} (Best={best_loss:.4e})")
             if out_dir is not None:
                 os.makedirs(out_dir, exist_ok=True)
-                ckpt = {"state_dict": model.state_dict(), "stats": stats,
+                ckpt = {"state_dict": model.state_dict(), "optimizer_state": opt.state_dict(), "stats": stats,
                         "config": {"hidden_dim": hidden, "hidden_layers": layers},
                         "epoch": epoch, "loss": current_loss}
                 torch.save(ckpt, os.path.join(out_dir, "transition.pt"))
-                try:
-                    example = torch.zeros(1, 6)
-                    traced = torch.jit.trace(model.eval(), example)
-                    traced.save(os.path.join(out_dir, "transition_traced.pt"))
-                    model.train()
-                except Exception:
-                    pass
 
-    ckpt = {"state_dict": model.state_dict(), "stats": stats,
+    ckpt = {"state_dict": model.state_dict(), "optimizer_state": opt.state_dict(), "stats": stats,
             "config": {"hidden_dim": hidden, "hidden_layers": layers},
             "total_epochs": epochs, "final_loss": best_loss}
     if out_dir is not None:
@@ -133,6 +142,8 @@ def train(data_dir=None, out_dir=None, epochs=300, hidden=32, layers=2,
         "hidden": hidden,
         "layers": layers,
         "lr": lr,
+        "batch_size": batch_size,
+        "patience": patience,
         "initial_loss": float(initial_loss if 'initial_loss' in locals() else best_loss),
         "final_loss": float(best_loss),
         "n_samples": int(len(x)),
@@ -158,9 +169,12 @@ def main():
     ap.add_argument("--hidden", type=int, default=32)
     ap.add_argument("--layers", type=int, default=2)
     ap.add_argument("--lr", type=float, default=1e-3)
+    ap.add_argument("--batch-size", type=int, default=1024)
+    ap.add_argument("--patience", type=int, default=20)
     args = ap.parse_args()
     train(data_dir=args.data, out_dir=args.out, epochs=args.epochs,
-          hidden=args.hidden, layers=args.layers, lr=args.lr)
+          hidden=args.hidden, layers=args.layers, lr=args.lr,
+          batch_size=args.batch_size, patience=args.patience)
 
 
 if __name__ == "__main__":
