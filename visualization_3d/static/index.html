@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Solar System & Multi-Satellite Orbital Dynamics Simulator</title>
+    <title>Earth-Moon Real-Scale Orbital Dynamics Simulator</title>
     <meta charset="utf-8">
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
@@ -10,8 +10,8 @@
         /* Top Navigation */
         #top-nav {
             position: absolute; top: 0; width: 100%;
-            background: rgba(24, 24, 28, 0.92); backdrop-filter: blur(8px);
-            padding: 8px 16px; box-sizing: border-box; border-bottom: 1px solid #3a3a44;
+            background: rgba(15, 23, 42, 0.92); backdrop-filter: blur(8px);
+            padding: 8px 16px; box-sizing: border-box; border-bottom: 1px solid #334155;
             display: flex; gap: 10px; align-items: center; z-index: 100;
         }
         #top-nav button {
@@ -27,23 +27,23 @@
 
         /* Sidebar */
         #sidebar {
-            position: absolute; top: 46px; left: 0; width: 300px; height: calc(100% - 46px);
-            background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(10px);
+            position: absolute; top: 46px; left: 0; width: 310px; height: calc(100% - 46px);
+            background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(10px);
             color: #f8fafc; border-right: 1px solid #334155;
             padding: 14px; box-sizing: border-box; overflow-y: auto; z-index: 90;
         }
-        #sidebar h3 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; border-bottom: 1px solid #334155; padding-bottom: 6px; }
+        #sidebar h3 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; border-bottom: 1px solid #334155; padding-bottom: 6px; }
         
         #sat-list { list-style: none; padding: 0; margin: 0 0 12px; }
         #sat-list li {
-            padding: 7px 10px; margin-bottom: 5px; background: #1e293b;
+            padding: 8px 10px; margin-bottom: 5px; background: #1e293b;
             border-radius: 5px; cursor: pointer; border-left: 4px solid transparent; font-size: 12px;
             display: flex; justify-content: space-between; align-items: center;
             transition: background 0.15s, border-color 0.15s;
         }
         #sat-list li:hover { background: #334155; }
         #sat-list li.active { background: #334155; border-left-color: #38bdf8 !important; }
-        #sat-list li.deorbited { opacity: 0.6; text-decoration: line-through; }
+        #sat-list li.deorbited { opacity: 0.65; text-decoration: line-through; }
         .sat-info-badge { display: flex; align-items: center; gap: 6px; }
         .del-sat-btn {
             background: #ef4444; color: white; border: none; width: 20px; height: 20px;
@@ -81,11 +81,11 @@
         /* Modal */
         #modal-overlay {
             display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.7); z-index: 200; justify-content: center; align-items: center;
+            background: rgba(0,0,0,0.75); z-index: 200; justify-content: center; align-items: center;
         }
         #modal-content {
             background: #0f172a; color: white; padding: 22px; border-radius: 8px;
-            width: 380px; border: 1px solid #334155; box-shadow: 0 8px 32px rgba(0,0,0,0.7);
+            width: 380px; border: 1px solid #334155; box-shadow: 0 8px 32px rgba(0,0,0,0.8);
         }
         #modal-content h3 { margin: 0 0 12px; font-size: 15px; border-bottom: 1px solid #334155; padding-bottom: 8px; }
         .form-group { margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #cbd5e1; }
@@ -104,7 +104,7 @@
 
         /* Sim Clock & Legend */
         #sim-clock {
-            position: absolute; bottom: 14px; left: 314px;
+            position: absolute; bottom: 14px; left: 324px;
             color: #38bdf8; font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 12px;
             background: rgba(15, 23, 42, 0.85); padding: 8px 14px;
             border: 1px solid #334155; border-radius: 6px; pointer-events: none; z-index: 100;
@@ -124,9 +124,9 @@
         <button onclick="openModal()">+ New Satellite</button>
         <button onclick="exportData()" style="background:#059669;">Export CSV</button>
         <div class="nav-sep"></div>
-        <button class="view-btn" onclick="focusView('Earth')">🌍 Earth System</button>
-        <button class="view-btn" onclick="focusView('Moon')">🌕 Moon System</button>
-        <button class="view-btn" onclick="focusView('Sun')">☀️ Solar System</button>
+        <button class="view-btn" onclick="focusView('Earth')">🌍 Earth View</button>
+        <button class="view-btn" onclick="focusView('Moon')">🌕 Moon View</button>
+        <button class="view-btn" onclick="focusView('System')">🌌 Earth-Moon System</button>
         <div style="flex-grow:1;"></div>
         <input type="text" id="save-name" placeholder="Simulation Name" style="width:140px;">
         <button onclick="saveSim()">Save</button>
@@ -146,11 +146,11 @@
         <div id="telemetry-panel">
             <div><span class="label">Target: </span><span id="t-name">—</span></div>
             <div><span class="label">Body: </span><span id="t-body">—</span></div>
-            <div><span class="label">Time: </span><span id="t-time">0.0 s</span></div>
+            <div><span class="label">Sim Time: </span><span id="t-time">0.0 s</span></div>
             <div><span class="label">Altitude: </span><span id="t-alt" class="val-highlight">— km</span></div>
             <div><span class="label">Velocity: </span><span id="t-vel">— km/s</span></div>
             <div><span class="label">Period: </span><span id="t-period">— min</span></div>
-            <div><span class="label">Lifetime: </span><span id="t-life" class="val-warn">Active (Indefinite)</span></div>
+            <div><span class="label">Lifetime: </span><span id="t-life" class="val-warn">Active (Safe Orbit)</span></div>
             <div><span class="label">|F_drag|: </span><span id="t-drag">— mm/s²</span></div>
             <div><span class="label">|F_J2|: </span><span id="t-j2">— mm/s²</span></div>
         </div>
@@ -194,7 +194,6 @@
                 <select id="m-body" onchange="updateBodyConstraints()">
                     <option value="Earth" selected>🌍 Earth</option>
                     <option value="Moon">🌕 Moon</option>
-                    <option value="Sun">☀️ Sun</option>
                 </select>
             </div>
             <div class="form-group"><label>Name:</label><input type="text" id="m-name" value="Sat-1"></div>
@@ -204,7 +203,7 @@
             
             <div class="form-section">
                 <div class="form-section-title">Orbital Elements</div>
-                <div id="stable-range-hint" class="stable-hint">Stable Range: 100 km – 50,000 km</div>
+                <div id="stable-range-hint" class="stable-hint">Stable Range: 100 km – 2,000 km</div>
                 <div class="form-group"><label>Perigee Alt (km):</label><input type="number" id="m-alt" value="400"></div>
                 <div class="form-group"><label>Eccentricity (e):</label><input type="number" id="m-ecc" value="0.001" step="0.001" min="0" max="0.95"></div>
                 <div class="form-group"><label>Inclination (°):</label><input type="number" id="m-inc" value="51.6" min="0" max="180"></div>
@@ -235,19 +234,16 @@
     <script>
     const M_TO_KM = 1 / 1000;
     
-    // Visual Scale Constants (in Three.js units)
-    const R_SUN_KM = 69634.0;       // Visual Sun size
-    const R_EARTH_KM = 6371.0;      // Real Earth radius in km
-    const R_MOON_KM = 1737.4;       // Real Moon radius in km
-    const D_EARTH_SUN_KM = 180000.0; // Scaled Earth-Sun orbital distance for visual clarity
-    const D_MOON_EARTH_KM = 24000.0; // Scaled Moon-Earth orbital distance for visual clarity
-
-    const T_YEAR_S = 365.25 * 86400; // 1 Earth year in seconds
-    const T_MONTH_S = 27.32 * 86400; // 1 Lunar month in seconds
+    // Real Physical Scale Constants (in km)
+    const R_EARTH_KM = 6378.137;     // Real Earth equatorial radius in km
+    const R_MOON_KM = 1737.4;        // Real Moon radius in km
+    const R_MOON_ORBIT_KM = 384400.0;// Real Moon distance from Earth in km
+    const T_MOON_ORBIT_S = 27.321661 * 86400; // 27.321661 days in seconds (~2,360,591 s)
+    const MOON_INC_RAD = 0.0898;     // 5.145 degrees orbital inclination
 
     // ── Three.js Scene Setup ──────────────────────────────────────────────────
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 10000000);
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 10, 50000000);
     let renderer, controls;
     try {
         renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -256,32 +252,22 @@
         controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.05;
+        controls.maxDistance = 3000000;
     } catch (e) {
         console.error("WebGL failed:", e);
     }
 
-    // Ambient and Point Light (Sunlight)
-    scene.add(new THREE.AmbientLight(0x333344));
-    const sunLight = new THREE.PointLight(0xffffff, 1.8, 0, 0);
+    // Directional Sunlight & Ambient Light
+    const sunLight = new THREE.DirectionalLight(0xffffff, 1.4);
+    sunLight.position.set(500000, 100000, 200000);
     scene.add(sunLight);
+    scene.add(new THREE.AmbientLight(0x2a2a35));
 
     const tl = new THREE.TextureLoader();
 
-    // ── Sun Mesh ──
-    const sunMat = new THREE.MeshBasicMaterial({ color: 0xffdd44 });
-    const sun = new THREE.Mesh(new THREE.SphereGeometry(22000, 48, 48), sunMat);
-    scene.add(sun);
-
-    // Sun Glow
-    const sunGlow = new THREE.Mesh(
-        new THREE.SphereGeometry(23500, 32, 32),
-        new THREE.MeshBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.25, side: THREE.BackSide })
-    );
-    scene.add(sunGlow);
-
-    // ── Earth Mesh ──
+    // ── Earth Mesh (Centered at Origin 0,0,0) ──
     const earth = new THREE.Mesh(
-        new THREE.SphereGeometry(R_EARTH_KM, 48, 48),
+        new THREE.SphereGeometry(R_EARTH_KM, 64, 64),
         new THREE.MeshPhongMaterial({
             map: tl.load('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg'),
             bumpMap: tl.load('https://unpkg.com/three-globe/example/img/earth-topology.png'),
@@ -289,10 +275,11 @@
         })
     );
     scene.add(earth);
+    scene.add(new THREE.AxesHelper(R_EARTH_KM * 2.0));
 
-    // ── Moon Mesh ──
+    // ── Moon Mesh (Real Physical Radius 1,737.4 km) ──
     const moon = new THREE.Mesh(
-        new THREE.SphereGeometry(R_MOON_KM, 32, 32),
+        new THREE.SphereGeometry(R_MOON_KM, 48, 48),
         new THREE.MeshPhongMaterial({
             map: tl.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/moon_1024.jpg'),
             shininess: 0
@@ -300,55 +287,35 @@
     );
     scene.add(moon);
 
-    // ── Celestial Orbit Rings (Full Closed Paths) ──
-    // 1. Earth Orbit around Sun
-    const earthOrbitPts = [];
-    for (let a = 0; a <= Math.PI * 2; a += 0.02) {
-        earthOrbitPts.push(new THREE.Vector3(Math.cos(a) * D_EARTH_SUN_KM, 0, Math.sin(a) * D_EARTH_SUN_KM));
-    }
-    const earthOrbitLine = new THREE.LineLoop(
-        new THREE.BufferGeometry().setFromPoints(earthOrbitPts),
-        new THREE.LineBasicMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.35 })
-    );
-    scene.add(earthOrbitLine);
-
-    // 2. Moon Orbit around Earth
+    // ── Full Closed Moon Orbit Path (Real Scale 384,400 km) ──
     const moonOrbitPts = [];
-    for (let a = 0; a <= Math.PI * 2; a += 0.05) {
-        moonOrbitPts.push(new THREE.Vector3(Math.cos(a) * D_MOON_EARTH_KM, 0, Math.sin(a) * D_MOON_EARTH_KM));
+    for (let a = 0; a <= Math.PI * 2; a += 0.015) {
+        const x = Math.cos(a) * R_MOON_ORBIT_KM;
+        const y = Math.sin(a) * R_MOON_ORBIT_KM * Math.sin(MOON_INC_RAD);
+        const z = Math.sin(a) * R_MOON_ORBIT_KM * Math.cos(MOON_INC_RAD);
+        moonOrbitPts.push(new THREE.Vector3(x, y, z));
     }
     const moonOrbitLine = new THREE.LineLoop(
         new THREE.BufferGeometry().setFromPoints(moonOrbitPts),
-        new THREE.LineBasicMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.45 })
+        new THREE.LineBasicMaterial({ color: 0x64748b, transparent: true, opacity: 0.5 })
     );
     scene.add(moonOrbitLine);
 
-    // Initial camera position
-    camera.position.set(D_EARTH_SUN_KM + R_EARTH_KM * 3, R_EARTH_KM * 2, R_EARTH_KM * 3);
-    if (controls) controls.target.set(D_EARTH_SUN_KM, 0, 0);
+    // Initial camera position (Earth View)
+    camera.position.set(R_EARTH_KM * 3.5, R_EARTH_KM * 2.2, R_EARTH_KM * 3.5);
+    if (controls) controls.target.set(0, 0, 0);
 
     // ── State Management ──────────────────────────────────────────────────────
     let activeSatellites = [];
-    /*
-     * sat: {
-     *   name, parentBody: 'Earth'|'Moon'|'Sun', params, period_s, color,
-     *   mesh, line, trailPts,
-     *   buf: { t:[], x:[], y:[], z:[], vx:[], vy:[], vz:[], alt_km:[], forces:{} },
-     *   lastState: [x,y,z,vx,vy,vz], lastT: number,
-     *   fetching: bool, reentry: bool, deorbitTime: string,
-     *   showForces: bool, forceArrows: { gravity, j2, drag }
-     * }
-     */
     let selectedSatIndex = -1;
-    let cameraFocusMode = 'Earth'; // 'Earth' | 'Moon' | 'Sun' | sat.name
+    let cameraFocusMode = 'Earth'; // 'Earth' | 'Moon' | 'System' | sat.name
     const clock = new THREE.Clock();
     let simTime = 0.0;
 
     // ── Body Constraints Configuration ────────────────────────────────────────
     const BODY_DEFAULTS = {
-        Earth: { minAlt: 100, maxAlt: 50000, defAlt: 400, maxEcc: 0.95, defInc: 51.6, defRaan: 45, hasAtm: true, hasMoon: true },
-        Moon:  { minAlt: 20,  maxAlt: 10000, defAlt: 100, maxEcc: 0.90, defInc: 90.0, defRaan: 0,  hasAtm: false, hasMoon: false },
-        Sun:   { minAlt: 5000000, maxAlt: 500000000, defAlt: 149600000, maxEcc: 0.95, defInc: 0, defRaan: 0, hasAtm: false, hasMoon: false }
+        Earth: { minAlt: 100, maxAlt: 2000, defAlt: 400, maxEcc: 0.95, defInc: 51.6, defRaan: 45, hasAtm: true, hasMoon: true },
+        Moon:  { minAlt: 20,  maxAlt: 10000, defAlt: 100, maxEcc: 0.90, defInc: 90.0, defRaan: 0,  hasAtm: false, hasMoon: false }
     };
 
     function updateBodyConstraints() {
@@ -389,17 +356,25 @@
         }
     }
 
-    // ── GUI Controls ──────────────────────────────────────────────────────────
+    // ── GUI Controls (Up to 10,000x Speedup) ───────────────────────────────────
     const gui = new lil.GUI({ title: 'Simulation Settings', container: document.getElementById('gui-container') });
     const simSettings = { playbackSpeed: 10, cameraTarget: 'Earth' };
-    gui.add(simSettings, 'playbackSpeed', 1, 500, 1).name('Speed Multiplier');
-    let cameraTargetCtrl = gui.add(simSettings, 'cameraTarget', ['Earth', 'Moon', 'Sun']).name('Camera Focus');
+    gui.add(simSettings, 'playbackSpeed', 1, 10000, 1).name('Speed Multiplier (1x-10000x)');
+    let cameraTargetCtrl = gui.add(simSettings, 'cameraTarget', ['Earth', 'Moon', 'System']).name('Camera Focus');
 
     function handleFocusChange(v) {
         cameraFocusMode = v;
-        if (v === 'Earth' || v === 'Moon' || v === 'Sun') {
+        if (v === 'Earth' || v === 'Moon' || v === 'System') {
             selectedSatIndex = -1;
             document.getElementById('maneuver-panel').style.display = 'none';
+            if (v === 'Earth') {
+                if (controls) controls.target.set(0, 0, 0);
+            } else if (v === 'System') {
+                if (controls) {
+                    controls.target.set(0, 0, 0);
+                    camera.position.set(300000, 200000, 450000);
+                }
+            }
         } else {
             selectedSatIndex = activeSatellites.findIndex(s => s.name === v);
             if (selectedSatIndex >= 0) {
@@ -410,14 +385,14 @@
     }
     cameraTargetCtrl.onChange(handleFocusChange);
 
-    function focusView(bodyName) {
-        simSettings.cameraTarget = bodyName;
-        handleFocusChange(bodyName);
-        if (cameraTargetCtrl) cameraTargetCtrl.setValue(bodyName);
+    function focusView(modeName) {
+        simSettings.cameraTarget = modeName;
+        handleFocusChange(modeName);
+        if (cameraTargetCtrl) cameraTargetCtrl.setValue(modeName);
     }
 
     function updateCameraDropdown() {
-        const opts = ['Earth', 'Moon', 'Sun', ...activeSatellites.map(s => s.name)];
+        const opts = ['Earth', 'Moon', 'System', ...activeSatellites.map(s => s.name)];
         if (!opts.includes(simSettings.cameraTarget)) {
             simSettings.cameraTarget = 'Earth';
             cameraFocusMode = 'Earth';
@@ -432,26 +407,21 @@
         }
     }
 
-    // ── Planetary Positions in Solar Frame ─────────────────────────────────────
-    function getEarthPosition(t) {
-        const angle = (2 * Math.PI * t) / T_YEAR_S;
-        return new THREE.Vector3(Math.cos(angle) * D_EARTH_SUN_KM, 0, Math.sin(angle) * D_EARTH_SUN_KM);
-    }
-
-    function getMoonLocalPosition(t) {
-        const angle = (2 * Math.PI * t) / T_MONTH_S;
-        return new THREE.Vector3(Math.cos(angle) * D_MOON_EARTH_KM, 0, Math.sin(angle) * D_MOON_EARTH_KM);
+    // ── Real-Scale Moon Ephemeris Propagation ──────────────────────────────────
+    function getMoonPosition(t) {
+        const angle = (2 * Math.PI * t) / T_MOON_ORBIT_S;
+        const x = Math.cos(angle) * R_MOON_ORBIT_KM;
+        const y = Math.sin(angle) * R_MOON_ORBIT_KM * Math.sin(MOON_INC_RAD);
+        const z = Math.sin(angle) * R_MOON_ORBIT_KM * Math.cos(MOON_INC_RAD);
+        return new THREE.Vector3(x, y, z);
     }
 
     function getParentBodyWorldPos(bodyName, t) {
-        if (bodyName === 'Sun') return new THREE.Vector3(0, 0, 0);
-        const earthPos = getEarthPosition(t);
-        if (bodyName === 'Earth') return earthPos;
-        if (bodyName === 'Moon') return earthPos.clone().add(getMoonLocalPosition(t));
-        return new THREE.Vector3(0, 0, 0);
+        if (bodyName === 'Moon') return getMoonPosition(t);
+        return new THREE.Vector3(0, 0, 0); // Earth at origin
     }
 
-    // ── Buffer & Interpolation ────────────────────────────────────────────────
+    // ── Trajectory Buffer & Interpolation ──────────────────────────────────────
     function appendChunk(sat, chunk) {
         const b = sat.buf;
         const skip = (b.t.length > 0 && chunk.t[0] <= b.t[b.t.length - 1]) ? 1 : 0;
@@ -520,7 +490,7 @@
                     params: sat.params,
                     t_start: sat.lastT,
                     state: sat.lastState,
-                    chunk_duration: sat.parentBody === 'Sun' ? 86400 : 600
+                    chunk_duration: 86400
                 })
             });
             const data = await res.json();
@@ -530,7 +500,9 @@
             sat.lastT = data.last_t;
             if (data.reentry && !sat.reentry) {
                 sat.reentry = true;
-                sat.deorbitTime = formatTime(data.reentry_time || sat.lastT);
+                sat.deorbitEpoch = data.reentry_time || sat.lastT;
+                sat.lifetimeSeconds = sat.deorbitEpoch;
+                sat.deorbitTime = formatTime(sat.lifetimeSeconds);
                 renderSidebar();
             }
         } catch (e) {
@@ -543,7 +515,7 @@
     // ── Add Satellite ─────────────────────────────────────────────────────────
     function addSatelliteToScene(satData) {
         const color = Math.floor(Math.random() * 0xffffff);
-        const radius = satData.parent_body === 'Sun' ? 1200 : 180;
+        const radius = satData.parent_body === 'Moon' ? 120 : 180;
 
         const mesh = new THREE.Mesh(
             new THREE.SphereGeometry(radius, 16, 16),
@@ -564,9 +536,12 @@
             return a;
         };
 
+        const isReentry = satData.reentry || false;
+        const reTime = satData.reentry_time || 0;
+
         const sat = {
             name: satData.name,
-            parentBody: satData.parent_body || satData.params.parent_body || 'Earth',
+            parentBody: satData.parent_body || (satData.params && satData.params.parent_body) || 'Earth',
             params: satData.params,
             period_s: satData.period_s || 5400,
             color, mesh, line, trailPts: [],
@@ -575,8 +550,10 @@
             lastState: satData.last_state,
             lastT: satData.last_t,
             fetching: false,
-            reentry: satData.reentry || false,
-            deorbitTime: satData.reentry ? formatTime(satData.reentry_time || 0) : null,
+            reentry: isReentry,
+            deorbitEpoch: isReentry ? reTime : null,
+            lifetimeSeconds: isReentry ? reTime : null,
+            deorbitTime: isReentry ? formatTime(reTime) : null,
             showForces: false,
             forceArrows: {
                 gravity: mkArrow(0x4ade80), // Green
@@ -638,7 +615,6 @@
             const data = await res.json();
             if (!res.ok) { alert('Burn failed: ' + data.detail); return; }
 
-            // Replace forward buffer from burn point onwards
             sat.buf = { t:[], x:[], y:[], z:[], vx:[], vy:[], vz:[], alt_km:[],
                         forces:{ central:[], j2:[], drag:[], moon:[], total:[] } };
             appendChunk(sat, data.trajectory);
@@ -646,7 +622,9 @@
             sat.lastT = data.last_t;
             if (data.reentry) {
                 sat.reentry = true;
-                sat.deorbitTime = formatTime(data.reentry_time || sat.lastT);
+                sat.deorbitEpoch = data.reentry_time || sat.lastT;
+                sat.lifetimeSeconds = sat.deorbitEpoch;
+                sat.deorbitTime = formatTime(sat.lifetimeSeconds);
             }
             renderSidebar();
         } catch (e) {
@@ -668,7 +646,7 @@
 
     function updateForceArrows(sat, idx, worldPos) {
         if (!sat.showForces) return;
-        const scale = sat.parentBody === 'Sun' ? 5e7 : 4e5;
+        const scale = 4e5;
 
         const fTypes = { gravity: 'central', j2: 'j2', drag: 'drag' };
         for (const [key, bufKey] of Object.entries(fTypes)) {
@@ -687,8 +665,9 @@
         }
     }
 
-    // ── Utilities ────────────────────────────────────────────────────────────
+    // ── Time Formatting Utilities ─────────────────────────────────────────────
     function formatTime(s) {
+        if (!s || isNaN(s)) return '0s';
         const d = Math.floor(s / 86400), hh = Math.floor((s % 86400) / 3600),
               mm = Math.floor((s % 3600) / 60), ss = Math.floor(s % 60);
         return `T+${d}d ${hh}h ${mm}m ${ss}s`;
@@ -713,25 +692,31 @@
         document.getElementById('save-name').value = '';
     }
 
-    // ── Export CSV ───────────────────────────────────────────────────────────
+    // ── Export CSV with Deorbit Lifetime Stats ────────────────────────────────
     function exportData() {
-        if (!activeSatellites.length) { alert('No satellites to export.'); return; }
-        let csv = 'Satellite,CentralBody,Time(s),X(m),Y(m),Z(m),VX(m/s),VY(m/s),VZ(m/s),Alt(km),LifetimeStatus\n';
+        if (!activeSatellites.length) { alert('No active satellites to export.'); return; }
+        let csv = 'Satellite,CentralBody,Time(s),X(m),Y(m),Z(m),VX(m/s),VY(m/s),VZ(m/s),Alt(km),DeorbitStatus,Lifetime_s,LifetimeFormatted\n';
+        
         activeSatellites.forEach(sat => {
             const b = sat.buf;
             const T = sat.period_s, step = Math.max(10, T / 6);
             const t_end = b.t[b.t.length - 1];
             const t_start = Math.max(0, t_end - 10 * T);
-            const lifeStr = sat.reentry ? `Deorbited at ${sat.deorbitTime}` : 'Active';
+            
+            const statusStr = sat.reentry ? 'Deorbited' : 'Active';
+            const lifeSecStr = sat.reentry ? (sat.lifetimeSeconds || sat.deorbitEpoch || 0).toFixed(1) : (simTime).toFixed(1);
+            const lifeFmtStr = sat.reentry ? (sat.deorbitTime || formatTime(sat.lifetimeSeconds)) : formatTime(simTime);
+
             for (let ct = t_start; ct <= t_end; ct += step) {
                 let lo = 0, hi = b.t.length - 1;
                 while (hi - lo > 1) { const m = (lo+hi)>>1; if (b.t[m] <= ct) lo=m; else hi=m; }
-                csv += `${sat.name},${sat.parentBody},${b.t[lo].toFixed(1)},${b.x[lo].toFixed(1)},${b.y[lo].toFixed(1)},${b.z[lo].toFixed(1)},${b.vx[lo].toFixed(3)},${b.vy[lo].toFixed(3)},${b.vz[lo].toFixed(3)},${b.alt_km[lo].toFixed(2)},${lifeStr}\n`;
+                csv += `${sat.name},${sat.parentBody},${b.t[lo].toFixed(1)},${b.x[lo].toFixed(1)},${b.y[lo].toFixed(1)},${b.z[lo].toFixed(1)},${b.vx[lo].toFixed(3)},${b.vy[lo].toFixed(3)},${b.vz[lo].toFixed(3)},${b.alt_km[lo].toFixed(2)},${statusStr},${lifeSecStr},"${lifeFmtStr}"\n`;
             }
         });
+
         const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
         const a = document.createElement('a');
-        a.href = url; a.download = 'multi_body_trajectory_export.csv';
+        a.href = url; a.download = 'earth_moon_satellite_trajectories.csv';
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
     }
 
@@ -745,8 +730,8 @@
             if (sat.reentry) li.classList.add('deorbited');
             li.style.borderLeftColor = '#' + sat.color.toString(16).padStart(6,'0');
 
-            const bodyIcon = sat.parentBody === 'Sun' ? '☀️' : (sat.parentBody === 'Moon' ? '🌕' : '🌍');
-            const statusIcon = sat.reentry ? ' 🔴 [Deorbited]' : '';
+            const bodyIcon = sat.parentBody === 'Moon' ? '🌕' : '🌍';
+            const statusIcon = sat.reentry ? ` 🔴 [Deorbited @ ${sat.deorbitTime || 'Re-entered'}]` : '';
 
             li.innerHTML = `
                 <div class="sat-info-badge">
@@ -848,7 +833,7 @@
             satellites: activeSatellites.map(s => ({
                 name: s.name, parent_body: s.parentBody, params: s.params, period_s: s.period_s,
                 last_state: s.lastState, last_t: s.lastT, color: s.color,
-                reentry: s.reentry, deorbitTime: s.deorbitTime,
+                reentry: s.reentry, deorbitTime: s.deorbitTime, lifetimeSeconds: s.lifetimeSeconds,
                 trajectory: s.buf
             }))
         };
@@ -894,25 +879,20 @@
         const dt = wallDt * simSettings.playbackSpeed;
         simTime += dt;
 
-        // 1. Update Planetary Celestial Bodies
-        const earthWorldPos = getEarthPosition(simTime);
-        earth.position.copy(earthWorldPos);
+        // 1. Earth Rotation
         earth.rotation.y += 7.2921e-5 * dt;
 
-        const moonLocalPos = getMoonLocalPosition(simTime);
-        const moonWorldPos = earthWorldPos.clone().add(moonLocalPos);
-        moon.position.copy(moonWorldPos);
+        // 2. Moon Orbit Propagation (Real 384,400 km scale)
+        const moonPos = getMoonPosition(simTime);
+        moon.position.copy(moonPos);
+        moon.rotation.y += (2 * Math.PI / T_MOON_ORBIT_S) * dt; // Tidally locked rotation
 
-        // Update Moon closed orbit ring position (centered on Earth)
-        moonOrbitLine.position.copy(earthWorldPos);
-
-        // 2. Update Satellites
+        // 3. Satellite Tracking & Positions
         activeSatellites.forEach(sat => {
             const bodyWorldPos = getParentBodyWorldPos(sat.parentBody, simTime);
             sat.line.position.copy(bodyWorldPos);
 
             if (sat.reentry) {
-                // If deorbited, place mesh on the surface of central body
                 sat.mesh.position.copy(bodyWorldPos);
                 Object.values(sat.forceArrows).forEach(a => { a.visible = false; });
                 return;
@@ -928,9 +908,9 @@
 
             sat.mesh.position.copy(worldPos);
 
-            // Trigger rolling stream fetch near buffer boundary
+            // Stream next chunk near buffer edge
             const bufEnd = buf.t[buf.t.length - 1];
-            if (simTime > bufEnd - (sat.parentBody === 'Sun' ? 3600 : 60)) {
+            if (simTime > bufEnd - (simSettings.playbackSpeed > 100 ? 7200 : 60)) {
                 fetchNextChunk(sat);
             }
 
@@ -940,7 +920,7 @@
             }
         });
 
-        // 3. Camera Focus and Tracking
+        // 4. Camera Focus Modes
         if (selectedSatIndex >= 0 && activeSatellites[selectedSatIndex]) {
             const sat = activeSatellites[selectedSatIndex];
             if (controls) controls.target.copy(sat.mesh.position);
@@ -950,16 +930,16 @@
         } else if (cameraFocusMode === 'Moon') {
             if (controls) controls.target.copy(moon.position);
             updateTelemetry(null, 0);
-        } else if (cameraFocusMode === 'Sun') {
+        } else if (cameraFocusMode === 'System') {
             if (controls) controls.target.set(0, 0, 0);
             updateTelemetry(null, 0);
         } else {
             // Earth focus default
-            if (controls) controls.target.copy(earth.position);
+            if (controls) controls.target.set(0, 0, 0);
             updateTelemetry(null, 0);
         }
 
-        // 4. Update HUD Clock
+        // 5. HUD Clock
         document.getElementById('sim-clock').innerText = 
             `⏱ ${formatTime(simTime)} (${simSettings.playbackSpeed}×)`;
 
