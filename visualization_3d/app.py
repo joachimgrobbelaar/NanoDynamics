@@ -521,16 +521,22 @@ def api_list_experiments():
     files = [f for f in os.listdir(EXPERIMENTS_DIR) if f.endswith(".csv")]
     files.sort(reverse=True)
     return {"experiments": files}
-
-
 @app.post("/save")
 def save_simulation(payload: SavePayload):
     safe_name = sanitize_filename(payload.filename)
-    filepath = os.path.join(SAVED_SIMS_DIR, f"{safe_name}.json")
     try:
-        with open(filepath, "w") as f:
-            json.dump(payload.satellites, f)
-        return {"status": "success", "message": f"Saved {safe_name}"}
+        # Try Firestore first
+        try:
+            from firebase_admin import firestore
+            db = firestore.client()
+            db.collection("scenarios").document(safe_name).set({"satellites": payload.satellites})
+            return {"status": "success", "message": f"Saved {safe_name} to Firestore"}
+        except Exception as e:
+            # Fallback to local
+            filepath = os.path.join(SAVED_SIMS_DIR, f"{safe_name}.json")
+            with open(filepath, "w") as f:
+                json.dump(payload.satellites, f)
+            return {"status": "success", "message": f"Saved {safe_name} locally"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -538,13 +544,26 @@ def save_simulation(payload: SavePayload):
 @app.get("/load/{filename}")
 def load_simulation(filename: str):
     safe_name = sanitize_filename(filename)
-    filepath = os.path.join(SAVED_SIMS_DIR, f"{safe_name}.json")
-    if not os.path.exists(filepath):
-        raise HTTPException(status_code=404, detail="File not found")
     try:
+        # Try Firestore first
+        try:
+            from firebase_admin import firestore
+            db = firestore.client()
+            doc = db.collection("scenarios").document(safe_name).get()
+            if doc.exists:
+                return doc.to_dict()["satellites"]
+        except Exception:
+            pass
+            
+        # Fallback to local
+        filepath = os.path.join(SAVED_SIMS_DIR, f"{safe_name}.json")
+        if not os.path.exists(filepath):
+            raise HTTPException(status_code=404, detail="Scenario not found in Firestore or local")
         with open(filepath, "r") as f:
             data = json.load(f)
         return {"satellites": data}
+    except HTTPException as e:
+        raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
