@@ -5,3 +5,8 @@ __pycache__/
 .ruff_cache/
 ai/data/
 ai/checkpoints/
+
+functions/venv/
+firestore-debug.log
+*.log
+.agents/
