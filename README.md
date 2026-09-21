@@ -1,4 +1,4 @@
-# NanoDynamics: Real-Scale Earth-Moon Orbital Dynamics & Experimentation Suite (v17-alpha)
+# NanoDynamics: Real-Scale Earth-Moon Orbital Dynamics & Experimentation Suite (v23-alpha)
 
 An interactive, high-fidelity numerical orbit propagator, mission analysis suite, and parametric experimentation engine for satellites orbiting the Earth and Moon. NanoDynamics combines high-order Runge-Kutta numerical integration (`scipy.integrate.solve_ivp`), a PyTorch Physics-Informed Neural Network (PINN) surrogate model, and a real-scale Three.js / FastAPI full-stack 3D interactive web application with rolling trajectory streaming, live maneuver simulation, single-orbit trailing fade, custom avatar icons, and automated deorbit lifetime sweeps.
 
@@ -153,7 +153,16 @@ Runs 195+ comprehensive unit, integration, numerical sanity, atmospheric consist
 
 ## 📜 Version History
 
-- **`v14-alpha` (Current):** Satellite Constellation Generator, Interactive 3D Drag-to-Orbit UX, Sutton-Graves Aerodynamic Heating simulation, visual Atmospheric Layers (Troposphere→Exosphere), adaptive streaming for stable 10,000x playback, ML Surrogate multithreading, and parallelized 1000-point Parametric Sweeps.
+- **`v23-alpha` (Current):** Satellite Constellation Generator, Sutton-Graves Aerodynamic Heating simulation, visual Atmospheric Layers (Troposphere→Exosphere), adaptive streaming for stable 10,000x playback, ML Surrogate multithreading, and parallelized 1000-point Parametric Sweeps.
+- **`v22-alpha`:** Interactive "Drag to Add Orbit" UX via camera-facing plane projection and 3D Raycaster KSP-style Maneuver node dragging.
+- **`v21-alpha`:** Floating 3D Stat Box HTML overlays and Radial View Lock (tracking camera faces radially inward toward the planet).
+- **`v20-alpha`:** ML Surrogate training speed and quality upgrade (`torch.set_num_threads`, batch size 1024, `ReduceLROnPlateau`, Adam momentum state persistence).
+- **`v19-alpha`:** Inter-satellite Kinematics tracking (Line of Sight, Range Rate, 3D distance).
+- **`v18-alpha`:** Custom 3D billboard avatar glyphs (Satellite, Rocket, Astronaut, Alien, UFO) with dynamic glowing halos matching chosen colors.
+- **`v17-alpha`:** Single-Orbit Dynamic Window & Trailing Fading Trail (alpha/brightness gradient fading out cleanly behind the satellite).
+- **`v16-alpha`:** High-energy maneuvers for Trans-Lunar Injection and Lunar Orbit Insertion with seamless Trajectory Bleeding & Ghost Trail Fading.
+- **`v15-alpha`:** Geodetic Coordinates & Key Event Tracking (WGS-84 sub-satellite lat/lon, initial insertion coordinates, re-entry interface).
+- **`v14-alpha`:** Core UI refactor, structural optimizations, and multi-threaded processing foundations.
 - **`v13-alpha`:** Server-side Parametric Experimentation Lab (`leo_simulator/experiment.py`), US Standard 1976 atmosphere model reconciliation, clean monotonic CSV export with Run_IDs, and lifetime vs ballistic coefficient data collection framework.
 - **`v12-alpha`:** Real-scale isolated Earth-Moon system ($384,400\text{ km}$ separation), $10,000\times$ speedup, rolling `/stream` trajectory chunks, RTN burn maneuvers, 3D force vector overlays, and deorbit lifetime tracking.
 - **`v11-alpha`:** Multi-satellite dynamic FastAPI architecture, Pydantic bounds validation, async offloading, and initial WebGL fallback safeguards.
