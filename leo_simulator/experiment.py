@@ -12,6 +12,7 @@ import csv
 import datetime
 import os
 import time
+import requests
 from dataclasses import asdict, dataclass
 from typing import Any, Callable
 
@@ -264,23 +265,53 @@ def _evaluate_sweep_point(args: tuple[int, str, float, dict[str, Any], str, floa
         run_params[param_name] = float(val)
 
     run_name = f"{param_name}_{val:.4g}"
-    metrics, traj = run_single_simulation(
-        name=run_name,
-        mass=float(run_params["mass"]),
-        drag_area=float(run_params["drag_area"]),
-        cd=float(run_params["cd"]),
-        altitude_km=float(run_params["altitude_km"]),
-        eccentricity=float(run_params["eccentricity"]),
-        inclination_deg=float(run_params["inclination_deg"]),
-        raan_deg=float(run_params.get("raan_deg", 0.0)),
-        atmosphere_type=atmosphere_type,
-        density_scale=curr_density_scale,
-        include_j2=bool(run_params.get("include_j2", True)),
-        include_drag=bool(run_params.get("include_drag", True)),
-        include_moon=bool(run_params.get("include_moon", False)),
-        max_duration_seconds=max_duration_seconds,
-        include_trajectory=not quiet,
-    )
+    
+    cloud_url = os.environ.get("FIREBASE_SWEEP_URL")
+    if cloud_url:
+        payload = {
+            "data": {
+                "params": {
+                    "name": run_name,
+                    "mass": float(run_params["mass"]),
+                    "drag_area": float(run_params["drag_area"]),
+                    "cd": float(run_params["cd"]),
+                    "altitude_km": float(run_params["altitude_km"]),
+                    "eccentricity": float(run_params["eccentricity"]),
+                    "inclination_deg": float(run_params["inclination_deg"]),
+                    "raan_deg": float(run_params.get("raan_deg", 0.0)),
+                    "include_j2": bool(run_params.get("include_j2", True)),
+                    "include_drag": bool(run_params.get("include_drag", True)),
+                    "include_moon": bool(run_params.get("include_moon", False)),
+                },
+                "atmosphere_type": atmosphere_type,
+                "density_scale": curr_density_scale,
+                "max_duration_seconds": max_duration_seconds,
+                "include_trajectory": not quiet
+            }
+        }
+        res = requests.post(cloud_url, json=payload, headers={"Content-Type": "application/json"})
+        res.raise_for_status()
+        res_data = res.json().get("result", {})
+        metrics = res_data.get("metrics")
+        traj = res_data.get("trajectory")
+    else:
+        metrics, traj = run_single_simulation(
+            name=run_name,
+            mass=float(run_params["mass"]),
+            drag_area=float(run_params["drag_area"]),
+            cd=float(run_params["cd"]),
+            altitude_km=float(run_params["altitude_km"]),
+            eccentricity=float(run_params["eccentricity"]),
+            inclination_deg=float(run_params["inclination_deg"]),
+            raan_deg=float(run_params.get("raan_deg", 0.0)),
+            atmosphere_type=atmosphere_type,
+            density_scale=curr_density_scale,
+            include_j2=bool(run_params.get("include_j2", True)),
+            include_drag=bool(run_params.get("include_drag", True)),
+            include_moon=bool(run_params.get("include_moon", False)),
+            max_duration_seconds=max_duration_seconds,
+            include_trajectory=not quiet,
+        )
 
     res_obj = SweepPointResult(
         run_id=idx + 1,
