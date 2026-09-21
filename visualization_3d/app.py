@@ -694,4 +694,40 @@ def api_get_ml_status():
     return {"status": "idle", "message": "No model trained yet. Run simulations and click Train ML Surrogate."}
 
 
+@app.get("/ai/pairs")
+def api_get_ml_pairs():
+    """Count total ML training data pairs across all recorded datasets."""
+    import numpy as np
+    total = 0
+    data_dir = os.path.join(PROJECT_ROOT, "ai", "data")
+    npz_files = []
+    for root, _, files in os.walk(data_dir):
+        for f in files:
+            if f.endswith(".npz"):
+                npz_files.append(os.path.join(root, f))
+    counted = set()
+    for path in npz_files:
+        if path in counted:
+            continue
+        try:
+            d = np.load(path, allow_pickle=False)
+            # x array holds input state vectors — rows = samples
+            if "x" in d:
+                total += int(d["x"].shape[0])
+                counted.add(path)
+        except Exception:
+            pass
+    # Also count JSONL sim log rows as a secondary metric
+    sim_log = os.path.join(data_dir, "sim_log.jsonl")
+    log_rows = 0
+    if os.path.exists(sim_log):
+        try:
+            with open(sim_log) as f:
+                log_rows = sum(1 for ln in f if ln.strip())
+        except Exception:
+            pass
+    return {"total_pairs": total, "sim_log_rows": log_rows, "npz_files_scanned": len(counted)}
+
+
+
 

@@ -1,0 +1,14 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Satellite scenarios — allow all reads/writes for alpha
+    match /scenarios/{docId} {
+      allow read, write: if true;
+    }
+    // ML training metadata — read-only for clients
+    match /ml_training/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}

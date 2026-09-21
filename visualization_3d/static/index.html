@@ -2317,16 +2317,13 @@
             if (data.status === 'trained' || data.status === 'up-to-date') {
                 badge.innerText = `Ready (Trained @ ${data.data_hash || 'Latest'})`;
                 badge.style.color = '#4ade80';
-                document.getElementById('ml-pairs-val').innerText = `${(data.n_pairs || data.n_total_pairs || 0).toLocaleString()} pairs`;
-                const finalDrift = (data.final_drift_pct !== undefined ? data.final_drift_pct : (data.drift_pct ? data.drift_pct[data.drift_pct.length-1] : null));
-                document.getElementById('ml-drift-val').innerText = finalDrift !== null ? `${finalDrift.toFixed(2)}%` : '—';
+                document.getElementById('ml-drift-val').innerText = (data.final_drift_pct !== undefined ? data.final_drift_pct : (data.drift_pct ? data.drift_pct[data.drift_pct.length-1] : null)) !== null ? `${((data.final_drift_pct !== undefined ? data.final_drift_pct : data.drift_pct[data.drift_pct.length-1])).toFixed(2)}%` : '—';
                 const meanDrift = (data.mean_drift_pct !== undefined ? data.mean_drift_pct : (data.mean_drift ? data.mean_drift : null));
                 document.getElementById('ml-mean-drift-val').innerText = meanDrift !== null ? `${meanDrift.toFixed(2)}%` : '—';
                 document.getElementById('ml-ckpt-val').innerText = data.ckpt || 'ai/checkpoints/agent/transition.pt';
             } else if (data.status === 'waiting') {
-                badge.innerText = `Waiting for data (${data.n_pairs || 0} pairs)`;
+                badge.innerText = `Waiting for data`;
                 badge.style.color = '#f59e0b';
-                document.getElementById('ml-pairs-val').innerText = `${data.n_pairs || 0} pairs`;
             } else {
                 badge.innerText = data.message || 'Idle / Not Trained';
                 badge.style.color = '#94a3b8';
@@ -2335,7 +2332,17 @@
             badge.innerText = 'Error checking status';
             badge.style.color = '#ef4444';
         }
+        // Always fetch live pair count independently
+        try {
+            const pRes = await fetch('/ai/pairs');
+            const pData = await pRes.json();
+            const n = pData.total_pairs || 0;
+            const el = document.getElementById('ml-pairs-val');
+            el.innerText = `${n.toLocaleString()} pairs`;
+            el.style.color = n > 100000 ? '#4ade80' : n > 10000 ? '#facc15' : '#94a3b8';
+        } catch (_) {}
     }
+
 
     async function startMLTraining() {
         const btn = document.getElementById('ml-train-btn');
