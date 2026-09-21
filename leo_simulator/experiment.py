@@ -68,6 +68,9 @@ class SweepPointResult:
     energy_loss_j_kg: float
     mean_decay_rate_km_day: float
     computation_time_ms: float
+    max_velocity_km_s: float
+    min_altitude_km: float
+    max_altitude_km: float
 
 
 @dataclass
@@ -186,6 +189,10 @@ def run_single_simulation(
     b_coeff = mass / (cd * drag_area) if (cd * drag_area) > 0 else float("inf")
     b_star = (cd * drag_area) / mass if mass > 0 else 0.0
 
+    v_norms = np.linalg.norm(res.v, axis=1) if len(res.v) > 0 else np.array([v_final_norm])
+    r_norms = np.linalg.norm(res.r, axis=1) if len(res.r) > 0 else np.array([r_final_norm])
+    alts_km = (r_norms - R_EARTH) / 1000.0
+    
     metrics = {
         "mass_kg": mass,
         "drag_area_m2": drag_area,
@@ -207,6 +214,9 @@ def run_single_simulation(
         "energy_loss_j_kg": float(e0 - ef),
         "mean_decay_rate_km_day": float(decay_rate),
         "computation_time_ms": float(elapsed_ms),
+        "max_velocity_km_s": float(np.max(v_norms)) / 1000.0,
+        "min_altitude_km": float(np.min(alts_km)),
+        "max_altitude_km": float(np.max(alts_km)),
     }
 
     traj_dict = None
@@ -296,6 +306,9 @@ def _evaluate_sweep_point(args: tuple[int, str, float, dict[str, Any], str, floa
         energy_loss_j_kg=metrics["energy_loss_j_kg"],
         mean_decay_rate_km_day=metrics["mean_decay_rate_km_day"],
         computation_time_ms=metrics["computation_time_ms"],
+        max_velocity_km_s=metrics["max_velocity_km_s"],
+        min_altitude_km=metrics["min_altitude_km"],
+        max_altitude_km=metrics["max_altitude_km"],
     )
     return res_obj, traj
 
@@ -335,7 +348,7 @@ def run_parametric_sweep(
     ]
 
     # Execute points concurrently in parallel threads
-    num_workers = min(len(values), 8)
+    num_workers = min(len(values), (os.cpu_count() or 4) * 2)
     with ThreadPoolExecutor(max_workers=num_workers) as executor:
         results_and_trajs = list(executor.map(_evaluate_sweep_point, tasks))
 
@@ -398,6 +411,9 @@ def save_experiment_to_csv(
         "final_energy_j_kg",
         "energy_loss_j_kg",
         "mean_decay_rate_km_day",
+        "max_velocity_km_s",
+        "min_altitude_km",
+        "max_altitude_km",
         "computation_time_ms",
     ]
 

@@ -144,8 +144,9 @@ class StreamRequest(BaseModel):
     t_start: float = Field(..., ge=0.0, description="Simulation time at start of chunk (s)")
     state: list[float] = Field(..., min_length=6, max_length=6,
                                description="[x, y, z, vx, vy, vz] in metres / m/s")
-    chunk_duration: float = Field(600.0, ge=10.0, le=604800.0,
+    chunk_duration: float = Field(600.0, ge=10.0, le=315360000.0,
                                   description="Duration of this chunk in seconds")
+    dt_eval: float = Field(None, description="Optional custom delta time for evaluation points (s)")
 
 
 class BurnRequest(BaseModel):
@@ -159,7 +160,7 @@ class BurnRequest(BaseModel):
 
 class ExperimentRequest(BaseModel):
     param_name: str = Field(..., description="Independent variable name to sweep")
-    values: list[float] = Field(..., min_length=1, max_length=100, description="List of parameter values")
+    values: list[float] = Field(..., min_length=1, max_length=1000, description="List of parameter values")
     base_params: SatelliteParams
     atmosphere_type: str = Field("piecewise", description="Atmosphere model type")
     density_scale: float = Field(1.0, ge=0.001, le=1000.0, description="Density scale multiplier")
@@ -338,7 +339,7 @@ async def stream_chunk(req: StreamRequest):
     try:
         body = BODIES.get(req.params.parent_body, BODIES["Earth"])
         prop = _build_propagator(req.params)
-        dt_eval = body["dt_eval"]
+        dt_eval = req.dt_eval if req.dt_eval else body["dt_eval"]
         res = await asyncio.to_thread(
             _propagate_chunk, prop, req.state, req.t_start, req.chunk_duration, dt_eval
         )

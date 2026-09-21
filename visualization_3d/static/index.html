@@ -200,6 +200,7 @@
             <div><span class="label">Period: </span><span id="t-period">— min</span></div>
             <div><span class="label">Lifetime: </span><span id="t-life" class="val-warn">Active (Safe Orbit)</span></div>
             <div><span class="label">|F_drag|: </span><span id="t-drag">— mm/s²</span></div>
+            <div><span class="label">Aero Temp: </span><span id="t-temp" class="val-warn">— °C</span></div>
             <div><span class="label">|F_J2|: </span><span id="t-j2">— mm/s²</span></div>
 
             <div id="coord-initial-card" class="coord-card" style="display:none;">
@@ -268,6 +269,7 @@
             <label><input type="checkbox" id="show-forces" onchange="toggleForceVectors()"> Show Force Vectors (3D Arrows)</label>
             <label><input type="checkbox" id="show-body-axes" checked onchange="toggleBodyAxes()"> Show Body Axes (X:Red, Y:Green, Z:Blue)</label>
             <label><input type="checkbox" id="show-intersat-line" checked onchange="toggleInterSatLine()"> Show Inter-Sat Laser Link</label>
+            <label><input type="checkbox" id="show-atm-layers" onchange="toggleAtmosphereLayers()"> ☁️ Show Atmospheric Layers</label>
         </div>
     </div>
 
@@ -386,7 +388,7 @@
                     </div>
                     <div class="form-group"><label>Start Value:</label><input type="number" id="exp-val-start" value="10.0" step="any"></div>
                     <div class="form-group"><label>End Value:</label><input type="number" id="exp-val-end" value="100.0" step="any"></div>
-                    <div class="form-group"><label>Evaluation Points:</label><input type="number" id="exp-val-steps" value="6" min="2" max="30"></div>
+                    <div class="form-group"><label>Evaluation Points:</label><input type="number" id="exp-val-steps" value="6" min="2" max="1000"></div>
                     
                     <div class="form-section-title" style="margin-top:10px;">Atmosphere & Limits</div>
                     <div class="form-group">
@@ -430,7 +432,9 @@
                             <th>Param Value</th>
                             <th>Ballistic (kg/m²)</th>
                             <th>Initial Alt</th>
+                            <th>Min Alt</th>
                             <th>Final Alt</th>
+                            <th>Max Vel</th>
                             <th>Deorbit?</th>
                             <th>Orbit Lifetime</th>
                             <th>Decay Rate</th>
@@ -538,17 +542,7 @@
             <div id="ml-log-readout" style="display:none; max-height:120px; overflow-y:auto; background:#020617; border:1px solid #1e293b; padding:8px; border-radius:4px; font-family:monospace; font-size:11px; color:#38bdf8; margin-bottom:12px;"></div>
 
             
-            <div class="row" style="margin-top:10px; border-top:1px solid #334155; padding-top:10px;">
-                <label style="color:#e2e8f0; font-weight:bold; font-size: 14px; cursor: pointer;"><input type="checkbox" id="m-cluster-enable" onchange="toggleClusterUI()"> 🌌 Generate Cluster / Constellation</label>
-            </div>
-            <div id="cluster-options" style="display:none; background:#0f172a; padding:12px; border-radius:6px; margin-top:8px; border:1px solid #3b82f6;">
-                <div class="form-group"><label style="color:#93c5fd;">Satellites (N):</label><input type="number" id="m-cluster-n" value="5" min="2" max="100"></div>
-                <div class="form-group"><label style="color:#93c5fd;">Δ Phase (°):</label><input type="number" id="m-cluster-dphase" value="10.0" step="1.0"></div>
-                <div class="form-group"><label style="color:#93c5fd;">Δ RAAN (°):</label><input type="number" id="m-cluster-draan" value="0.0" step="1.0"></div>
-                <div class="form-group"><label style="color:#93c5fd;">Δ Alt (km):</label><input type="number" id="m-cluster-dalt" value="0.0" step="1.0"></div>
-                <div class="form-group"><label style="color:#93c5fd;">Δ Inc (°):</label><input type="number" id="m-cluster-dinc" value="0.0" step="1.0"></div>
-                <div style="font-size:11px; color:#64748b; margin-top:6px;">Generates N satellites spaced out sequentially by these parameters to form Walker stars, strings-of-pearls, or custom local offsets.</div>
-            </div>
+
 
             <div class="modal-buttons">
                 <button onclick="closeMLModal()" style="background:#475569; color:white;">Close</button>
@@ -641,6 +635,41 @@
         return graticule;
     }
     earth.add(buildEarthGraticule());
+
+    // ── Atmospheric Layers Visualization ──
+    const atmLayersGroup = new THREE.Group();
+    atmLayersGroup.visible = false;
+    
+    function buildAtmosphereSpheres() {
+        const layers = [
+            ['Troposphere (12km)', 12, 0x38bdf8, 0.25],
+            ['Stratosphere (50km)', 50, 0x818cf8, 0.15],
+            ['Mesosphere (85km)', 85, 0xa78bfa, 0.1],
+            ['Thermosphere (600km)', 600, 0xc084fc, 0.05],
+            ['Exosphere (2000km)', 2000, 0xf472b6, 0.02]
+        ];
+        layers.forEach((lyr) => {
+            const mesh = new THREE.Mesh(
+                new THREE.SphereGeometry(R_EARTH_KM + lyr[1], 48, 48),
+                new THREE.MeshBasicMaterial({
+                    color: lyr[2],
+                    transparent: true,
+                    opacity: lyr[3],
+                    side: THREE.DoubleSide,
+                    depthWrite: false
+                })
+            );
+            atmLayersGroup.add(mesh);
+        });
+        return atmLayersGroup;
+    }
+    earth.add(buildAtmosphereSpheres());
+
+    window.toggleAtmosphereLayers = function() {
+        if (atmLayersGroup) {
+            atmLayersGroup.visible = document.getElementById('show-atm-layers').checked;
+        }
+    };
 
     // ── Moon Mesh ──
     const moon = new THREE.Mesh(
@@ -1071,6 +1100,13 @@
         if (sat.fetching || sat.reentry) return;
         sat.fetching = true;
         try {
+            // Adaptive scaling: fetch larger chunks with coarser resolution at high speeds
+            let chunkDays = 1;
+            let dtEval = 60.0;
+            if (simSettings.playbackSpeed > 10000) { chunkDays = 15; dtEval = 3600.0; } // 15 days, 1hr res
+            else if (simSettings.playbackSpeed > 1000) { chunkDays = 7; dtEval = 900.0; } // 7 days, 15m res
+            else if (simSettings.playbackSpeed > 100) { chunkDays = 3; dtEval = 180.0; } // 3 days, 3m res
+
             const res = await fetch('/stream', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1078,7 +1114,8 @@
                     params: sat.params,
                     t_start: sat.lastT,
                     state: sat.lastState,
-                    chunk_duration: 86400
+                    chunk_duration: 86400 * chunkDays,
+                    dt_eval: dtEval
                 })
             });
             const data = await res.json();
@@ -1155,9 +1192,11 @@
         const iconType = (satData.params && satData.params.icon) || satData.icon || 'satellite';
         const { sprite, glyph } = createAvatarSprite(iconType, colorHex);
 
-        const radius = satData.parent_body === 'Moon' ? 80 : 120;
+        // Use tiny 10-meter radius (0.01 km) for real-life scale. 
+        // The overlay sprite handles visibility from afar.
+        const radius = 0.01;
         const coreMesh = new THREE.Mesh(
-            new THREE.SphereGeometry(radius, 16, 16),
+            new THREE.SphereGeometry(radius, 8, 8),
             new THREE.MeshBasicMaterial({ color: colorNum })
         );
         const group = new THREE.Group();
@@ -1783,6 +1822,32 @@
 
         document.getElementById('t-drag').innerText  = `${dragMag.toFixed(4)} mm/s²`;
         document.getElementById('t-j2').innerText    = `${j2Mag.toFixed(4)} mm/s²`;
+        
+        let aeroTempC = -150; // Baseline ambient roughly
+        if (dragMag > 0 && v > 0) {
+            const a_drag = dragMag / 1000.0; // m/s^2
+            const m = sat.params.mass;
+            const cd = sat.params.cd;
+            const area = sat.params.drag_area;
+            const v_m_s = v * 1000.0;
+            // rho = 2 * m * a_drag / (Cd * A * v^2)
+            const rho = (2.0 * m * a_drag) / (cd * area * v_m_s * v_m_s);
+            // Sutton-Graves stagnation heat flux (W/m^2), R_n assumed 1.0m
+            const qs = 1.83e-4 * Math.sqrt(rho) * Math.pow(v_m_s, 3);
+            // Radiative equilibrium temp: T = (qs / (epsilon * sigma))^0.25
+            const sigma = 5.67e-8;
+            const epsilon = 0.85;
+            if (qs > 0) {
+                const T_k = Math.pow(qs / (epsilon * sigma), 0.25);
+                aeroTempC = Math.max(-150, T_k - 273.15);
+            }
+        }
+        
+        const tempEl = document.getElementById('t-temp');
+        if (tempEl) {
+            tempEl.innerText = `${aeroTempC.toFixed(1)} °C`;
+            tempEl.style.color = aeroTempC > 1000 ? '#ef4444' : (aeroTempC > 200 ? '#f59e0b' : '#38bdf8');
+        }
 
         // Key Coordinates Cards
         const ev = sat.events || {};
@@ -1822,32 +1887,47 @@
         btn.textContent = 'Computing Orbit...';
         btn.disabled = true;
         try {
-            const payload = {
-                name: document.getElementById('m-name').value || 'Sat',
-                parent_body: document.getElementById('m-body').value,
-                mass: parseFloat(document.getElementById('m-mass').value),
-                drag_area: parseFloat(document.getElementById('m-area').value),
-                cd: parseFloat(document.getElementById('m-cd').value),
-                altitude_km: parseFloat(document.getElementById('m-alt').value),
-                eccentricity: parseFloat(document.getElementById('m-ecc').value),
-                inclination_deg: parseFloat(document.getElementById('m-inc').value),
-                raan_deg: parseFloat(document.getElementById('m-raan').value),
-                atmosphere_type: document.getElementById('m-atm-type').value,
-                density_scale: parseFloat(document.getElementById('m-density-scale').value) || 1.0,
-                include_j2: document.getElementById('m-j2').checked,
-                include_drag: document.getElementById('m-drag').checked,
-                include_moon: document.getElementById('m-moon').checked,
-                color: document.getElementById('m-color').value || '#38bdf8',
-                icon: document.getElementById('m-icon').value || 'satellite',
-                t_start: simTime,
-            };
-            const res = await fetch('/simulate', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            const data = await res.json();
-            if (!res.ok) { alert('Simulation failed: ' + (data.detail || res.status)); return; }
-            addSatelliteToScene(data);
+            const isCluster = document.getElementById('m-cluster-enable').checked;
+            const nSats = isCluster ? parseInt(document.getElementById('m-cluster-n').value) : 1;
+            const dPhase = isCluster ? parseFloat(document.getElementById('m-cluster-dphase').value) : 0;
+            const dRaan = isCluster ? parseFloat(document.getElementById('m-cluster-draan').value) : 0;
+            const dAlt = isCluster ? parseFloat(document.getElementById('m-cluster-dalt').value) : 0;
+            const dInc = isCluster ? parseFloat(document.getElementById('m-cluster-dinc').value) : 0;
+            
+            const baseName = document.getElementById('m-name').value || 'Sat';
+            const baseAlt = parseFloat(document.getElementById('m-alt').value);
+            const baseRaan = parseFloat(document.getElementById('m-raan').value);
+            const baseInc = parseFloat(document.getElementById('m-inc').value);
+
+            for (let i = 0; i < nSats; i++) {
+                const payload = {
+                    name: isCluster ? `${baseName}-${i+1}` : baseName,
+                    parent_body: document.getElementById('m-body').value,
+                    mass: parseFloat(document.getElementById('m-mass').value),
+                    drag_area: parseFloat(document.getElementById('m-area').value),
+                    cd: parseFloat(document.getElementById('m-cd').value),
+                    altitude_km: baseAlt + (i * dAlt),
+                    eccentricity: parseFloat(document.getElementById('m-ecc').value),
+                    inclination_deg: baseInc + (i * dInc),
+                    raan_deg: baseRaan + (i * dRaan),
+                    true_anomaly_deg: (i * dPhase) % 360,
+                    atmosphere_type: document.getElementById('m-atm-type').value,
+                    density_scale: parseFloat(document.getElementById('m-density-scale').value) || 1.0,
+                    include_j2: document.getElementById('m-j2').checked,
+                    include_drag: document.getElementById('m-drag').checked,
+                    include_moon: document.getElementById('m-moon').checked,
+                    color: document.getElementById('m-color').value || '#38bdf8',
+                    icon: document.getElementById('m-icon').value || 'satellite',
+                    t_start: simTime,
+                };
+                const res = await fetch('/simulate', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (!res.ok) { alert(`Simulation failed for sat ${i+1}: ` + (data.detail || res.status)); break; }
+                addSatelliteToScene(data);
+            }
         } catch (e) {
             alert('Simulation failed: ' + e.message);
         } finally {
@@ -1944,7 +2024,9 @@
                     <td><strong>${r.param_value.toFixed(3)}</strong></td>
                     <td>${r.ballistic_coeff_kg_m2.toFixed(1)}</td>
                     <td>${r.initial_altitude_km.toFixed(1)} km</td>
+                    <td>${r.min_altitude_km ? r.min_altitude_km.toFixed(1) : r.final_altitude_km.toFixed(1)} km</td>
                     <td>${r.final_altitude_km.toFixed(1)} km</td>
+                    <td>${r.max_velocity_km_s ? r.max_velocity_km_s.toFixed(2) : '-'} km/s</td>
                     <td>${deorbStr}</td>
                     <td><strong>${lifeStr}</strong></td>
                     <td>${r.mean_decay_rate_km_day.toFixed(2)} km/d</td>

@@ -6,7 +6,10 @@ An interactive, high-fidelity numerical orbit propagator, mission analysis suite
 
 ## 🚀 Key Features
 
-- **🧪 Server-Side Parametric Experimentation Lab:** Automated parametric sweeps evaluating independent variables ($B = \frac{m}{C_D A}$, mass, drag area, $C_D$, altitude, eccentricity, atmospheric density scale) to measure and record satellite deorbit lifetime, energy loss, and orbital decay rates. Supports quiet high-speed headless evaluation and visual trajectory inspection.
+- **🌌 Satellite Constellation Generator:** Instantly spawn multi-satellite Walker constellations or local clusters (e.g. string-of-pearls) with automatic incremental offsets in Phase ($\nu$), RAAN ($\Omega$), altitude, and inclination.
+- **☁️ Visual Atmospheric Layers & Aerodynamic Heating:** Real-time 3D shells representing the Troposphere (12km) through Exosphere (2000km). Live telemetry calculates aerodynamic stagnation heating temperature (°C) via the Sutton-Graves equation based on dynamic atmospheric density and velocity.
+- **⚡ Adaptive High-Speed Streaming:** Backend API endpoints dynamically adapt `chunk_duration` and `dt_eval` interpolation resolution based on simulation playback speed, easily supporting swarms of satellites at $10,000\times$ speed without stutter or backend overload.
+- **🧪 Server-Side Parametric Experimentation Lab:** Automated, parallelized (multi-core) parametric sweeps evaluating independent variables ($B = \frac{m}{C_D A}$, mass, drag area, $C_D$, altitude, eccentricity, atmospheric density scale). Record lifetime, orbital decay rates, max velocity, and min altitude across up to 1000 sweep points per batch. Supports quiet high-speed headless evaluation and visual trajectory inspection.
 - **🎨 Custom Satellite Colors & Avatar Icons:** Full color picker support (`<input type="color">`) and customizable 3D billboard avatar glyphs (🛰️ **Satellite**, 🚀 **Rocket**, 👨‍🚀 **Astronaut**, 👽 **Alien**, 🛸 **UFO**, ⚪ **Pure Sphere**) with dynamic glowing halos matching chosen colors.
 - **✨ Single-Orbit Dynamic Window & Trailing Fading Trail:** Trajectory display is automatically scoped to the active single-orbit time window ($[t - T_{\text{orbit}}, t + T_{\text{orbit}}]$) with a smooth alpha/brightness gradient that fades out cleanly behind the satellite as it propagates forward.
 - **🌕 Moon Orbit Propagation & Multi-Body Mechanics:** Full orbital mechanics around both **Earth** ($R_\oplus = 6,378.137\text{ km}$, $\mu_\oplus = 3.986\times 10^{14}$) and the **Moon** ($R_{\text{Moon}} = 1,737.4\text{ km}$, $\mu_{\text{Moon}} = 4.9048\times 10^{12}$) with real $384,400\text{ km}$ distance, dynamic ephemeris, and local lunar coordinate frames.
@@ -150,6 +153,7 @@ Runs 195+ comprehensive unit, integration, numerical sanity, atmospheric consist
 
 ## 📜 Version History
 
-- **`v13-alpha` (Current):** Server-side Parametric Experimentation Lab (`leo_simulator/experiment.py`), US Standard 1976 atmosphere model reconciliation, clean monotonic CSV export with Run_IDs, and lifetime vs ballistic coefficient data collection framework.
+- **`v14-alpha` (Current):** Satellite Constellation Generator, Interactive 3D Drag-to-Orbit UX, Sutton-Graves Aerodynamic Heating simulation, visual Atmospheric Layers (Troposphere→Exosphere), adaptive streaming for stable 10,000x playback, ML Surrogate multithreading, and parallelized 1000-point Parametric Sweeps.
+- **`v13-alpha`:** Server-side Parametric Experimentation Lab (`leo_simulator/experiment.py`), US Standard 1976 atmosphere model reconciliation, clean monotonic CSV export with Run_IDs, and lifetime vs ballistic coefficient data collection framework.
 - **`v12-alpha`:** Real-scale isolated Earth-Moon system ($384,400\text{ km}$ separation), $10,000\times$ speedup, rolling `/stream` trajectory chunks, RTN burn maneuvers, 3D force vector overlays, and deorbit lifetime tracking.
 - **`v11-alpha`:** Multi-satellite dynamic FastAPI architecture, Pydantic bounds validation, async offloading, and initial WebGL fallback safeguards.
