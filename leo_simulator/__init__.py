@@ -35,6 +35,7 @@ from leo_simulator.orbit.elements import (
     coe_to_rv,
     rv_to_coe,
 )
+from leo_simulator.orbit.pinn_propagator import PINNPropagator
 from leo_simulator.orbit.satellite import Satellite
 from leo_simulator.propagator import OrbitPropagator, PropagationResult
 from leo_simulator.coordinates import (
@@ -57,6 +58,7 @@ __all__ = [
     "BaseAtmosphere",
     "ExponentialAtmosphere",
     "OrbitPropagator",
+    "PINNPropagator",
     "OrbitalDynamics",
     "OrbitalElements",
     "PiecewiseExponentialAtmosphere",

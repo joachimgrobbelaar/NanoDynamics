@@ -191,6 +191,7 @@
         <div id="telemetry-panel">
             <div id="telemetry" style="display:none;"></div>
             <div><span class="label">Target: </span><span id="t-name">—</span></div>
+            <div><span class="label">Engine: </span><span id="t-engine" style="font-weight:600;">—</span></div>
             <div><span class="label">Body: </span><span id="t-body">—</span></div>
             <div><span class="label">Sim Time: </span><span id="t-time">0.0 s</span></div>
             <div><span class="label">Latitude: </span><span id="t-lat" class="val-accent">—</span></div>
@@ -216,6 +217,10 @@
             <div id="coord-impact-card" class="coord-card" style="display:none; border-color:#ef4444;">
                 <div class="coord-card-title" style="color:#ef4444;">💥 Ground Impact / Collision</div>
                 <div id="coord-impact-val">—</div>
+            </div>
+
+            <div id="compare-clone-container" style="display:none; margin-top:10px;">
+                <button id="compare-clone-btn" onclick="cloneCurrentSatWithAlternateEngine()" style="width:100%; background:#7c3aed; color:white; border:none; padding:6px 8px; border-radius:4px; font-size:11px; cursor:pointer; font-weight:600; transition:background 0.15s;">🤖 Clone with Alternate Engine</button>
             </div>
         </div>
 
@@ -273,6 +278,16 @@
         </div>
     </div>
 
+    <div id="floating-stat-box" style="display:none; position:absolute; pointer-events:none; z-index:110; background:rgba(15, 23, 42, 0.90); backdrop-filter:blur(6px); border:1px solid #38bdf8; border-radius:6px; padding:6px 10px; font-family:monospace; font-size:11px; color:#f8fafc; box-shadow:0 4px 12px rgba(0,0,0,0.5);">
+        <div style="font-weight:bold; color:#38bdf8; margin-bottom:2px; display:flex; justify-content:space-between; gap:10px;">
+            <span id="fs-name">Sat</span>
+            <span id="fs-engine" style="font-size:9px; padding:1px 4px; border-radius:3px; background:#0284c7; color:white;">RK45</span>
+        </div>
+        <div>Alt: <span id="fs-alt" style="color:#4ade80;">—</span></div>
+        <div>Vel: <span id="fs-vel" style="color:#facc15;">—</span></div>
+        <div>Inc: <span id="fs-inc" style="color:#c084fc;">—</span></div>
+    </div>
+
     <div id="sim-clock">⏱ T+0d 0h 0m 0s (10×)</div>
 
     <div id="legend">
@@ -290,6 +305,13 @@
                 <select id="m-body" onchange="updateBodyConstraints()">
                     <option value="Earth" selected>🌍 Earth</option>
                     <option value="Moon">🌕 Moon</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Propagator Engine:</label>
+                <select id="m-engine" style="width:160px; font-weight:500;">
+                    <option value="rk45" selected>⚡ Numerical (solve_ivp)</option>
+                    <option value="pinn">🤖 ML PINN Surrogate</option>
                 </select>
             </div>
             <div class="form-group"><label>Name:</label><input type="text" id="m-name" value="Sat-1"></div>
@@ -1236,6 +1258,7 @@
         const sat = {
             name: satData.name,
             parentBody: satData.parent_body || (satData.params && satData.params.parent_body) || 'Earth',
+            engine: satData.engine || (satData.params && satData.params.propagation_mode) || 'rk45',
             params: satData.params,
             period_s: satData.period_s || 5400,
             color: colorNum,
@@ -1745,12 +1768,16 @@
 
             const bodyIcon = sat.parentBody === 'Moon' ? '🌕' : '🌍';
             const avatarIcon = sat.iconGlyph || '🛰️';
+            const isPinn = (sat.engine === 'pinn');
+            const engineBadge = isPinn
+                ? `<span style="background:#7c3aed;color:white;font-size:9px;padding:1px 4px;border-radius:3px;font-weight:600;margin-left:4px;" title="Propagated by ML PINN Neural Surrogate">PINN</span>`
+                : `<span style="background:#0284c7;color:white;font-size:9px;padding:1px 4px;border-radius:3px;font-weight:600;margin-left:4px;" title="Propagated by Numerical RK45 (solve_ivp)">RK45</span>`;
             const statusIcon = sat.reentry ? ` 🔴 [Deorbited @ ${sat.deorbitTime || 'Re-entered'}]` : '';
 
             li.innerHTML = `
                 <div class="sat-info-badge">
                     <span>${bodyIcon} ${avatarIcon}</span>
-                    <span><strong>${sat.name}</strong>${statusIcon}</span>
+                    <span><strong>${sat.name}</strong>${engineBadge}${statusIcon}</span>
                 </div>
                 <button class="del-sat-btn" title="Remove satellite" onclick="removeSatellite(${idx}, event)">✕</button>
             `;
@@ -1784,10 +1811,12 @@
 
     function updateTelemetry(sat, idx) {
         if (!sat) {
-            ['t-name','t-body','t-time','t-lat','t-lon','t-alt','t-vel','t-period','t-life','t-drag','t-j2'].forEach(id => {
+            ['t-name','t-engine','t-body','t-time','t-lat','t-lon','t-alt','t-vel','t-period','t-life','t-drag','t-temp','t-j2'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.innerText = '—';
             });
+            const cloneCont = document.getElementById('compare-clone-container');
+            if (cloneCont) cloneCont.style.display = 'none';
             document.getElementById('coord-initial-card').style.display = 'none';
             document.getElementById('coord-reentry-card').style.display = 'none';
             document.getElementById('coord-impact-card').style.display = 'none';
@@ -1806,6 +1835,26 @@
         const j2Mag   = j2F   ? Math.sqrt(j2F.reduce((s,x)=>s+x*x,0))*1000   : 0;
 
         document.getElementById('t-name').innerText = sat.name;
+        const engineEl = document.getElementById('t-engine');
+        if (engineEl) {
+            if (sat.engine === 'pinn') {
+                engineEl.innerHTML = '<span style="color:#c084fc;">🤖 ML PINN Surrogate</span>';
+            } else {
+                engineEl.innerHTML = '<span style="color:#38bdf8;">⚡ RK45 Numerical</span>';
+            }
+        }
+        const cloneCont = document.getElementById('compare-clone-container');
+        const cloneBtn = document.getElementById('compare-clone-btn');
+        if (cloneCont && cloneBtn) {
+            cloneCont.style.display = 'block';
+            if (sat.engine === 'pinn') {
+                cloneBtn.style.background = '#0284c7';
+                cloneBtn.innerText = '⚡ Compare with RK45 Ground Truth (Clone)';
+            } else {
+                cloneBtn.style.background = '#7c3aed';
+                cloneBtn.innerText = '🤖 Compare with ML PINN Surrogate (Clone)';
+            }
+        }
         document.getElementById('t-body').innerText = `${sat.parentBody}`;
         document.getElementById('t-time').innerText = formatTime(simTime);
         document.getElementById('t-lat').innerText  = `${geo.lat >= 0 ? geo.lat.toFixed(3)+'° N' : Math.abs(geo.lat).toFixed(3)+'° S'}`;
@@ -1899,10 +1948,13 @@
             const baseRaan = parseFloat(document.getElementById('m-raan').value);
             const baseInc = parseFloat(document.getElementById('m-inc').value);
 
+            const engineMode = document.getElementById('m-engine') ? document.getElementById('m-engine').value : 'rk45';
+
             for (let i = 0; i < nSats; i++) {
                 const payload = {
                     name: isCluster ? `${baseName}-${i+1}` : baseName,
                     parent_body: document.getElementById('m-body').value,
+                    propagation_mode: engineMode,
                     mass: parseFloat(document.getElementById('m-mass').value),
                     drag_area: parseFloat(document.getElementById('m-area').value),
                     cd: parseFloat(document.getElementById('m-cd').value),
@@ -1936,6 +1988,48 @@
             closeModal();
         }
     }
+
+    async function cloneCurrentSatWithAlternateEngine() {
+        if (selectedSatIndex < 0 || !activeSatellites[selectedSatIndex]) return;
+        const src = activeSatellites[selectedSatIndex];
+        if (!src.params) return;
+        const isPinn = (src.engine === 'pinn');
+        const targetMode = isPinn ? 'rk45' : 'pinn';
+        const tag = isPinn ? 'RK45' : 'PINN';
+        const newColor = isPinn ? '#38bdf8' : '#c084fc';
+        const cloneBtn = document.getElementById('compare-clone-btn');
+        if (cloneBtn) {
+            cloneBtn.disabled = true;
+            cloneBtn.textContent = 'Cloning Orbit...';
+        }
+        try {
+            const payload = Object.assign({}, src.params, {
+                name: `${src.name}-${tag}`,
+                propagation_mode: targetMode,
+                color: newColor,
+                t_start: simTime
+            });
+            const res = await fetch('/simulate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                alert('Clone comparison failed: ' + (data.detail || res.status));
+                return;
+            }
+            addSatelliteToScene(data);
+        } catch (e) {
+            alert('Clone comparison failed: ' + e.message);
+        } finally {
+            if (cloneBtn) {
+                cloneBtn.disabled = false;
+                cloneBtn.textContent = isPinn ? '⚡ Compare with RK45 Ground Truth (Clone)' : '🤖 Compare with ML PINN Surrogate (Clone)';
+            }
+        }
+    }
+    window.cloneCurrentSatWithAlternateEngine = cloneCurrentSatWithAlternateEngine;
 
     // ── Experimentation Lab Modal Logic ───────────────────────────────────────
     function openExperimentModal() {
@@ -2530,9 +2624,19 @@
                 const fName = document.getElementById('fs-name');
                 if(fName) {
                     fName.innerText = sat.name || 'Sat';
+                    const fsEng = document.getElementById('fs-engine');
+                    if (fsEng) {
+                        const isPinn = (sat.engine === 'pinn');
+                        fsEng.innerText = isPinn ? 'PINN' : 'RK45';
+                        fsEng.style.background = isPinn ? '#7c3aed' : '#0284c7';
+                    }
                     document.getElementById('fs-alt').innerText = document.getElementById('t-alt').innerText;
                     document.getElementById('fs-vel').innerText = document.getElementById('t-vel').innerText;
-                    document.getElementById('fs-inc').innerText = document.getElementById('t-inc').innerText;
+                    const fsInc = document.getElementById('fs-inc');
+                    if (fsInc) {
+                        const incVal = (sat.params && sat.params.inclination_deg !== undefined) ? sat.params.inclination_deg.toFixed(1) + '°' : '—';
+                        fsInc.innerText = incVal;
+                    }
                 }
                 
                 // Project 3D pos to 2D screen

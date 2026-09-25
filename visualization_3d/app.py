@@ -22,6 +22,7 @@ from leo_simulator import (
     ExponentialAtmosphere,
     OrbitalElements,
     OrbitPropagator,
+    PINNPropagator,
     Satellite,
     eci_to_geodetic,
     extract_trajectory_key_events,
@@ -118,9 +119,14 @@ class SatelliteParams(BaseModel):
     color: str = Field("#38bdf8", description="Hex color for trajectory and indicator")
     icon: str = Field("satellite", description="Avatar icon type: satellite, rocket, astronaut, alien, ufo, sphere")
     t_start: float = Field(0.0, ge=0.0, description="Initial simulation epoch in seconds")
+    propagation_mode: str = Field("rk45", description="Propagation mode: 'rk45' (Numerical RK45) or 'pinn' (ML PINN Surrogate)")
 
     @model_validator(mode="after")
     def validate_orbit_safety(self) -> "SatelliteParams":
+        if self.propagation_mode.lower() == "pinn" and self.parent_body != "Earth":
+            raise ValueError(
+                "propagation_mode: The PINN surrogate model currently only supports Earth orbits. Select 'rk45' for Moon simulations."
+            )
         body = BODIES.get(self.parent_body, BODIES["Earth"])
         if self.altitude_km < body["min_alt_km"] or self.altitude_km > body["max_alt_km"]:
             raise ValueError(
@@ -202,6 +208,10 @@ def _build_propagator(params: SatelliteParams) -> OrbitPropagator:
         omega_earth=body["omega"],
         rtol=1e-8,
         atol=1e-9,
+        # Terminal re-entry floor matches the input validator's own collision
+        # lines (50 km Earth / 10 km Moon): crossing it ends the run instead
+        # of flying on to impact.
+        min_altitude_reentry=50_000.0 if body["has_atmosphere"] else 10_000.0,
     )
 
 
@@ -290,7 +300,22 @@ async def simulate_satellite(params: SatelliteParams):
     """Bootstrap: propagates the first chunk and returns initial state + trajectory."""
     try:
         body = BODIES.get(params.parent_body, BODIES["Earth"])
-        prop = _build_propagator(params)
+        is_pinn = params.propagation_mode.lower() == "pinn"
+        if is_pinn:
+            prop = PINNPropagator(
+                satellite=Satellite(
+                    name=params.name,
+                    mass=params.mass,
+                    drag_area=params.drag_area,
+                    cd=params.cd,
+                ),
+                mu=body["mu"],
+                r_earth=body["radius_m"],
+                omega_earth=body["omega"],
+                min_altitude_reentry=50_000.0,
+            )
+        else:
+            prop = _build_propagator(params)
         
         a_m = body["radius_m"] + params.altitude_km * 1000.0
         orbit = OrbitalElements(
@@ -314,7 +339,8 @@ async def simulate_satellite(params: SatelliteParams):
         last_state = res.r[-1].tolist() + res.v[-1].tolist()
         period_s = 2.0 * np.pi * np.sqrt((a_m**3) / body["mu"])
 
-        _log_sim_for_ml(params, dt_eval, chunk)
+        if not is_pinn:
+            _log_sim_for_ml(params, dt_eval, chunk)
 
         return {
             "name": params.name,
@@ -326,6 +352,7 @@ async def simulate_satellite(params: SatelliteParams):
             "last_t": float(res.t[-1]),
             "reentry": bool(res.reentry_detected),
             "reentry_time": float(res.reentry_time) if res.reentry_time is not None else None,
+            "engine": "pinn" if is_pinn else "rk45",
         }
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
@@ -338,7 +365,22 @@ async def stream_chunk(req: StreamRequest):
     """Rolling propagation: given last known state, propagate next chunk."""
     try:
         body = BODIES.get(req.params.parent_body, BODIES["Earth"])
-        prop = _build_propagator(req.params)
+        is_pinn = getattr(req.params, "propagation_mode", "rk45").lower() == "pinn"
+        if is_pinn:
+            prop = PINNPropagator(
+                satellite=Satellite(
+                    name=req.params.name,
+                    mass=req.params.mass,
+                    drag_area=req.params.drag_area,
+                    cd=req.params.cd,
+                ),
+                mu=body["mu"],
+                r_earth=body["radius_m"],
+                omega_earth=body["omega"],
+                min_altitude_reentry=50_000.0,
+            )
+        else:
+            prop = _build_propagator(req.params)
         dt_eval = req.dt_eval if req.dt_eval else body["dt_eval"]
         res = await asyncio.to_thread(
             _propagate_chunk, prop, req.state, req.t_start, req.chunk_duration, dt_eval
@@ -352,6 +394,7 @@ async def stream_chunk(req: StreamRequest):
             "last_t": float(res.t[-1]),
             "reentry": bool(res.reentry_detected),
             "reentry_time": float(res.reentry_time) if res.reentry_time is not None else None,
+            "engine": "pinn" if is_pinn else "rk45",
         }
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))

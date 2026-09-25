@@ -1,11 +1,14 @@
-# NanoDynamics: Real-Scale Earth-Moon Orbital Dynamics & Experimentation Suite (v23-alpha)
+# NanoDynamics: Real-Scale Earth-Moon Orbital Dynamics & Experimentation Suite (v1.0-beta)
 
-An interactive, high-fidelity numerical orbit propagator, mission analysis suite, and parametric experimentation engine for satellites orbiting the Earth and Moon. NanoDynamics combines high-order Runge-Kutta numerical integration (`scipy.integrate.solve_ivp`), a PyTorch Physics-Informed Neural Network (PINN) surrogate model, and a real-scale Three.js / FastAPI full-stack 3D interactive web application with rolling trajectory streaming, live maneuver simulation, single-orbit trailing fade, custom avatar icons, and automated deorbit lifetime sweeps.
+An interactive, high-fidelity numerical orbit propagator, mission analysis suite, and parametric experimentation engine for satellites orbiting the Earth and Moon. NanoDynamics combines high-order Runge-Kutta numerical integration (`scipy.integrate.solve_ivp`), an offline PyTorch Physics-Informed Neural Network (PINN) surrogate model, and a real-scale Three.js / FastAPI full-stack 3D interactive web application with dual-engine switching, rolling trajectory streaming, live maneuver simulation, single-orbit trailing fade, custom avatar icons, and automated deorbit lifetime sweeps.
 
 ---
 
 ## 🚀 Key Features
 
+- **🤖 Dual-Engine Orbital Propagation (Numerical RK45 vs. ML PINN):** Switch propagation engine between classical numerical integration (`solve_ivp` RK45) and an offline PyTorch Physics-Informed Neural Network surrogate (`TransitionMLP`). Runs local tensor inference without external cloud compute dependencies.
+- **🔄 Instant Comparison Cloning:** Clone any active satellite with one click using the alternate engine to visually compare numerical ground truth against neural surrogate rollouts side-by-side in the 3D viewport.
+- **🏷️ Floating 3D Stat Box & Engine Badging:** Screen-projected 3D HUD boxes displaying satellite name, active engine badge (`[RK45]` / `[PINN]`), altitude, velocity, and orbital inclination directly above tracked spacecraft.
 - **🌌 Satellite Constellation Generator:** Instantly spawn multi-satellite Walker constellations or local clusters (e.g. string-of-pearls) with automatic incremental offsets in Phase ($\nu$), RAAN ($\Omega$), altitude, and inclination.
 - **☁️ Visual Atmospheric Layers & Aerodynamic Heating:** Real-time 3D shells representing the Troposphere (12km) through Exosphere (2000km). Live telemetry calculates aerodynamic stagnation heating temperature (°C) via the Sutton-Graves equation based on dynamic atmospheric density and velocity.
 - **⚡ Adaptive High-Speed Streaming:** Backend API endpoints dynamically adapt `chunk_duration` and `dt_eval` interpolation resolution based on simulation playback speed, easily supporting swarms of satellites at $10,000\times$ speed without stutter or backend overload.
@@ -153,7 +156,8 @@ Runs 195+ comprehensive unit, integration, numerical sanity, atmospheric consist
 
 ## 📜 Version History
 
-- **`v23-alpha` (Current):** Satellite Constellation Generator, Sutton-Graves Aerodynamic Heating simulation, visual Atmospheric Layers (Troposphere→Exosphere), adaptive streaming for stable 10,000x playback, ML Surrogate multithreading, and parallelized 1000-point Parametric Sweeps.
+- **`v1.0-beta` (First Beta Build - Current):** Dual-Engine Orbital Propagation (Numerical RK45 vs. offline ML PINN Surrogate), instant comparison cloning with color-coded trails, 3D floating stat box with active engine badging, PINN Moon-orbit boundary guards, and complete independence from external cloud compute services.
+- **`v23-alpha`:** Satellite Constellation Generator, Sutton-Graves Aerodynamic Heating simulation, visual Atmospheric Layers (Troposphere→Exosphere), adaptive streaming for stable 10,000x playback, ML Surrogate multithreading, and parallelized 1000-point Parametric Sweeps.
 - **`v22-alpha`:** Interactive "Drag to Add Orbit" UX via camera-facing plane projection and 3D Raycaster KSP-style Maneuver node dragging.
 - **`v21-alpha`:** Floating 3D Stat Box HTML overlays and Radial View Lock (tracking camera faces radially inward toward the planet).
 - **`v20-alpha`:** ML Surrogate training speed and quality upgrade (`torch.set_num_threads`, batch size 1024, `ReduceLROnPlateau`, Adam momentum state persistence).

@@ -276,7 +276,12 @@ class TestBoundaryValues:
             },
         )
         assert res_valid.status_code == 200
-        assert len(res_valid.json()["trajectory"]["t"]) == 1441
+        # NOTE (2026-09-21, Muse): with the nu=0 convention /simulate starts
+        # this orbit AT perigee (73.0 km), so it cannot survive the day: the
+        # physical assertion is prompt re-entry, not a full 1441-point arc.
+        body = res_valid.json()
+        assert body.get("reentry") is True
+        assert len(body["trajectory"]["t"]) < 1441
 
         # e = 0.24 -> rp = 8371 * 0.76 = 6361.96 km < 6421 km (invalid, collision)
         res_invalid = client.post(
