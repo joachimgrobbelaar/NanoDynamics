@@ -24,6 +24,8 @@ from leo_simulator import (
     OrbitPropagator,
     PINNPropagator,
     Satellite,
+    compute_orbital_collision_impulse,
+    detect_conjunction,
     eci_to_geodetic,
     extract_trajectory_key_events,
 )
@@ -162,6 +164,17 @@ class BurnRequest(BaseModel):
     dv_prograde: float = Field(0.0, description="Delta-v in prograde/transverse direction (m/s)")
     dv_normal: float = Field(0.0, description="Delta-v in normal/out-of-plane direction (m/s)")
     dv_radial: float = Field(0.0, description="Delta-v in radial-outward direction (m/s)")
+
+
+class CollisionRequest(BaseModel):
+    sat1_params: SatelliteParams
+    sat1_state: list[float] = Field(..., min_length=6, max_length=6, description="[x, y, z, vx, vy, vz] for satellite 1")
+    sat2_params: SatelliteParams
+    sat2_state: list[float] = Field(..., min_length=6, max_length=6, description="[x, y, z, vx, vy, vz] for satellite 2")
+    t_collision: float = Field(..., ge=0.0, description="Epoch of collision in seconds")
+    restitution: float = Field(0.2, ge=0.0, le=1.0, description="Restitution coefficient (0=plastic, 1=elastic)")
+    post_collision_duration: float = Field(86400.0, ge=10.0, le=604800.0, description="Post-collision propagation window (s)")
+    dt_eval: float = Field(None, description="Evaluation delta time (s)")
 
 
 class ExperimentRequest(BaseModel):
@@ -509,6 +522,100 @@ async def execute_burn(req: BurnRequest):
             "events": chunk.get("events"),
             "reentry": bool(res.reentry_detected),
             "reentry_time": float(res.reentry_time) if res.reentry_time is not None else None,
+        }
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/collision/resolve")
+async def resolve_collision(req: CollisionRequest):
+    """Compute momentum-exchange impulse and propagate perturbed orbits for colliding satellites."""
+    try:
+        body1 = BODIES.get(req.sat1_params.parent_body, BODIES["Earth"])
+        body2 = BODIES.get(req.sat2_params.parent_body, BODIES["Earth"])
+        if req.sat1_params.parent_body != req.sat2_params.parent_body:
+            raise ValueError("Colliding satellites must share the same parent celestial body.")
+
+        r1 = np.array(req.sat1_state[:3], dtype=np.float64)
+        v1 = np.array(req.sat1_state[3:], dtype=np.float64)
+        r2 = np.array(req.sat2_state[:3], dtype=np.float64)
+        v2 = np.array(req.sat2_state[3:], dtype=np.float64)
+
+        col_res = compute_orbital_collision_impulse(
+            m1=req.sat1_params.mass,
+            r1=r1,
+            v1=v1,
+            m2=req.sat2_params.mass,
+            r2=r2,
+            v2=v2,
+            restitution=req.restitution,
+        )
+
+        new_state1 = r1.tolist() + col_res.v1_post.tolist()
+        new_state2 = r2.tolist() + col_res.v2_post.tolist()
+
+        is_pinn1 = getattr(req.sat1_params, "propagation_mode", "rk45").lower() == "pinn"
+        is_pinn2 = getattr(req.sat2_params, "propagation_mode", "rk45").lower() == "pinn"
+
+        if is_pinn1:
+            prop1 = PINNPropagator(
+                satellite=Satellite(name=req.sat1_params.name, mass=req.sat1_params.mass, drag_area=req.sat1_params.drag_area, cd=req.sat1_params.cd),
+                mu=body1["mu"], r_earth=body1["radius_m"], omega_earth=body1["omega"], min_altitude_reentry=50_000.0,
+            )
+        else:
+            prop1 = _build_propagator(req.sat1_params)
+
+        if is_pinn2:
+            prop2 = PINNPropagator(
+                satellite=Satellite(name=req.sat2_params.name, mass=req.sat2_params.mass, drag_area=req.sat2_params.drag_area, cd=req.sat2_params.cd),
+                mu=body2["mu"], r_earth=body2["radius_m"], omega_earth=body2["omega"], min_altitude_reentry=50_000.0,
+            )
+        else:
+            prop2 = _build_propagator(req.sat2_params)
+
+        chunk_dur = min(req.post_collision_duration, body1["default_chunk_duration"])
+        dt_eval = req.dt_eval or body1["dt_eval"]
+
+        res1, res2 = await asyncio.gather(
+            asyncio.to_thread(_propagate_chunk, prop1, new_state1, req.t_collision, chunk_dur, dt_eval),
+            asyncio.to_thread(_propagate_chunk, prop2, new_state2, req.t_collision, chunk_dur, dt_eval),
+        )
+
+        chunk1 = _format_chunk(res1, prop1, body1["radius_m"], include_forces=True)
+        chunk2 = _format_chunk(res2, prop2, body2["radius_m"], include_forces=True)
+
+        return {
+            "status": "success",
+            "t_collision": float(req.t_collision),
+            "separation_m": float(col_res.separation_distance),
+            "relative_speed_m_s": float(col_res.relative_speed),
+            "impulse_ns": float(col_res.impulse_mag),
+            "sat1": {
+                "name": req.sat1_params.name,
+                "dv_mag_m_s": float(col_res.dv1_mag),
+                "new_state": new_state1,
+                "trajectory": chunk1,
+                "last_state": res1.r[-1].tolist() + res1.v[-1].tolist(),
+                "last_t": float(res1.t[-1]),
+                "events": chunk1.get("events"),
+                "reentry": bool(res1.reentry_detected),
+                "reentry_time": float(res1.reentry_time) if res1.reentry_time is not None else None,
+                "engine": "pinn" if is_pinn1 else "rk45",
+            },
+            "sat2": {
+                "name": req.sat2_params.name,
+                "dv_mag_m_s": float(col_res.dv2_mag),
+                "new_state": new_state2,
+                "trajectory": chunk2,
+                "last_state": res2.r[-1].tolist() + res2.v[-1].tolist(),
+                "last_t": float(res2.t[-1]),
+                "events": chunk2.get("events"),
+                "reentry": bool(res2.reentry_detected),
+                "reentry_time": float(res2.reentry_time) if res2.reentry_time is not None else None,
+                "engine": "pinn" if is_pinn2 else "rk45",
+            },
         }
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))

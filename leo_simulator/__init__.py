@@ -35,6 +35,11 @@ from leo_simulator.orbit.elements import (
     coe_to_rv,
     rv_to_coe,
 )
+from leo_simulator.orbit.collision import (
+    CollisionResult,
+    compute_orbital_collision_impulse,
+    detect_conjunction,
+)
 from leo_simulator.orbit.pinn_propagator import PINNPropagator
 from leo_simulator.orbit.satellite import Satellite
 from leo_simulator.propagator import OrbitPropagator, PropagationResult
@@ -56,9 +61,12 @@ __all__ = [
     "R_MOON_ORBIT",
     "T_MOON_ORBIT",
     "BaseAtmosphere",
+    "CollisionResult",
     "ExponentialAtmosphere",
     "OrbitPropagator",
     "PINNPropagator",
+    "compute_orbital_collision_impulse",
+    "detect_conjunction",
     "OrbitalDynamics",
     "OrbitalElements",
     "PiecewiseExponentialAtmosphere",

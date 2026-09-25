@@ -96,6 +96,15 @@
         #force-toggle { margin-top: 10px; font-size: 12px; }
         #force-toggle label { cursor: pointer; display: flex; align-items: center; gap: 6px; color: #cbd5e1; }
 
+        #collision-banner {
+            position: absolute; top: 56px; left: 50%; transform: translateX(-50%);
+            background: rgba(185, 28, 28, 0.95); color: white; padding: 10px 20px;
+            border-radius: 8px; font-weight: bold; font-size: 13px; z-index: 250;
+            display: none; box-shadow: 0 4px 20px rgba(239, 68, 68, 0.6);
+            border: 1px solid #f87171; text-align: center; pointer-events: none;
+            backdrop-filter: blur(6px);
+        }
+
         #gui-container { position: absolute; top: 54px; right: 10px; z-index: 90; }
 
         /* Modals */
@@ -164,6 +173,8 @@
         <button onclick="loadSim()">Load</button>
     </div>
 
+    <div id="collision-banner"></div>
+
     <div id="gui-container"></div>
 
     <div id="sidebar">
@@ -185,6 +196,23 @@
             <div><span class="label">Rel. Speed (Δv): </span><span id="isat-rel-v" class="val-accent">— km/s</span></div>
             <div><span class="label">Range Rate: </span><span id="isat-range-rate">— km/s</span></div>
             <div><span class="label">Line of Sight: </span><span id="isat-los" style="font-weight:600; color:#4ade80;">—</span></div>
+            <div><span class="label">Conjunction: </span><span id="isat-collision-status" style="font-weight:bold; color:#22c55e;">CLEAR</span></div>
+            <div style="margin-top:8px; padding-top:6px; border-top:1px solid #334155;">
+                <label style="display:flex; align-items:center; gap:6px; font-weight:600; cursor:pointer;">
+                    <input type="checkbox" id="collision-enabled" checked>
+                    <span>💥 Enable Orbit Collisions</span>
+                </label>
+                <div style="display:flex; justify-content:space-between; margin-top:4px; font-size:11px;">
+                    <span style="color:#94a3b8;">Collision Radius:</span>
+                    <span id="col-radius-label" style="color:#38bdf8; font-weight:600;">1.0 km</span>
+                </div>
+                <input type="range" id="col-radius" min="0.1" max="10.0" step="0.1" value="1.0" style="width:100%; margin:2px 0;" oninput="document.getElementById('col-radius-label').innerText = parseFloat(this.value).toFixed(1) + ' km'">
+                <div style="display:flex; justify-content:space-between; margin-top:2px; font-size:11px;">
+                    <span style="color:#94a3b8;">Restitution (e):</span>
+                    <span id="col-rest-label" style="color:#facc15; font-weight:600;">0.20</span>
+                </div>
+                <input type="range" id="col-rest" min="0.0" max="1.0" step="0.05" value="0.2" style="width:100%; margin:2px 0;" oninput="document.getElementById('col-rest-label').innerText = parseFloat(this.value).toFixed(2)">
+            </div>
         </div>
 
         <h3>Telemetry & Geodetic Coords</h3>
@@ -792,6 +820,53 @@
     const interSatLine = new THREE.Line(interSatGeo, interSatMat);
     interSatLine.visible = false;
     scene.add(interSatLine);
+
+    // ── Orbital Collision FX & Shockwaves ──
+    const activeShockwaves = [];
+    const collisionCooldowns = new Map();
+
+    function spawnCollisionShockwave(pos) {
+        const geom = new THREE.SphereGeometry(25, 24, 24);
+        const mat = new THREE.MeshBasicMaterial({
+            color: 0xff3b30,
+            wireframe: true,
+            transparent: true,
+            opacity: 1.0
+        });
+        const mesh = new THREE.Mesh(geom, mat);
+        mesh.position.copy(pos);
+        scene.add(mesh);
+        activeShockwaves.push({ mesh, scale: 1.0, opacity: 1.0 });
+    }
+
+    function showCollisionBanner(htmlText, durMs = 5000) {
+        const el = document.getElementById('collision-banner');
+        if (!el) return;
+        el.innerHTML = htmlText;
+        el.style.display = 'block';
+        clearTimeout(el._timer);
+        el._timer = setTimeout(() => { el.style.display = 'none'; }, durMs);
+    }
+
+    function snapshotGhostTrail(sat) {
+        if (sat.trailPts && sat.trailPts.length > 1) {
+            const ghostGeo = new THREE.BufferGeometry().setFromPoints(sat.trailPts);
+            const ghostMat = new THREE.LineDashedMaterial({
+                color: sat.color,
+                dashSize: 180,
+                gapSize: 90,
+                linewidth: 2,
+                transparent: true,
+                opacity: 0.85
+            });
+            const ghostLine = new THREE.Line(ghostGeo, ghostMat);
+            ghostLine.computeLineDistances();
+            ghostLine.position.copy(sat.line.position);
+            scene.add(ghostLine);
+            if (!sat.ghostTrails) sat.ghostTrails = [];
+            sat.ghostTrails.push({ line: ghostLine, opacity: 0.85, fadeSpeed: 0.008 });
+        }
+    }
 
     camera.position.set(R_EARTH_KM * 3.5, R_EARTH_KM * 2.2, R_EARTH_KM * 3.5);
     if (controls) controls.target.set(0, 0, 0);
@@ -2290,6 +2365,20 @@
         const rangeRate = distKm > 1e-4 ? dVec.dot(relV) / distKm : 0.0;
         rrEl.innerText = `${rangeRate > 0 ? '+' : ''}${rangeRate.toFixed(3)} km/s`;
 
+        // Update Conjunction / Proximity Status Badge
+        const colStatusEl = document.getElementById('isat-collision-status');
+        const colRadiusEl = document.getElementById('col-radius');
+        const colThreshKm = colRadiusEl ? parseFloat(colRadiusEl.value) : 1.0;
+        if (colStatusEl) {
+            if (distKm <= colThreshKm && rangeRate <= 0.0) {
+                colStatusEl.innerHTML = '<span style="color:#ef4444; font-weight:bold;">💥 CRITICAL CONJUNCTION</span>';
+            } else if (distKm <= colThreshKm * 3.0 && rangeRate < 0.0) {
+                colStatusEl.innerHTML = `<span style="color:#f59e0b; font-weight:bold;">⚠️ APPROACHING (${distKm.toFixed(1)} km)</span>`;
+            } else {
+                colStatusEl.innerHTML = '<span style="color:#22c55e;">CLEAR</span>';
+            }
+        }
+
         // Check Line-of-Sight Occlusion by Earth and Moon
         let occluded = false;
         let blocker = '';
@@ -2326,7 +2415,8 @@
         } else {
             losEl.innerHTML = `<span style="color:#22c55e;">🟢 Clear LOS</span>`;
             if (interSatLine) {
-                interSatLine.material.color.setHex(0x38bdf8);
+                const lineColor = (distKm <= colThreshKm) ? 0xef4444 : (distKm <= colThreshKm * 3.0 ? 0xf59e0b : 0x38bdf8);
+                interSatLine.material.color.setHex(lineColor);
                 interSatLine.material.opacity = 0.85;
             }
         }
@@ -2338,6 +2428,109 @@
             interSatLine.visible = true;
         } else if (interSatLine) {
             interSatLine.visible = false;
+        }
+    }
+
+    // ── Orbital Collision Engine & Real-Time Conjunction Resolution ──────────
+    async function checkOrbitalCollisions(currentSimTime) {
+        const enabledBox = document.getElementById('collision-enabled');
+        if (!enabledBox || !enabledBox.checked) return;
+        if (activeSatellites.length < 2) return;
+
+        const radInput = document.getElementById('col-radius');
+        const colRadiusKm = radInput ? parseFloat(radInput.value) : 1.0;
+        const restInput = document.getElementById('col-rest');
+        const restitution = restInput ? parseFloat(restInput.value) : 0.2;
+
+        for (let i = 0; i < activeSatellites.length; i++) {
+            for (let j = i + 1; j < activeSatellites.length; j++) {
+                const satA = activeSatellites[i];
+                const satB = activeSatellites[j];
+                if (!satA || !satB || satA.reentry || satB.reentry) continue;
+                if (satA.parentBody !== satB.parentBody) continue;
+
+                const pairKey = `${satA.name}:${satB.name}`;
+                const lastCol = collisionCooldowns.get(pairKey) || -999999;
+                if (Math.abs(currentSimTime - lastCol) < 300.0) continue;
+
+                const bA = satA.buf, bB = satB.buf;
+                if (!bA.t.length || !bB.t.length) continue;
+
+                const interpA = interpAt(bA, currentSimTime);
+                const interpB = interpAt(bB, currentSimTime);
+                const iA = typeof interpA === 'number' ? interpA : interpA.lo;
+                const iB = typeof interpB === 'number' ? interpB : interpB.lo;
+
+                const posA = satA.mesh.position;
+                const posB = satB.mesh.position;
+                const distKm = posA.distanceTo(posB);
+
+                const velA = new THREE.Vector3((bA.vx[iA]||0)/1000, (bA.vy[iA]||0)/1000, (bA.vz[iA]||0)/1000);
+                const velB = new THREE.Vector3((bB.vx[iB]||0)/1000, (bB.vy[iB]||0)/1000, (bB.vz[iB]||0)/1000);
+                const relV = velA.clone().sub(velB);
+                const dVec = posA.clone().sub(posB);
+                const rangeRate = distKm > 1e-4 ? dVec.dot(relV) / distKm : 0.0;
+
+                if (distKm <= colRadiusKm && rangeRate <= 0.0) {
+                    collisionCooldowns.set(pairKey, currentSimTime);
+
+                    const impactWorldPos = posA.clone().add(posB).multiplyScalar(0.5);
+                    spawnCollisionShockwave(impactWorldPos);
+
+                    snapshotGhostTrail(satA);
+                    snapshotGhostTrail(satB);
+
+                    const relSpeedKmS = relV.length();
+                    showCollisionBanner(`💥 ORBITAL COLLISION: <strong>${satA.name}</strong> × <strong>${satB.name}</strong><br><span style="font-size:11px; font-weight:normal;">Separation: ${distKm.toFixed(2)} km | Rel. Velocity: ${relSpeedKmS.toFixed(2)} km/s | Deflecting trajectories...</span>`);
+
+                    try {
+                        const payload = {
+                            sat1_params: satA.params,
+                            sat1_state: [bA.x[iA], bA.y[iA], bA.z[iA], bA.vx[iA], bA.vy[iA], bA.vz[iA]],
+                            sat2_params: satB.params,
+                            sat2_state: [bB.x[iB], bB.y[iB], bB.z[iB], bB.vx[iB], bB.vy[iB], bB.vz[iB]],
+                            t_collision: currentSimTime,
+                            restitution: restitution,
+                            post_collision_duration: 86400.0,
+                            dt_eval: 60.0
+                        };
+                        const res = await fetch('/collision/resolve', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        if (!res.ok) throw new Error(await res.text());
+                        const data = await res.json();
+
+                        [ { sat: satA, d: data.sat1 }, { sat: satB, d: data.sat2 } ].forEach(({ sat, d }) => {
+                            const b = sat.buf;
+                            let cutIdx = 0;
+                            while (cutIdx < b.t.length && b.t[cutIdx] < currentSimTime) cutIdx++;
+                            ['t','x','y','z','vx','vy','vz','alt_km','lat_deg','lon_deg'].forEach(k => {
+                                if (b[k]) b[k] = b[k].slice(0, cutIdx);
+                            });
+                            for (const fk of ['central','j2','drag','moon','total']) {
+                                if (b.forces[fk]) b.forces[fk] = b.forces[fk].slice(0, cutIdx);
+                            }
+                            appendChunk(sat, d.trajectory);
+                            sat.lastState = d.last_state;
+                            sat.lastT = d.last_t;
+                            if (d.events) sat.events = d.events;
+                            if (d.reentry) {
+                                sat.reentry = true;
+                                sat.deorbitEpoch = d.reentry_time || sat.lastT;
+                                sat.lifetimeSeconds = sat.deorbitEpoch;
+                                sat.deorbitTime = formatTime(sat.lifetimeSeconds);
+                            }
+                        });
+
+                        showCollisionBanner(`💥 ORBITAL COLLISION RESOLVED<br><span style="font-size:11px; font-weight:normal;">Δv<sub>${satA.name}</sub>: ${(data.sat1.dv_mag_m_s).toFixed(1)} m/s | Δv<sub>${satB.name}</sub>: ${(data.sat2.dv_mag_m_s).toFixed(1)} m/s | Orbits Perturbed!</span>`, 5000);
+                        renderSidebar();
+                    } catch (err) {
+                        console.error("Collision resolution error:", err);
+                    }
+                }
+            }
         }
     }
 
@@ -2581,6 +2774,24 @@
 
         // 4. Update Inter-Satellite Distance & Link
         updateInterSatCalculation();
+
+        // 4b. Check Real-Time Orbital Conjunctions & Collisions
+        checkOrbitalCollisions(simTime);
+
+        // 4c. Animate Active Collision Shockwaves
+        for (let s = activeShockwaves.length - 1; s >= 0; s--) {
+            const sw = activeShockwaves[s];
+            sw.scale += wallDt * 35.0;
+            sw.opacity -= wallDt * 0.9;
+            sw.mesh.scale.set(sw.scale, sw.scale, sw.scale);
+            sw.mesh.material.opacity = Math.max(0, sw.opacity);
+            if (sw.opacity <= 0) {
+                scene.remove(sw.mesh);
+                sw.mesh.geometry.dispose();
+                sw.mesh.material.dispose();
+                activeShockwaves.splice(s, 1);
+            }
+        }
 
         // 5. Update Maneuver preview anchor if lunar
         if (activeManeuver.satIndex >= 0 && activeSatellites[activeManeuver.satIndex]) {
