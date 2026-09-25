@@ -14,7 +14,10 @@ import numpy as np
 import torch
 
 from leo_simulator.constants import MU_EARTH, OMEGA_EARTH, R_EARTH
-from leo_simulator.models.drag import ExponentialAtmosphere
+from leo_simulator.models.drag import (
+    ExponentialAtmosphere,
+    aerodynamic_drag_acceleration,
+)
 from leo_simulator.models.dynamics import OrbitalDynamics
 from leo_simulator.orbit.elements import OrbitalElements, coe_to_rv, rv_to_coe
 from leo_simulator.orbit.satellite import Satellite
@@ -170,27 +173,64 @@ class PINNPropagator:
         reentry_detected = False
         reentry_time = None
 
-        curr_state_tensor = (
-            torch.tensor(state0, dtype=torch.float32) / sc
-        ).unsqueeze(0)
+        curr_r = state0[0:3].copy()
+        curr_v = state0[3:6].copy()
+        atm = ExponentialAtmosphere()
 
         with torch.no_grad():
             curr_t = float(t_start)
             for _ in range(n_steps):
-                curr_state_tensor = self.model(curr_state_tensor)
-                unscaled = (curr_state_tensor.squeeze(0) * sc).numpy().astype(np.float64)
-                
+                r_mag = float(np.linalg.norm(curr_r))
+                v_mag = float(np.linalg.norm(curr_v))
+                alt_curr = r_mag - self.r_earth
+
+                E_k = (v_mag**2) / 2.0 - self.mu / r_mag
+                if alt_curr < 1_000_000.0:
+                    a_drag = aerodynamic_drag_acceleration(
+                        curr_r,
+                        curr_v,
+                        mass=self.satellite.mass,
+                        area=self.satellite.drag_area,
+                        cd=self.satellite.cd,
+                        atmosphere_model=atm,
+                        r_earth=self.r_earth,
+                        omega_earth=self.omega_earth,
+                    )
+                    dE = float(np.dot(curr_v, a_drag)) * step_dt
+                else:
+                    dE = 0.0
+                E_target = E_k + dE
+
+                state_norm = (
+                    torch.tensor(np.concatenate([curr_r, curr_v]), dtype=torch.float32) / sc
+                ).unsqueeze(0)
+                next_norm = self.model(state_norm).squeeze(0)
+                unscaled = (next_norm * sc).numpy().astype(np.float64)
+
+                r_nn = unscaled[0:3]
+                v_nn = unscaled[3:6]
+
+                r_kin = curr_r + 0.5 * (curr_v + v_nn) * step_dt
+                r_next = 0.5 * r_nn + 0.5 * r_kin
+                r_next_mag = float(np.linalg.norm(r_next))
+
+                v_sq_target = 2.0 * (E_target + self.mu / r_next_mag)
+                if v_sq_target > 0.0:
+                    v_nn_norm = float(np.linalg.norm(v_nn))
+                    v_next = v_nn * (np.sqrt(v_sq_target) / v_nn_norm) if v_nn_norm > 0 else v_nn
+                else:
+                    v_next = v_nn
+
                 curr_t += step_dt
-                r_k = unscaled[0:3]
-                v_k = unscaled[3:6]
-                r_norm = float(np.linalg.norm(r_k))
-                alt_k = r_norm - self.r_earth
+                curr_r = r_next
+                curr_v = v_next
+                alt_k = r_next_mag - self.r_earth
 
                 t_list.append(curr_t)
-                r_list.append(r_k)
-                v_list.append(v_k)
+                r_list.append(curr_r.copy())
+                v_list.append(curr_v.copy())
                 alt_list.append(alt_k)
-                speed_list.append(float(np.linalg.norm(v_k)))
+                speed_list.append(float(np.linalg.norm(curr_v)))
 
                 if alt_k <= self.min_altitude_reentry:
                     reentry_detected = True

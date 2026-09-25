@@ -131,3 +131,25 @@ def test_stream_continuation_pinn(client):
     stream_data = stream_res.json()
     assert stream_data["engine"] == "pinn"
     assert len(stream_data["trajectory"]["t"]) > 0
+
+
+def test_pinn_long_term_stability():
+    """Verify that PINN sustained rollout over 24 hours does not prematurely deorbit."""
+    prop = PINNPropagator()
+    oe = OrbitalElements(
+        a=R_EARTH + 400_000.0,
+        e=0.001,
+        i=np.radians(51.6),
+        raan=np.radians(45.0),
+        arg_pe=0.0,
+        nu=0.0,
+    )
+    # Propagate for a full 24 hours (1440 steps at 60s)
+    res = prop.propagate(oe, duration_seconds=86_400.0, dt_eval=60.0)
+    assert res.reentry_detected is False
+    assert len(res.t) == 1441
+    # Check altitude remains stably in LEO across all 1440 steps
+    alts = (np.linalg.norm(res.r, axis=1) - R_EARTH) / 1000.0
+    assert np.all(alts > 200.0)  # No premature deorbit
+    assert np.all(alts < 600.0)  # No divergent ejection
+
