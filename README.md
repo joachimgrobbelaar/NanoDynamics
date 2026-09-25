@@ -26,6 +26,7 @@ An interactive, high-fidelity numerical orbit propagator, mission analysis suite
   - 🟢 **Central Gravity** ($-\frac{\mu}{r^3}\mathbf{r}$)
   - 🟡 **$J_2$ Earth Oblateness**
   - 🔴 **Atmospheric Drag** ($-\frac{1}{2}\rho \frac{C_D A}{m} v_{\text{rel}} \mathbf{v}_{\text{rel}}$)
+- **💥 Orbital Collision Simulation & Trajectory Deflection:** Real-time inter-satellite conjunction detection using 3D relative separation and closing velocity ($\dot{d} \le 0$). Calculates 3D momentum exchange with configurable restitution ($e \in [0, 1]$), conserves linear momentum ($m_1 \mathbf{v}_1 + m_2 \mathbf{v}_2 = m_1 \mathbf{v}_1' + m_2 \mathbf{v}_2'$), triggers 3D shockwave FX and HUD banners, re-propagates post-impact orbits across RK45/PINN engines, and preserves pre-collision ghost trails for visual deflection analysis.
 - **Orbital Decay & Deorbit Lifetime Tracking:** Continuous altitude monitoring captures the exact deorbit epoch when atmospheric drag forces re-entry ($h \le 0\text{ km}$), recording satellite lifetime in live telemetry and downloadable CSV exports.
 - **Scenario Persistence:** Save and load multi-satellite configurations as JSON scenarios.
 
@@ -42,7 +43,9 @@ leo_simulator/
 │   ├── drag.py                  # Exponential & piecewise US Standard 1976 density models, co-rotating drag
 │   └── dynamics.py              # Equations of motion: d/dt [r, v] = [v, a_total] & force decomposition
 ├── orbit/
+│   ├── collision.py             # Conjunction detection & 3D momentum exchange kinematics
 │   ├── elements.py              # Keplerian orbital elements conversions [a, e, i, Omega, omega, nu]
+│   ├── pinn_propagator.py       # Offline PyTorch PINN surrogate model with Hamiltonian projection
 │   └── satellite.py             # Spacecraft specifications (mass, cross-section area, Cd, ballistic coeff)
 ├── propagator.py                # High-order numerical propagator (DOP853 Runge-Kutta via SciPy)
 ├── main.py                      # Headless verification run & trajectory generator
@@ -52,9 +55,11 @@ leo_simulator/
 ├── tests/
 │   ├── test_app.py              # E2E API tests (validation, async offload, streaming, burns)
 │   ├── test_challenger1_stress.py # Stress tests (concurrency, energy conservation, boundary knife-edges)
+│   ├── test_collision.py        # Momentum conservation, deflection, and collision API tests
 │   ├── test_elements.py         # Keplerian elements round-trip conversion tests
 │   ├── test_experiment.py       # Parametric sweep and atmospheric density unit tests
 │   ├── test_models.py           # Gravity, J2, and atmospheric drag physical model tests
+│   ├── test_pinn_switching.py   # Acceptance tests for dual-engine RK45/PINN switching & 24h stability
 │   ├── test_propagator.py       # Numerical convergence & event termination tests
 │   ├── test_simulation.py       # Physics assertions (drag decay & nodal precession rates)
 │   ├── test_ui_adversarial.py   # Adversarial UI stress tests (speed sweeps, tab switching)
