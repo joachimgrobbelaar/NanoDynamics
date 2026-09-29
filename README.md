@@ -133,7 +133,22 @@ Stabilizes recurrent neural rollouts over 24-hour (1,440-step) mission arcs, eli
 
 ## 🛠️ Quickstart Guide
 
-### 1. Run the 3D Interactive Web Simulator & Experiment Lab
+### 1. Clone & Initialize Environment (Python >= 3.10)
+```bash
+git clone https://github.com/joachimgrobbelaar/NanoDynamics.git
+cd NanoDynamics
+
+python3 -m venv venv
+source venv/bin/activate       # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+### 2. Run the Verification Test Suite
+```bash
+pytest -v
+```
+
+### 3. Run the 3D Interactive Web Simulator & Experiment Lab
 ```bash
 cd visualization_3d
 uvicorn app:app --reload --host 0.0.0.0 --port 8000
