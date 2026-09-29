@@ -8,7 +8,10 @@ import numpy as np
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+try:
+    from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+except Exception:
+    pass
 
 from leo_simulator.constants import R_EARTH
 from leo_simulator.propagator import PropagationResult

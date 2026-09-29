@@ -20,6 +20,7 @@ import sys
 import time
 
 import pytest
+pytest.importorskip("playwright", reason="playwright not installed; skipping browser UI tests")
 from playwright.sync_api import sync_playwright
 
 # Ensure temporary files use tmpfs (/dev/shm) to prevent out-of-disk crashes on small root /tmp

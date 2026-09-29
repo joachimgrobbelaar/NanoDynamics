@@ -20,6 +20,7 @@ import sys
 import time
 
 import pytest
+pytest.importorskip("playwright", reason="playwright not installed; skipping browser UI tests")
 from playwright.sync_api import sync_playwright
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
