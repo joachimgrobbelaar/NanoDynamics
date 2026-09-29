@@ -4,7 +4,12 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 ai/data/
-ai/checkpoints/
+ai/checkpoints/*
+!ai/checkpoints/agent/
+!ai/checkpoints/agent/transition.pt
+!ai/checkpoints/agent/transition_traced.pt
+!ai/checkpoints/agent/training_history.jsonl
+!ai/checkpoints/transition.pt
 
 functions/venv/
 firestore-debug.log

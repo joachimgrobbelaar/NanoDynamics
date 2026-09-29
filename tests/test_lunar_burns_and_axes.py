@@ -74,14 +74,20 @@ def test_lunar_burn_preview_and_execute(client):
     assert min(exec_data["trajectory"]["alt_km"]) > 20.0
 
 
-def test_ai_status_and_train_endpoints(client):
+def test_ai_status_and_train_endpoints(client, monkeypatch):
     """Verify /ai/status and /ai/train endpoints integration."""
     status_res = client.get("/ai/status")
     assert status_res.status_code == 200
     status_data = status_res.json()
     assert "status" in status_data
 
-    # Trigger a 10-epoch smoke training run
+    # Mock heavy neural network training to avoid multi-gigabyte memory swap and preserve verified weights
+    monkeypatch.setattr(
+        "ai.agent.run_once",
+        lambda **kwargs: {"status": "trained", "epochs": kwargs.get("epochs", 10), "final_drift_pct": 2.1}
+    )
+
+    # Trigger smoke training run
     train_res = client.post("/ai/train", json={"epochs": 10, "hidden": 32, "layers": 2, "force": True})
     assert train_res.status_code == 200
     train_data = train_res.json()
