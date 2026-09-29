@@ -4,14 +4,21 @@ import os
 
 # Ensure headless execution
 import matplotlib
-import numpy as np
-
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
+import sys
+
 try:
+    import mpl_toolkits
+    for _p in sys.path:
+        _cand = os.path.join(_p, "mpl_toolkits")
+        if os.path.isdir(_cand) and _cand not in getattr(mpl_toolkits, "__path__", []):
+            mpl_toolkits.__path__.insert(0, _cand)
     from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 except Exception:
     pass
+
+import matplotlib.pyplot as plt
+import numpy as np
 
 from leo_simulator.constants import R_EARTH
 from leo_simulator.propagator import PropagationResult
