@@ -26,36 +26,85 @@ CACHE_TTL_SECONDS = 3600 * 24  # 24 hours cache
 
 GROUPS = {
     "stations": {
-        "name": "Space Stations",
-        "description": "International Space Station (ISS), Tiangong (CSS), and crew vehicles",
+        "name": "Space Stations & Resupply",
+        "description": "International Space Station (ISS), Tiangong (CSS), Crew Dragon, Cygnus, Progress, Soyuz",
         "default_mass": 420000.0,
         "default_area": 1200.0,
         "default_color": "#00ffcc",
         "icon": "space_station",
+        "celestrak_group": "stations",
+    },
+    "visual": {
+        "name": "100 Brightest Visual Satellites",
+        "description": "Hubble Space Telescope (HST), Envisat, Genesis, Seasat, active visual targets",
+        "default_mass": 11000.0,
+        "default_area": 25.0,
+        "default_color": "#eab308",
+        "icon": "satellite",
+        "celestrak_group": "visual",
+    },
+    "resource": {
+        "name": "Earth Observation & Weather",
+        "description": "Landsat 8/9, Sentinel 1/2/3/5P, Terra, Aqua, Suomi NPP, meteorological satellites",
+        "default_mass": 2200.0,
+        "default_area": 12.0,
+        "default_color": "#22c55e",
+        "icon": "satellite",
+        "celestrak_group": "resource",
+    },
+    "science": {
+        "name": "Space & Earth Science",
+        "description": "Astrophysics, Fermi, Swift, SWARM, GRACE, and scientific orbiters",
+        "default_mass": 1500.0,
+        "default_area": 6.0,
+        "default_color": "#38bdf8",
+        "icon": "satellite",
+        "celestrak_group": "science",
+    },
+    "oneweb": {
+        "name": "OneWeb Constellation",
+        "description": "Global low-latency broadband internet satellite fleet",
+        "default_mass": 147.0,
+        "default_area": 3.2,
+        "default_color": "#ec4899",
+        "icon": "satellite",
+        "celestrak_group": "oneweb",
+    },
+    "iridium": {
+        "name": "Iridium NEXT Constellation",
+        "description": "Global cross-linked low Earth orbit communications network",
+        "default_mass": 860.0,
+        "default_area": 9.5,
+        "default_color": "#a855f7",
+        "icon": "satellite",
+        "celestrak_group": "iridium-NEXT",
+    },
+    "planet": {
+        "name": "Planet Labs Constellation",
+        "description": "Commercial high-resolution Earth imaging PlanetScope Doves and SkySats",
+        "default_mass": 5.5,
+        "default_area": 0.05,
+        "default_color": "#f97316",
+        "icon": "satellite",
+        "celestrak_group": "planet",
+    },
+    "spire": {
+        "name": "Spire Lemur Constellation",
+        "description": "Global maritime, aviation, and GNSS radio occultation weather nanosatellites",
+        "default_mass": 4.5,
+        "default_area": 0.04,
+        "default_color": "#06b6d4",
+        "icon": "satellite",
+        "celestrak_group": "spire",
     },
     "cubesat": {
         "name": "CubeSats & NanoSats",
-        "description": "Educational, scientific, and commercial 1U-12U nanosatellites",
+        "description": "Educational, scientific, and experimental 1U-12U university nanosatellites",
         "default_mass": 4.0,
         "default_area": 0.03,
-        "default_color": "#38bdf8",
+        "default_color": "#60a5fa",
         "icon": "satellite",
-    },
-    "starlink": {
-        "name": "Starlink Constellation",
-        "description": "SpaceX broadband mega-constellation in Low Earth Orbit",
-        "default_mass": 260.0,
-        "default_area": 12.0,
-        "default_color": "#a855f7",
-        "icon": "satellite",
-    },
-    "weather": {
-        "name": "Earth Observation & Weather",
-        "description": "NOAA, MetOp, Sentinel, and meteorological monitoring satellites",
-        "default_mass": 1200.0,
-        "default_area": 8.0,
-        "default_color": "#22c55e",
-        "icon": "satellite",
+        "celestrak_group": "cubesat",
     },
 }
 
@@ -114,7 +163,9 @@ def parse_omm_record(record: Dict[str, Any], group: str = "cubesat") -> Optional
         mean_anomaly_rad = np.radians(mean_anomaly_deg)
         eccentric_anomaly_rad = solve_kepler(mean_anomaly_rad, eccentricity)
         true_anomaly_rad = eccentric_to_true_anomaly(eccentric_anomaly_rad, eccentricity)
-        true_anomaly_deg = float(np.degrees(true_anomaly_rad))
+        raan_deg = float(round(raan_deg % 360.0, 4))
+        arg_pe_deg = float(round(arg_pe_deg % 360.0, 4))
+        true_anomaly_deg = float(round(float(np.degrees(true_anomaly_rad)) % 360.0, 4))
 
         group_meta = GROUPS.get(group, GROUPS["cubesat"])
 
@@ -131,19 +182,27 @@ def parse_omm_record(record: Dict[str, Any], group: str = "cubesat") -> Optional
             mass = 100000.0
             area = 400.0
             color = "#f59e0b"
+        elif "HST" in object_name or "HUBBLE" in object_name or norad_id == 20580:
+            mass = 11110.0
+            area = 30.0
+            color = "#38bdf8"
+        elif "ENVISAT" in object_name or norad_id == 27386:
+            mass = 8211.0
+            area = 80.0
+            color = "#ef4444"
 
         return {
             "norad_id": norad_id,
-            "name": object_name,
+            "name": object_name[:90],
             "group": group,
             "epoch": epoch,
             "semi_major_axis_km": float(semi_major_axis_m / 1000.0),
             "altitude_km": float(round(altitude_km, 2)),
             "eccentricity": float(round(eccentricity, 6)),
             "inclination_deg": float(round(inclination_deg, 4)),
-            "raan_deg": float(round(raan_deg, 4)),
-            "arg_periapsis_deg": float(round(arg_pe_deg, 4)),
-            "true_anomaly_deg": float(round(true_anomaly_deg, 4)),
+            "raan_deg": raan_deg,
+            "arg_periapsis_deg": arg_pe_deg,
+            "true_anomaly_deg": true_anomaly_deg,
             "period_minutes": float(round((2.0 * np.pi / n_rad_s) / 60.0, 2)),
             "mass": float(mass),
             "drag_area": float(area),
@@ -156,9 +215,10 @@ def parse_omm_record(record: Dict[str, Any], group: str = "cubesat") -> Optional
         return None
 
 
-def fetch_celestrak_group(group: str = "stations", timeout: float = 2.0) -> List[Dict[str, Any]]:
+def fetch_celestrak_group(group: str = "stations", timeout: float = 3.5) -> List[Dict[str, Any]]:
     """Fetch live OMM data from CelesTrak API."""
-    url = f"https://celestrak.org/NORAD/elements/gp.php?GROUP={group}&FORMAT=json"
+    celestrak_param = GROUPS.get(group, {}).get("celestrak_group", group)
+    url = f"https://celestrak.org/NORAD/elements/gp.php?GROUP={celestrak_param}&FORMAT=json"
     req = urllib.request.Request(
         url,
         headers={"User-Agent": "NanoDynamics-LEO-Tracker/1.0 (Academic Research; Linux)"},
@@ -243,7 +303,7 @@ def get_live_catalog(
 
 def get_satellite_by_norad(norad_id: int) -> Optional[Dict[str, Any]]:
     """Look up a satellite by its NORAD ID from all groups."""
-    catalog = get_live_catalog(limit=1000)
+    catalog = get_live_catalog(limit=10000)
     for sat in catalog:
         if sat["norad_id"] == norad_id:
             return sat

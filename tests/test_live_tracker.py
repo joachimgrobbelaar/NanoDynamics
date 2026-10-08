@@ -82,6 +82,8 @@ def test_api_live_endpoints():
     assert len(track_data["trajectory"]["t"]) > 10
 
     # 4. Track endpoint (PINN Surrogate)
-    res_pinn = client.post("/satellites/live/track", json={"norad_id": 43547, "propagation_mode": "pinn"})
+    cubesats = client.get("/satellites/live/catalog?group=cubesat").json()["satellites"]
+    cubesat_norad = cubesats[0]["norad_id"] if cubesats else 25544
+    res_pinn = client.post("/satellites/live/track", json={"norad_id": cubesat_norad, "propagation_mode": "pinn"})
     assert res_pinn.status_code == 200
     assert res_pinn.json()["engine"] == "pinn"

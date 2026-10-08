@@ -766,11 +766,16 @@
 
             <div style="display:flex; gap:10px; margin-bottom:12px; align-items:center;">
                 <select id="live-group-select" onchange="loadLiveCatalog()" style="background:#1e293b; color:white; border:1px solid #475569; padding:6px 10px; border-radius:4px; font-size:12px;">
-                    <option value="">All Constellations / Groups</option>
-                    <option value="stations" selected>Space Stations (ISS / Tiangong)</option>
-                    <option value="cubesat">CubeSats & NanoSats</option>
-                    <option value="starlink">Starlink Constellation</option>
-                    <option value="weather">Earth Observation & Weather</option>
+                    <option value="" selected>🌟 All Active Spacecraft & Constellations (1,380+)</option>
+                    <option value="stations">🛸 Space Stations & Resupply (ISS, Tiangong, Crew/Cargo)</option>
+                    <option value="visual">✨ 100 Brightest Visual (Hubble HST, Envisat, Seasat)</option>
+                    <option value="resource">🌍 Earth Observation & Weather (Landsat, Sentinel, Terra, Aqua)</option>
+                    <option value="science">🔬 Space & Earth Science (Astrophysics, Geodetic)</option>
+                    <option value="oneweb">🌐 OneWeb Broadband Constellation</option>
+                    <option value="iridium">📡 Iridium NEXT Constellation</option>
+                    <option value="planet">📸 Planet Labs Dove & SkySat Swarm</option>
+                    <option value="spire">🛰️ Spire Lemur Constellation</option>
+                    <option value="cubesat">📦 CubeSats & Educational NanoSats</option>
                 </select>
                 <input type="text" id="live-search-input" placeholder="Search by name or NORAD ID..." oninput="filterLiveCatalog()" style="flex:1; background:#1e293b; color:white; border:1px solid #475569; padding:6px 10px; border-radius:4px; font-size:12px;">
                 <button onclick="refreshLiveCatalogOnline()" style="background:#0284c7; color:white; border:none; padding:6px 12px; border-radius:4px; font-size:12px; font-weight:600; cursor:pointer;">🔄 Refresh Live Feed</button>
@@ -1615,6 +1620,7 @@
 
         const glyphMap = {
             satellite: '🛰️',
+            space_station: '🛸',
             rocket: '🚀',
             astronaut: '👨‍🚀',
             alien: '👽',
@@ -3742,12 +3748,24 @@
             return;
         }
 
+        const grpLabelMap = {
+            stations: 'Space Station',
+            visual: 'Visual Target',
+            resource: 'Earth Obs / Weather',
+            science: 'Space Science',
+            oneweb: 'OneWeb Broadband',
+            iridium: 'Iridium NEXT',
+            planet: 'Planet Dove/SkySat',
+            spire: 'Spire Lemur',
+            cubesat: 'CubeSat'
+        };
+
         tbody.innerHTML = sats.map(s => {
             const norad = s.norad_id;
             const alt = (s.altitude_km !== undefined) ? s.altitude_km.toFixed(1) + ' km' : '—';
             const inc = (s.inclination_deg !== undefined) ? s.inclination_deg.toFixed(2) + '°' : '—';
             const period = (s.period_minutes !== undefined) ? s.period_minutes.toFixed(1) + ' min' : '—';
-            const grpLabel = s.group === 'stations' ? 'Space Station' : (s.group === 'cubesat' ? 'CubeSat' : (s.group === 'starlink' ? 'Starlink' : 'Weather / EO'));
+            const grpLabel = grpLabelMap[s.group] || s.group || 'LEO Satellite';
             const color = s.color || '#38bdf8';
 
             return `
@@ -3761,18 +3779,23 @@
                     <td style="padding:8px 10px; color:#c084fc; font-family:monospace;">${inc}</td>
                     <td style="padding:8px 10px; color:#facc15; font-family:monospace;">${period}</td>
                     <td style="padding:8px 10px; color:#94a3b8; font-size:11px;">${grpLabel}</td>
-                    <td style="padding:8px 10px; text-align:right;">
-                        <button onclick="trackLiveSatellite(${norad}, 'rk45')" style="background:#2563eb; color:white; border:none; padding:4px 8px; border-radius:3px; font-size:11px; cursor:pointer; font-weight:500; margin-right:4px;">🛰️ Track (RK45)</button>
-                        <button onclick="trackLiveSatellite(${norad}, 'pinn')" style="background:#7c3aed; color:white; border:none; padding:4px 8px; border-radius:3px; font-size:11px; cursor:pointer; font-weight:500;">🤖 PINN</button>
+                    <td style="padding:8px 10px; text-align:right; white-space:nowrap;">
+                        <button onclick="trackLiveSatellite(${norad}, 'rk45', this)" style="background:#2563eb; color:white; border:none; padding:4px 8px; border-radius:3px; font-size:11px; cursor:pointer; font-weight:500; margin-right:4px;">🛰️ Track (RK45)</button>
+                        <button onclick="trackLiveSatellite(${norad}, 'pinn', this)" style="background:#7c3aed; color:white; border:none; padding:4px 8px; border-radius:3px; font-size:11px; cursor:pointer; font-weight:500;">🤖 PINN</button>
                     </td>
                 </tr>
             `;
         }).join('');
     }
 
-    window.trackLiveSatellite = async function(noradId, mode = 'rk45') {
+    window.trackLiveSatellite = async function(noradId, mode = 'rk45', btnElem = null) {
         const sat = liveSatelliteCatalog.find(s => s.norad_id === noradId);
         const name = sat ? sat.name : `NORAD ${noradId}`;
+        const origBtnText = btnElem ? btnElem.innerText : null;
+        if (btnElem) {
+            btnElem.disabled = true;
+            btnElem.innerText = '📡 Syncing...';
+        }
         try {
             const res = await fetch('/satellites/live/track', {
                 method: 'POST',
@@ -3781,16 +3804,27 @@
             });
             if (!res.ok) {
                 const err = await res.json();
-                alert(`Error tracking satellite: ${err.detail || 'Simulation error'}`);
+                const errMsg = typeof err.detail === 'string' ? err.detail : (Array.isArray(err.detail) ? err.detail.map(d => d.msg || JSON.stringify(d)).join(', ') : 'Simulation error');
+                alert(`Error tracking satellite: ${errMsg}`);
+                if (btnElem) { btnElem.disabled = false; btnElem.innerText = origBtnText; }
                 return;
             }
             const data = await res.json();
+
+            // If user triggered tracking while on the splash screen, enter active mission view
+            if (inSplashMode) {
+                enterMissionMode();
+            }
+
             addSatelliteToScene(data);
+            selectedSatIndex = activeSatellites.length - 1;
             updateSatList();
+            renderSidebar();
             focusView('Earth');
             closeLiveTrackingModal();
         } catch (e) {
             alert(`Network error tracking satellite: ${e.message}`);
+            if (btnElem) { btnElem.disabled = false; btnElem.innerText = origBtnText; }
         }
     };
 

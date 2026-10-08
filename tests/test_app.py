@@ -149,9 +149,9 @@ class TestSimulateEndpointValid:
 class TestSimulateEndpointInvalid:
     """Tests asserting HTTP 400 or 422 with descriptive details on invalid inputs (R1)."""
 
-    @pytest.mark.parametrize("bad_mass", [-100.0, -5.0, -0.001, 0.0, 100000.1, 1000000.0])
+    @pytest.mark.parametrize("bad_mass", [-100.0, -5.0, -0.001, 0.0, 1000000.1, 5000000.0])
     def test_simulate_invalid_mass(self, bad_mass):
-        """Assert mass <= 0 or > 100000 kg returns HTTP 422 with descriptive detail."""
+        """Assert mass <= 0 or > 1000000 kg returns HTTP 422 with descriptive detail."""
         payload = {
             "name": "BadMassSat",
             "mass": bad_mass,

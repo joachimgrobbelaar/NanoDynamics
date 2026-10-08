@@ -104,7 +104,7 @@ BODIES = {
 
 
 class SatelliteParams(BaseModel):
-    name: str = Field(..., min_length=1, max_length=100, description="Satellite name")
+    name: str = Field(..., min_length=1, max_length=150, description="Satellite name")
     parent_body: str = Field("Earth", description="Central body: Earth or Moon")
     mass: float = Field(..., gt=0.0, le=1000000.0, description="Mass in kg")
     drag_area: float = Field(..., ge=0.0, le=50000.0, description="Cross-section area in m^2")
@@ -344,7 +344,7 @@ async def track_live_satellite(req: LiveTrackRequest):
     if not sat_data:
         raise HTTPException(status_code=404, detail=f"Satellite with NORAD ID {req.norad_id} not found in active catalog.")
 
-    sat_name = req.custom_name or f"{sat_data['name']} (NORAD {sat_data['norad_id']})"
+    sat_name = (req.custom_name or f"{sat_data['name']} (NORAD {sat_data['norad_id']})")[:120]
 
     params = SatelliteParams(
         name=sat_name,
@@ -355,9 +355,9 @@ async def track_live_satellite(req: LiveTrackRequest):
         altitude_km=float(sat_data["altitude_km"]),
         eccentricity=float(sat_data["eccentricity"]),
         inclination_deg=float(sat_data["inclination_deg"]),
-        raan_deg=float(sat_data["raan_deg"]),
-        arg_periapsis_deg=float(sat_data["arg_periapsis_deg"]),
-        true_anomaly_deg=float(sat_data["true_anomaly_deg"]),
+        raan_deg=float(sat_data["raan_deg"] % 360.0),
+        arg_periapsis_deg=float(sat_data.get("arg_periapsis_deg", 0.0) % 360.0),
+        true_anomaly_deg=float(sat_data.get("true_anomaly_deg", 0.0) % 360.0),
         atmosphere_type="piecewise",
         density_scale=1.0,
         include_j2=True,
