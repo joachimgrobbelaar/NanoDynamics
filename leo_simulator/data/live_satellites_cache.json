@@ -1,0 +1,196 @@
+{
+  "timestamp": 1728350000,
+  "groups": {
+    "stations": {
+      "timestamp": 1728350000,
+      "satellites": [
+        {
+          "norad_id": 25544,
+          "name": "ISS (ZARYA)",
+          "group": "stations",
+          "epoch": "2026-10-08T00:00:00.000000",
+          "semi_major_axis_km": 6793.14,
+          "altitude_km": 415.0,
+          "eccentricity": 0.00052,
+          "inclination_deg": 51.64,
+          "raan_deg": 134.2,
+          "arg_periapsis_deg": 88.5,
+          "true_anomaly_deg": 271.6,
+          "period_minutes": 92.8,
+          "mass": 450000.0,
+          "drag_area": 1500.0,
+          "cd": 2.2,
+          "color": "#00ffcc",
+          "icon": "space_station"
+        },
+        {
+          "norad_id": 48274,
+          "name": "CSS (TIANHE)",
+          "group": "stations",
+          "epoch": "2026-10-08T00:00:00.000000",
+          "semi_major_axis_km": 6768.14,
+          "altitude_km": 390.0,
+          "eccentricity": 0.00035,
+          "inclination_deg": 41.47,
+          "raan_deg": 210.4,
+          "arg_periapsis_deg": 140.2,
+          "true_anomaly_deg": 219.8,
+          "period_minutes": 92.3,
+          "mass": 100000.0,
+          "drag_area": 400.0,
+          "cd": 2.2,
+          "color": "#f59e0b",
+          "icon": "space_station"
+        }
+      ]
+    },
+    "cubesat": {
+      "timestamp": 1728350000,
+      "satellites": [
+        {
+          "norad_id": 43547,
+          "name": "LEMUR-2 (FOREST-1)",
+          "group": "cubesat",
+          "epoch": "2026-10-08T00:00:00.000000",
+          "semi_major_axis_km": 6878.14,
+          "altitude_km": 500.0,
+          "eccentricity": 0.0012,
+          "inclination_deg": 97.4,
+          "raan_deg": 45.1,
+          "arg_periapsis_deg": 110.0,
+          "true_anomaly_deg": 250.0,
+          "period_minutes": 94.6,
+          "mass": 4.5,
+          "drag_area": 0.03,
+          "cd": 2.2,
+          "color": "#38bdf8",
+          "icon": "satellite"
+        },
+        {
+          "norad_id": 40042,
+          "name": "FLOCK 1B-1 (PLANET DOVE)",
+          "group": "cubesat",
+          "epoch": "2026-10-08T00:00:00.000000",
+          "semi_major_axis_km": 6853.14,
+          "altitude_km": 475.0,
+          "eccentricity": 0.0008,
+          "inclination_deg": 51.6,
+          "raan_deg": 88.0,
+          "arg_periapsis_deg": 45.0,
+          "true_anomaly_deg": 135.0,
+          "period_minutes": 94.1,
+          "mass": 5.0,
+          "drag_area": 0.04,
+          "cd": 2.2,
+          "color": "#38bdf8",
+          "icon": "satellite"
+        },
+        {
+          "norad_id": 44434,
+          "name": "LIGHTSAIL 2",
+          "group": "cubesat",
+          "epoch": "2026-10-08T00:00:00.000000",
+          "semi_major_axis_km": 7098.14,
+          "altitude_km": 720.0,
+          "eccentricity": 0.015,
+          "inclination_deg": 24.0,
+          "raan_deg": 312.0,
+          "arg_periapsis_deg": 220.0,
+          "true_anomaly_deg": 140.0,
+          "period_minutes": 99.2,
+          "mass": 5.0,
+          "drag_area": 32.0,
+          "cd": 2.2,
+          "color": "#eab308",
+          "icon": "satellite"
+        }
+      ]
+    },
+    "starlink": {
+      "timestamp": 1728350000,
+      "satellites": [
+        {
+          "norad_id": 44713,
+          "name": "STARLINK-1007",
+          "group": "starlink",
+          "epoch": "2026-10-08T00:00:00.000000",
+          "semi_major_axis_km": 6928.14,
+          "altitude_km": 550.0,
+          "eccentricity": 0.00015,
+          "inclination_deg": 53.05,
+          "raan_deg": 165.2,
+          "arg_periapsis_deg": 92.4,
+          "true_anomaly_deg": 267.6,
+          "period_minutes": 95.6,
+          "mass": 260.0,
+          "drag_area": 12.0,
+          "cd": 2.2,
+          "color": "#a855f7",
+          "icon": "satellite"
+        },
+        {
+          "norad_id": 44714,
+          "name": "STARLINK-1008",
+          "group": "starlink",
+          "epoch": "2026-10-08T00:00:00.000000",
+          "semi_major_axis_km": 6928.14,
+          "altitude_km": 550.0,
+          "eccentricity": 0.00015,
+          "inclination_deg": 53.05,
+          "raan_deg": 165.2,
+          "arg_periapsis_deg": 112.4,
+          "true_anomaly_deg": 247.6,
+          "period_minutes": 95.6,
+          "mass": 260.0,
+          "drag_area": 12.0,
+          "cd": 2.2,
+          "color": "#a855f7",
+          "icon": "satellite"
+        }
+      ]
+    },
+    "weather": {
+      "timestamp": 1728350000,
+      "satellites": [
+        {
+          "norad_id": 43013,
+          "name": "NOAA 20 (JPSS-1)",
+          "group": "weather",
+          "epoch": "2026-10-08T00:00:00.000000",
+          "semi_major_axis_km": 7202.14,
+          "altitude_km": 824.0,
+          "eccentricity": 0.0002,
+          "inclination_deg": 98.7,
+          "raan_deg": 280.5,
+          "arg_periapsis_deg": 75.0,
+          "true_anomaly_deg": 285.0,
+          "period_minutes": 101.4,
+          "mass": 2296.0,
+          "drag_area": 14.5,
+          "cd": 2.2,
+          "color": "#22c55e",
+          "icon": "satellite"
+        },
+        {
+          "norad_id": 40697,
+          "name": "SENTINEL-2A",
+          "group": "weather",
+          "epoch": "2026-10-08T00:00:00.000000",
+          "semi_major_axis_km": 7164.14,
+          "altitude_km": 786.0,
+          "eccentricity": 0.0001,
+          "inclination_deg": 98.57,
+          "raan_deg": 315.0,
+          "arg_periapsis_deg": 120.0,
+          "true_anomaly_deg": 240.0,
+          "period_minutes": 100.6,
+          "mass": 1140.0,
+          "drag_area": 8.0,
+          "cd": 2.2,
+          "color": "#22c55e",
+          "icon": "satellite"
+        }
+      ]
+    }
+  }
+}

@@ -35,6 +35,11 @@ from leo_simulator.experiment import (
     run_single_simulation,
 )
 from leo_simulator.models.gravity import moon_position
+from leo_simulator.tle_tracker import (
+    GROUPS as LIVE_SATELLITE_GROUPS,
+    get_live_catalog,
+    get_satellite_by_norad,
+)
 
 app = FastAPI()
 
@@ -101,8 +106,8 @@ BODIES = {
 class SatelliteParams(BaseModel):
     name: str = Field(..., min_length=1, max_length=100, description="Satellite name")
     parent_body: str = Field("Earth", description="Central body: Earth or Moon")
-    mass: float = Field(..., gt=0.0, le=100000.0, description="Mass in kg")
-    drag_area: float = Field(..., ge=0.0, le=10000.0, description="Cross-section area in m^2")
+    mass: float = Field(..., gt=0.0, le=1000000.0, description="Mass in kg")
+    drag_area: float = Field(..., ge=0.0, le=50000.0, description="Cross-section area in m^2")
     cd: float = Field(..., ge=0.0, le=20.0, description="Drag coefficient")
     altitude_km: float = Field(..., description="Altitude in km")
     eccentricity: float = Field(..., ge=0.0, lt=1.0, description="Orbital eccentricity")
@@ -190,6 +195,12 @@ class ExperimentRequest(BaseModel):
 class SavePayload(BaseModel):
     filename: str
     satellites: list
+
+
+class LiveTrackRequest(BaseModel):
+    norad_id: int = Field(..., description="NORAD Catalog ID of the satellite")
+    propagation_mode: str = Field("rk45", description="Propagation mode: 'rk45' or 'pinn'")
+    custom_name: str | None = Field(None, description="Optional custom display name")
 
 
 def sanitize_filename(filename: str) -> str:
@@ -306,6 +317,62 @@ def read_root():
 def get_bodies():
     """Return parameters and constraints for each central celestial body."""
     return {"bodies": BODIES}
+
+
+@app.get("/satellites/live/groups")
+def get_live_groups():
+    """Return list of supported live satellite tracking groups."""
+    return {"groups": LIVE_SATELLITE_GROUPS}
+
+
+@app.get("/satellites/live/catalog")
+def get_live_satellite_catalog(
+    group: str | None = None,
+    search: str | None = None,
+    limit: int = 100,
+    refresh: bool = False,
+):
+    """Return catalog of active satellites fetched from live CelesTrak feed / local cache."""
+    sats = get_live_catalog(group=group, search=search, limit=limit, force_refresh=refresh)
+    return {"count": len(sats), "satellites": sats}
+
+
+@app.post("/satellites/live/track")
+async def track_live_satellite(req: LiveTrackRequest):
+    """Instantiate and simulate an active real-time satellite by NORAD ID."""
+    sat_data = get_satellite_by_norad(req.norad_id)
+    if not sat_data:
+        raise HTTPException(status_code=404, detail=f"Satellite with NORAD ID {req.norad_id} not found in active catalog.")
+
+    sat_name = req.custom_name or f"{sat_data['name']} (NORAD {sat_data['norad_id']})"
+
+    params = SatelliteParams(
+        name=sat_name,
+        parent_body="Earth",
+        mass=float(sat_data.get("mass", 500.0)),
+        drag_area=float(sat_data.get("drag_area", 2.0)),
+        cd=float(sat_data.get("cd", 2.2)),
+        altitude_km=float(sat_data["altitude_km"]),
+        eccentricity=float(sat_data["eccentricity"]),
+        inclination_deg=float(sat_data["inclination_deg"]),
+        raan_deg=float(sat_data["raan_deg"]),
+        arg_periapsis_deg=float(sat_data["arg_periapsis_deg"]),
+        true_anomaly_deg=float(sat_data["true_anomaly_deg"]),
+        atmosphere_type="piecewise",
+        density_scale=1.0,
+        include_j2=True,
+        include_drag=True,
+        include_moon=False,
+        color=sat_data.get("color", "#00ffcc"),
+        icon=sat_data.get("icon", "satellite"),
+        propagation_mode=req.propagation_mode,
+    )
+
+    sim_result = await simulate_satellite(params)
+    sim_result["norad_id"] = sat_data["norad_id"]
+    sim_result["epoch"] = sat_data.get("epoch", "")
+    sim_result["group"] = sat_data.get("group", "cubesat")
+    return sim_result
 
 
 @app.post("/simulate")

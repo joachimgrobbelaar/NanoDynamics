@@ -159,6 +159,7 @@
         <button onclick="openModal()">+ New Satellite</button>
         <button class="lab-btn" onclick="openExperimentModal()">🧪 Experiment Lab</button>
         <button class="lab-btn" onclick="openMLModal()" style="background:#7c3aed;">🤖 ML Surrogate</button>
+        <button class="lab-btn" onclick="openLiveTrackingModal()" style="background:#0284c7;">🛰️ Live LEO Tracking</button>
         <button onclick="exportData()" style="background:#059669;">Export CSV</button>
         <div class="nav-sep"></div>
         <button class="view-btn" onclick="focusView('Earth')">🌍 Earth View</button>
@@ -601,6 +602,59 @@
         </div>
     </div>
 
+    <!-- Live LEO Satellite Tracking Modal -->
+    <div id="live-modal-overlay" class="modal-overlay">
+        <div class="modal-content modal-large" style="width:820px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #334155; padding-bottom:8px; margin-bottom:12px;">
+                <h3 style="margin:0; border:none; padding:0; color:#38bdf8; display:flex; align-items:center; gap:8px;">
+                    <span>🛰️ Real-Time LEO Satellite Tracking</span>
+                    <span style="font-size:11px; background:#0369a1; color:white; padding:2px 6px; border-radius:4px;">CelesTrak GP OMM Feed</span>
+                </h3>
+                <button onclick="closeLiveTrackingModal()" style="background:transparent; border:none; color:#94a3b8; font-size:16px; cursor:pointer;">✕</button>
+            </div>
+
+            <div style="display:flex; gap:10px; margin-bottom:12px; align-items:center;">
+                <select id="live-group-select" onchange="loadLiveCatalog()" style="background:#1e293b; color:white; border:1px solid #475569; padding:6px 10px; border-radius:4px; font-size:12px;">
+                    <option value="">All Constellations / Groups</option>
+                    <option value="stations" selected>Space Stations (ISS / Tiangong)</option>
+                    <option value="cubesat">CubeSats & NanoSats</option>
+                    <option value="starlink">Starlink Constellation</option>
+                    <option value="weather">Earth Observation & Weather</option>
+                </select>
+                <input type="text" id="live-search-input" placeholder="Search by name or NORAD ID..." oninput="filterLiveCatalog()" style="flex:1; background:#1e293b; color:white; border:1px solid #475569; padding:6px 10px; border-radius:4px; font-size:12px;">
+                <button onclick="refreshLiveCatalogOnline()" style="background:#0284c7; color:white; border:none; padding:6px 12px; border-radius:4px; font-size:12px; font-weight:600; cursor:pointer;">🔄 Refresh Live Feed</button>
+            </div>
+
+            <div style="max-height:360px; overflow-y:auto; border:1px solid #334155; border-radius:6px; background:#0f172a;">
+                <table style="width:100%; border-collapse:collapse; font-size:12px; text-align:left;">
+                    <thead style="background:#1e293b; color:#94a3b8; position:sticky; top:0; z-index:10;">
+                        <tr>
+                            <th style="padding:8px 10px;">NORAD</th>
+                            <th style="padding:8px 10px;">Name</th>
+                            <th style="padding:8px 10px;">Altitude</th>
+                            <th style="padding:8px 10px;">Inclination</th>
+                            <th style="padding:8px 10px;">Period</th>
+                            <th style="padding:8px 10px;">Category</th>
+                            <th style="padding:8px 10px; text-align:right;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="live-satellite-tbody">
+                        <tr><td colspan="7" style="padding:20px; text-align:center; color:#64748b;">Loading active LEO satellites...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px; padding-top:10px; border-top:1px solid #334155; font-size:11px; color:#94a3b8;">
+                <div>
+                    <span>📡 Live Telemetry converted to Cartesian ECI & propagated with high-order Runge-Kutta / PINN surrogate.</span>
+                </div>
+                <div style="display:flex; gap:8px;">
+                    <button onclick="closeLiveTrackingModal()" style="background:#475569; color:white; padding:6px 14px; border:none; border-radius:4px; cursor:pointer;">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -977,7 +1031,16 @@
             selectedSatIndex = -1;
             document.getElementById('maneuver-panel').style.display = 'none';
             if (v === 'Earth') {
-                if (controls) controls.target.set(0, 0, 0);
+                if (controls) {
+                    controls.target.set(0, 0, 0);
+                    camera.position.set(16000, 10000, 16000);
+                }
+            } else if (v === 'Moon') {
+                if (controls) {
+                    const mPos = moon.position.clone();
+                    controls.target.copy(mPos);
+                    camera.position.set(mPos.x + 3600, mPos.y + 1200, mPos.z + 3600);
+                }
             } else if (v === 'System') {
                 if (controls) {
                     controls.target.set(0, 0, 0);
@@ -2811,7 +2874,12 @@
             const t = Math.min(simTime, buf.t[buf.t.length - 1]);
             updateTelemetry(sat, interpAt(buf, t));
         } else if (cameraFocusMode === 'Moon') {
-            if (controls) controls.target.copy(moon.position);
+            if (controls) {
+                const prevTarget = controls.target.clone();
+                controls.target.copy(moon.position);
+                const delta = moon.position.clone().sub(prevTarget);
+                camera.position.add(delta);
+            }
             updateTelemetry(null, 0);
         } else if (cameraFocusMode === 'System') {
             if (controls) controls.target.set(0, 0, 0);
@@ -3051,6 +3119,114 @@
     renderer.domElement.addEventListener('pointerdown', onPointerDown);
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', onPointerUp);
+
+    // ── LIVE LEO SATELLITE TRACKING ──────────────────────────────────────────
+    let liveSatelliteCatalog = [];
+
+    window.openLiveTrackingModal = function() {
+        document.getElementById('live-modal-overlay').style.display = 'flex';
+        loadLiveCatalog();
+    };
+
+    window.closeLiveTrackingModal = function() {
+        document.getElementById('live-modal-overlay').style.display = 'none';
+    };
+
+    window.loadLiveCatalog = async function(refresh = false) {
+        const group = document.getElementById('live-group-select').value;
+        const search = document.getElementById('live-search-input').value.trim();
+        const tbody = document.getElementById('live-satellite-tbody');
+        tbody.innerHTML = `<tr><td colspan="7" style="padding:20px; text-align:center; color:#64748b;">🔄 Fetching active LEO constellation telemetry...</td></tr>`;
+
+        try {
+            let url = `/satellites/live/catalog?limit=100`;
+            if (group) url += `&group=${encodeURIComponent(group)}`;
+            if (search) url += `&search=${encodeURIComponent(search)}`;
+            if (refresh) url += `&refresh=true`;
+
+            const res = await fetch(url);
+            const data = await res.json();
+            liveSatelliteCatalog = data.satellites || [];
+            renderLiveCatalogTable(liveSatelliteCatalog);
+        } catch (err) {
+            tbody.innerHTML = `<tr><td colspan="7" style="padding:20px; text-align:center; color:#ef4444;">Failed to load live satellites: ${err.message}</td></tr>`;
+        }
+    };
+
+    window.filterLiveCatalog = function() {
+        const q = document.getElementById('live-search-input').value.toLowerCase().trim();
+        if (!q) {
+            renderLiveCatalogTable(liveSatelliteCatalog);
+            return;
+        }
+        const filtered = liveSatelliteCatalog.filter(s => 
+            s.name.toLowerCase().includes(q) || String(s.norad_id).includes(q)
+        );
+        renderLiveCatalogTable(filtered);
+    };
+
+    window.refreshLiveCatalogOnline = function() {
+        loadLiveCatalog(true);
+    };
+
+    function renderLiveCatalogTable(sats) {
+        const tbody = document.getElementById('live-satellite-tbody');
+        if (!sats || sats.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" style="padding:20px; text-align:center; color:#64748b;">No matching active satellites found.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = sats.map(s => {
+            const norad = s.norad_id;
+            const alt = (s.altitude_km !== undefined) ? s.altitude_km.toFixed(1) + ' km' : '—';
+            const inc = (s.inclination_deg !== undefined) ? s.inclination_deg.toFixed(2) + '°' : '—';
+            const period = (s.period_minutes !== undefined) ? s.period_minutes.toFixed(1) + ' min' : '—';
+            const grpLabel = s.group === 'stations' ? 'Space Station' : (s.group === 'cubesat' ? 'CubeSat' : (s.group === 'starlink' ? 'Starlink' : 'Weather / EO'));
+            const color = s.color || '#38bdf8';
+
+            return `
+                <tr style="border-bottom:1px solid #1e293b; transition:background 0.15s;" onmouseover="this.style.background='#1e293b'" onmouseout="this.style.background='transparent'">
+                    <td style="padding:8px 10px; font-family:monospace; color:#94a3b8;">${norad}</td>
+                    <td style="padding:8px 10px; font-weight:600; color:#f8fafc; display:flex; align-items:center; gap:6px;">
+                        <span style="width:8px; height:8px; border-radius:50%; background:${color}; display:inline-block;"></span>
+                        <span>${s.name}</span>
+                    </td>
+                    <td style="padding:8px 10px; color:#4ade80; font-family:monospace;">${alt}</td>
+                    <td style="padding:8px 10px; color:#c084fc; font-family:monospace;">${inc}</td>
+                    <td style="padding:8px 10px; color:#facc15; font-family:monospace;">${period}</td>
+                    <td style="padding:8px 10px; color:#94a3b8; font-size:11px;">${grpLabel}</td>
+                    <td style="padding:8px 10px; text-align:right;">
+                        <button onclick="trackLiveSatellite(${norad}, 'rk45')" style="background:#2563eb; color:white; border:none; padding:4px 8px; border-radius:3px; font-size:11px; cursor:pointer; font-weight:500; margin-right:4px;">🛰️ Track (RK45)</button>
+                        <button onclick="trackLiveSatellite(${norad}, 'pinn')" style="background:#7c3aed; color:white; border:none; padding:4px 8px; border-radius:3px; font-size:11px; cursor:pointer; font-weight:500;">🤖 PINN</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    window.trackLiveSatellite = async function(noradId, mode = 'rk45') {
+        const sat = liveSatelliteCatalog.find(s => s.norad_id === noradId);
+        const name = sat ? sat.name : `NORAD ${noradId}`;
+        try {
+            const res = await fetch('/satellites/live/track', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ norad_id: noradId, propagation_mode: mode })
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                alert(`Error tracking satellite: ${err.detail || 'Simulation error'}`);
+                return;
+            }
+            const data = await res.json();
+            addSatelliteToScene(data);
+            updateSatList();
+            focusView('Earth');
+            closeLiveTrackingModal();
+        } catch (e) {
+            alert(`Network error tracking satellite: ${e.message}`);
+        }
+    };
 
 </script>
 </body>
