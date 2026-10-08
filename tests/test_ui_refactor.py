@@ -91,6 +91,7 @@ def run_ui_refactor_test(server_url: str):
 
         # Step 1: Navigate to the application
         page.goto(server_url)
+        page.evaluate("if (typeof enterMissionMode === 'function') enterMissionMode();")
         page.wait_for_selector("#top-nav", state="visible", timeout=15000)
         page.wait_for_selector("#telemetry", state="visible", timeout=15000)
 
@@ -124,7 +125,7 @@ def run_ui_refactor_test(server_url: str):
         # Wait for option to be attached to DOM
         page.wait_for_selector('#load-dropdown option[value="Alpha"]', state="attached", timeout=10000)
         page.select_option("#load-dropdown", "Alpha")
-        page.click("button:has-text('Load')")
+        page.click("#top-nav button:has-text('Load')")
 
         # Give 2 seconds for scene reconstruction and animation update
         page.wait_for_timeout(2000)

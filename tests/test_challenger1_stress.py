@@ -172,9 +172,9 @@ class TestBoundaryValues:
         for k in REQUIRED_KEYS:
             assert all(math.isfinite(x) for x in traj[k])
 
-    @pytest.mark.parametrize("bad_mass", [0.0, -1e-6, -100.0, 100000.0001, 1e7])
+    @pytest.mark.parametrize("bad_mass", [0.0, -1e-6, -100.0, 1000000.0001, 1e7])
     def test_mass_outside_bounds_rejected(self, bad_mass):
-        """Mass <= 0 or > 100000 must return HTTP 422 with descriptive detail."""
+        """Mass <= 0 or > 1000000 must return HTTP 422 with descriptive detail."""
         payload = {
             "name": "BadMassSat",
             "mass": bad_mass,

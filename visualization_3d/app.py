@@ -104,7 +104,7 @@ BODIES = {
 
 
 class SatelliteParams(BaseModel):
-    name: str = Field(..., min_length=1, max_length=150, description="Satellite name")
+    name: str = Field(..., min_length=1, max_length=100, description="Satellite name")
     parent_body: str = Field("Earth", description="Central body: Earth or Moon")
     mass: float = Field(..., gt=0.0, le=1000000.0, description="Mass in kg")
     drag_area: float = Field(..., ge=0.0, le=50000.0, description="Cross-section area in m^2")

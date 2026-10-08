@@ -310,7 +310,7 @@
         <button class="lab-btn" onclick="openMLModal()" style="background:#7c3aed;">🤖 ML Surrogate</button>
         <button class="lab-btn" onclick="openLiveTrackingModal()" style="background:#0284c7;">🛰️ Live LEO Tracking</button>
         <button onclick="openSettingsModal()" style="background:#475569;">⚙️ Settings</button>
-        <button onclick="exportData()" style="background:#059669;">Export CSV</button>
+        <button id="export-btn" onclick="exportData()" style="background:#059669;">Export Data / CSV</button>
         <div class="nav-sep"></div>
         <button class="view-btn" onclick="focusView('Earth')">🌍 Earth View</button>
         <button class="view-btn" onclick="focusView('Moon')">🌕 Moon View</button>
@@ -368,38 +368,40 @@
 
         <h3>Telemetry & Geodetic Coords</h3>
         <div id="telemetry-panel">
-            <div id="telemetry" style="display:none;"></div>
-            <div><span class="label">Target: </span><span id="t-name">—</span></div>
-            <div><span class="label">Engine: </span><span id="t-engine" style="font-weight:600;">—</span></div>
-            <div><span class="label">Body: </span><span id="t-body">—</span></div>
-            <div><span class="label">Sim Time: </span><span id="t-time">0.0 s</span></div>
-            <div><span class="label">Latitude: </span><span id="t-lat" class="val-accent">—</span></div>
-            <div><span class="label">Longitude: </span><span id="t-lon" class="val-accent">—</span></div>
-            <div><span class="label">Altitude: </span><span id="t-alt" class="val-highlight">— km</span></div>
-            <div><span class="label">Velocity: </span><span id="t-vel">— km/s</span></div>
-            <div><span class="label">Period: </span><span id="t-period">— min</span></div>
-            <div><span class="label">Lifetime: </span><span id="t-life" class="val-warn">Active (Safe Orbit)</span></div>
-            <div><span class="label">|F_drag|: </span><span id="t-drag">— mm/s²</span></div>
-            <div><span class="label">Aero Temp: </span><span id="t-temp" class="val-warn">— °C</span></div>
-            <div><span class="label">|F_J2|: </span><span id="t-j2">— mm/s²</span></div>
+            <div id="telemetry">
+                <div id="telemetry-focus" style="font-weight:600; color:#38bdf8; margin-bottom:4px; display:none;"></div>
+                <div><span class="label">Target: </span><span id="t-name">—</span></div>
+                <div><span class="label">Engine: </span><span id="t-engine" style="font-weight:600;">—</span></div>
+                <div><span class="label">Body: </span><span id="t-body">—</span></div>
+                <div><span class="label">Sim Time: </span><span id="t-time">0.0 s</span></div>
+                <div><span class="label">Latitude: </span><span id="t-lat" class="val-accent">—</span></div>
+                <div><span class="label">Longitude: </span><span id="t-lon" class="val-accent">—</span></div>
+                <div><span class="label">Altitude: </span><span id="t-alt" class="val-highlight">— km</span></div>
+                <div><span class="label">Velocity: </span><span id="t-vel">— km/s</span></div>
+                <div><span class="label">Period: </span><span id="t-period">— min</span></div>
+                <div><span class="label">Lifetime: </span><span id="t-life" class="val-warn">Active (Safe Orbit)</span></div>
+                <div><span class="label">|F_drag|: </span><span id="t-drag">— mm/s²</span></div>
+                <div><span class="label">Aero Temp: </span><span id="t-temp" class="val-warn">— °C</span></div>
+                <div><span class="label">|F_J2|: </span><span id="t-j2">— mm/s²</span></div>
 
-            <div id="coord-initial-card" class="coord-card" style="display:none;">
-                <div class="coord-card-title">🚀 Initial Insertion</div>
-                <div id="coord-initial-val">—</div>
-            </div>
+                <div id="coord-initial-card" class="coord-card" style="display:none;">
+                    <div class="coord-card-title">🚀 Initial Insertion</div>
+                    <div id="coord-initial-val">—</div>
+                </div>
 
-            <div id="coord-reentry-card" class="coord-card" style="display:none; border-color:#f59e0b;">
-                <div class="coord-card-title" style="color:#f59e0b;">🔥 Re-entry Interface (120 km)</div>
-                <div id="coord-reentry-val">—</div>
-            </div>
+                <div id="coord-reentry-card" class="coord-card" style="display:none; border-color:#f59e0b;">
+                    <div class="coord-card-title" style="color:#f59e0b;">🔥 Re-entry Interface (120 km)</div>
+                    <div id="coord-reentry-val">—</div>
+                </div>
 
-            <div id="coord-impact-card" class="coord-card" style="display:none; border-color:#ef4444;">
-                <div class="coord-card-title" style="color:#ef4444;">💥 Ground Impact / Collision</div>
-                <div id="coord-impact-val">—</div>
-            </div>
+                <div id="coord-impact-card" class="coord-card" style="display:none; border-color:#ef4444;">
+                    <div class="coord-card-title" style="color:#ef4444;">💥 Ground Impact / Collision</div>
+                    <div id="coord-impact-val">—</div>
+                </div>
 
-            <div id="compare-clone-container" style="display:none; margin-top:10px;">
-                <button id="compare-clone-btn" onclick="cloneCurrentSatWithAlternateEngine()" style="width:100%; background:#7c3aed; color:white; border:none; padding:6px 8px; border-radius:4px; font-size:11px; cursor:pointer; font-weight:600; transition:background 0.15s;">🤖 Clone with Alternate Engine</button>
+                <div id="compare-clone-container" style="display:none; margin-top:10px;">
+                    <button id="compare-clone-btn" onclick="cloneCurrentSatWithAlternateEngine()" style="width:100%; background:#7c3aed; color:white; border:none; padding:6px 8px; border-radius:4px; font-size:11px; cursor:pointer; font-weight:600; transition:background 0.15s;">🤖 Clone with Alternate Engine</button>
+                </div>
             </div>
         </div>
 
@@ -561,7 +563,7 @@
                 <div style="font-size:11px; color:#64748b; margin-top:6px;">Generates N satellites spaced out sequentially by these parameters to form Walker stars, strings-of-pearls, or custom local offsets.</div>
             </div>
 
-            <div class="modal-buttons">
+            <div id="modal-buttons" class="modal-buttons">
                 <button onclick="closeModal()" style="background:#475569;color:white;">Cancel</button>
                 <button id="launch-btn" onclick="submitNewSatellite()" style="background:#2563eb;color:white;">Launch</button>
             </div>
@@ -909,54 +911,142 @@
     const hemiLight = new THREE.HemisphereLight(0x38bdf8, 0x1e293b, 0.55);
     scene.add(hemiLight);
 
-    // ── Visual Glowing Sun in Distant Space ──
+    // ── Ultra High-Definition Glowing Sun with Procedural Texturing & Multi-Layer Corona ──
+    let sunGroupRef = null;
+    let sunCoronaSpikes = null;
     function buildVisualSun() {
         const sunGroup = new THREE.Group();
         sunGroup.position.copy(SUN_POS);
 
-        // Sun core sphere
-        const coreGeo = new THREE.SphereGeometry(14000, 32, 32);
-        const coreMat = new THREE.MeshBasicMaterial({ color: 0xfffbeb });
+        // 1. Generate High-Res 1024x1024 Procedural Solar Photosphere Texture with Granulation & Limb Darkening
+        const sunTexCanvas = document.createElement('canvas');
+        sunTexCanvas.width = 1024; sunTexCanvas.height = 512;
+        const sCtx = sunTexCanvas.getContext('2d');
+        
+        // Base solar plasma gradient
+        const plasmaGrad = sCtx.createLinearGradient(0, 0, 0, 512);
+        plasmaGrad.addColorStop(0, '#fffbeb');
+        plasmaGrad.addColorStop(0.3, '#fef08a');
+        plasmaGrad.addColorStop(0.7, '#f59e0b');
+        plasmaGrad.addColorStop(1, '#ea580c');
+        sCtx.fillStyle = plasmaGrad;
+        sCtx.fillRect(0, 0, 1024, 512);
+
+        // Solar granulation noise pattern
+        const imgData = sCtx.getImageData(0, 0, 1024, 512);
+        const data = imgData.data;
+        for (let y = 0; y < 512; y++) {
+            for (let x = 0; x < 1024; x++) {
+                const idx = (y * 1024 + x) * 4;
+                const noise1 = Math.sin(x * 0.08) * Math.cos(y * 0.08);
+                const noise2 = Math.sin(x * 0.16 + 1.2) * Math.sin(y * 0.16 + 0.8);
+                const noise3 = Math.cos(x * 0.32) * Math.cos(y * 0.32);
+                const totalNoise = (noise1 * 0.5 + noise2 * 0.35 + noise3 * 0.15) * 28;
+                
+                data[idx] = Math.min(255, Math.max(0, data[idx] + totalNoise));
+                data[idx+1] = Math.min(255, Math.max(0, data[idx+1] + totalNoise * 0.8));
+                data[idx+2] = Math.min(255, Math.max(0, data[idx+2] + totalNoise * 0.3));
+            }
+        }
+        sCtx.putImageData(imgData, 0, 0);
+
+        const sunSurfaceTex = new THREE.CanvasTexture(sunTexCanvas);
+        sunSurfaceTex.wrapS = THREE.RepeatWrapping;
+        sunSurfaceTex.wrapT = THREE.ClampToEdgeWrapping;
+
+        // Photosphere 3D Sphere (64x64 segments)
+        const coreGeo = new THREE.SphereGeometry(18000, 64, 64);
+        const coreMat = new THREE.MeshBasicMaterial({
+            map: sunSurfaceTex,
+            color: 0xffffff
+        });
         const sunCore = new THREE.Mesh(coreGeo, coreMat);
         sunGroup.add(sunCore);
 
-        // Sun corona canvas glow sprite
-        const canvas = document.createElement('canvas');
-        canvas.width = 256; canvas.height = 256;
-        const ctx = canvas.getContext('2d');
-        const grad = ctx.createRadialGradient(128, 128, 10, 128, 128, 128);
-        grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
-        grad.addColorStop(0.2, 'rgba(254, 240, 138, 0.85)');
-        grad.addColorStop(0.5, 'rgba(251, 146, 60, 0.35)');
-        grad.addColorStop(1, 'rgba(249, 115, 22, 0)');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, 256, 256);
+        // 2. High-Definition Inner Chromosphere Glow
+        const innerGlowCanvas = document.createElement('canvas');
+        innerGlowCanvas.width = 512; innerGlowCanvas.height = 512;
+        const igCtx = innerGlowCanvas.getContext('2d');
+        const igGrad = igCtx.createRadialGradient(256, 256, 40, 256, 256, 256);
+        igGrad.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
+        igGrad.addColorStop(0.25, 'rgba(254, 240, 138, 0.95)');
+        igGrad.addColorStop(0.55, 'rgba(245, 158, 11, 0.6)');
+        igGrad.addColorStop(0.85, 'rgba(234, 88, 12, 0.2)');
+        igGrad.addColorStop(1, 'rgba(194, 65, 12, 0.0)');
+        igCtx.fillStyle = igGrad;
+        igCtx.fillRect(0, 0, 512, 512);
 
-        const tex = new THREE.CanvasTexture(canvas);
-        const spriteMat = new THREE.SpriteMaterial({ map: tex, transparent: true, blending: THREE.AdditiveBlending });
-        const corona = new THREE.Sprite(spriteMat);
-        corona.scale.set(120000, 120000, 1.0);
+        const innerTex = new THREE.CanvasTexture(innerGlowCanvas);
+        const innerMat = new THREE.SpriteMaterial({ map: innerTex, transparent: true, blending: THREE.AdditiveBlending });
+        const innerGlowSprite = new THREE.Sprite(innerMat);
+        innerGlowSprite.scale.set(70000, 70000, 1.0);
+        sunGroup.add(innerGlowSprite);
+
+        // 3. Volumetric Outer Corona Flares & Diffraction Rays
+        const coronaCanvas = document.createElement('canvas');
+        coronaCanvas.width = 512; coronaCanvas.height = 512;
+        const cCtx = coronaCanvas.getContext('2d');
+        const cGrad = cCtx.createRadialGradient(256, 256, 10, 256, 256, 256);
+        cGrad.addColorStop(0, 'rgba(255, 250, 230, 0.9)');
+        cGrad.addColorStop(0.2, 'rgba(253, 224, 71, 0.55)');
+        cGrad.addColorStop(0.45, 'rgba(249, 115, 22, 0.25)');
+        cGrad.addColorStop(0.75, 'rgba(239, 68, 68, 0.08)');
+        cGrad.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
+        cCtx.fillStyle = cGrad;
+        cCtx.fillRect(0, 0, 512, 512);
+
+        // Draw 8 optical diffraction spikes
+        cCtx.strokeStyle = 'rgba(255, 240, 180, 0.25)';
+        cCtx.lineWidth = 3;
+        for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
+            cCtx.beginPath();
+            cCtx.moveTo(256, 256);
+            cCtx.lineTo(256 + Math.cos(a) * 250, 256 + Math.sin(a) * 250);
+            cCtx.stroke();
+        }
+
+        const coronaTex = new THREE.CanvasTexture(coronaCanvas);
+        const coronaMat = new THREE.SpriteMaterial({ map: coronaTex, transparent: true, blending: THREE.AdditiveBlending });
+        const corona = new THREE.Sprite(coronaMat);
+        corona.scale.set(190000, 190000, 1.0);
         sunGroup.add(corona);
+        sunCoronaSpikes = corona;
 
         scene.add(sunGroup);
+        sunGroupRef = sunGroup;
     }
     buildVisualSun();
 
-    // ── Deep-Space Multi-Colored Starfield ──
+    // ── High-Definition Deep-Space Starfield Skybox ──
     let starfieldPoints = null;
     function buildDistantStarfield() {
+        // High-definition point sprite texture with soft Gaussian bloom
+        const starCanvas = document.createElement('canvas');
+        starCanvas.width = 64; starCanvas.height = 64;
+        const ctx = starCanvas.getContext('2d');
+        const radGrad = ctx.createRadialGradient(32, 32, 2, 32, 32, 32);
+        radGrad.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
+        radGrad.addColorStop(0.2, 'rgba(255, 255, 255, 0.85)');
+        radGrad.addColorStop(0.5, 'rgba(186, 230, 253, 0.35)');
+        radGrad.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
+        ctx.fillStyle = radGrad;
+        ctx.fillRect(0, 0, 64, 64);
+        const starTexture = new THREE.CanvasTexture(starCanvas);
+
         const starGeo = new THREE.BufferGeometry();
-        const starCount = 9000;
+        const starCount = 14000;
         const positions = new Float32Array(starCount * 3);
         const colors = new Float32Array(starCount * 3);
-        const rStar = 1800000.0;
+        const rStar = 3500000.0;
 
-        const palette = [
-            new THREE.Color(0xffffff), // White
-            new THREE.Color(0xbae6fd), // Cyan/Blue
-            new THREE.Color(0xfef08a), // Pale Yellow
-            new THREE.Color(0xfcd34d), // Amber
-            new THREE.Color(0xe9d5ff), // Violet
+        const spectralPalette = [
+            new THREE.Color(0xffffff), // O/B Class Pure Brilliant White
+            new THREE.Color(0x93c5fd), // B Class Azure Blue
+            new THREE.Color(0x38bdf8), // A Class Electric Sky
+            new THREE.Color(0xfef08a), // F/G Class Solar Yellow
+            new THREE.Color(0xfb923c), // K Class Warm Amber
+            new THREE.Color(0xf472b6), // M/Nebular Magenta Pink
+            new THREE.Color(0xc084fc), // Distant Deep Nebula Violet
         ];
 
         for (let i = 0; i < starCount; i++) {
@@ -966,12 +1056,14 @@
             const phi = Math.acos(2.0 * v - 1.0);
             const sinPhi = Math.sin(phi);
 
-            positions[i * 3] = rStar * sinPhi * Math.cos(theta);
-            positions[i * 3 + 1] = rStar * sinPhi * Math.sin(theta);
-            positions[i * 3 + 2] = rStar * Math.cos(phi);
+            // Subtle depth variation across stellar shells
+            const shellDist = rStar * (0.85 + Math.random() * 0.3);
+            positions[i * 3] = shellDist * sinPhi * Math.cos(theta);
+            positions[i * 3 + 1] = shellDist * sinPhi * Math.sin(theta);
+            positions[i * 3 + 2] = shellDist * Math.cos(phi);
 
-            const c = palette[Math.floor(Math.random() * palette.length)];
-            const lum = 0.55 + Math.random() * 0.45;
+            const c = spectralPalette[Math.floor(Math.random() * spectralPalette.length)];
+            const lum = 0.65 + Math.random() * 0.35;
             colors[i * 3] = c.r * lum;
             colors[i * 3 + 1] = c.g * lum;
             colors[i * 3 + 2] = c.b * lum;
@@ -981,10 +1073,13 @@
         starGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
         const starMat = new THREE.PointsMaterial({
-            size: 2500,
+            map: starTexture,
+            size: 7500,
             vertexColors: true,
             transparent: true,
-            opacity: 0.88,
+            opacity: 0.95,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
             sizeAttenuation: true
         });
 
@@ -1435,14 +1530,32 @@
     }
 
     function appendChunk(sat, chunk) {
+        if (!chunk) return;
         const b = sat.buf;
-        const skip = (b.t.length > 0 && chunk.t[0] <= b.t[b.t.length - 1]) ? 1 : 0;
-        ['t','x','y','z','vx','vy','vz','alt_km'].forEach(k => {
-            if (chunk[k]) b[k].push(...chunk[k].slice(skip));
-        });
-        if (chunk.forces) {
-            for (const fk of ['central','j2','drag','moon','total']) {
-                b.forces[fk].push(...(chunk.forces[fk] || []).slice(skip));
+        if (Array.isArray(chunk)) {
+            // Handle array-of-objects legacy trajectory format: [{t, x, y, z, vx, vy, vz}, ...]
+            chunk.forEach(pt => {
+                if (b.t.length > 0 && pt.t <= b.t[b.t.length - 1]) return;
+                b.t.push(pt.t);
+                b.x.push(pt.x);
+                b.y.push(pt.y);
+                b.z.push(pt.z);
+                b.vx.push(pt.vx || 0);
+                b.vy.push(pt.vy || 0);
+                b.vz.push(pt.vz || 0);
+                const r = Math.sqrt(pt.x * pt.x + pt.y * pt.y + pt.z * pt.z);
+                const parentR = (sat.parentBody === 'Moon' ? R_MOON_KM : R_EARTH_KM) * 1000.0;
+                b.alt_km.push(pt.alt_km !== undefined ? pt.alt_km : (r - parentR) / 1000.0);
+            });
+        } else {
+            const skip = (b.t.length > 0 && chunk.t && chunk.t.length > 0 && chunk.t[0] <= b.t[b.t.length - 1]) ? 1 : 0;
+            ['t','x','y','z','vx','vy','vz','alt_km'].forEach(k => {
+                if (chunk[k]) b[k].push(...chunk[k].slice(skip));
+            });
+            if (chunk.forces) {
+                for (const fk of ['central','j2','drag','moon','total']) {
+                    b.forces[fk].push(...(chunk.forces[fk] || []).slice(skip));
+                }
             }
         }
         rebuildTrail(sat);
@@ -1572,7 +1685,7 @@
     }
 
     async function fetchNextChunk(sat) {
-        if (sat.fetching || sat.reentry) return;
+        if (sat.fetching || sat.reentry || !sat.params || !sat.lastState || sat.lastT === undefined || !sat.params.name) return;
         sat.fetching = true;
         try {
             // Adaptive scaling: fetch larger chunks with coarser resolution at high speeds
@@ -1714,7 +1827,7 @@
             parentBody: satData.parent_body || (satData.params && satData.params.parent_body) || 'Earth',
             engine: satData.engine || (satData.params && satData.params.propagation_mode) || 'rk45',
             params: satData.params,
-            period_s: satData.period_s || 5400,
+            period_s: satData.period_s || (satData.params && satData.params.altitude_km ? 2 * Math.PI * Math.sqrt(Math.pow((R_EARTH_KM + satData.params.altitude_km) * 1000, 3) / 3.986004418e14) : 5400),
             color: colorNum,
             colorHex,
             colorObj,
@@ -2264,7 +2377,20 @@
     }
 
     function updateTelemetry(sat, idx) {
+        const focusEl = document.getElementById('telemetry-focus');
         if (!sat) {
+            if (focusEl) {
+                if (cameraFocusMode === 'Moon') {
+                    focusEl.innerText = 'Focus: Moon';
+                    focusEl.style.display = 'block';
+                } else if (cameraFocusMode === 'System') {
+                    focusEl.innerText = 'Focus: Earth-Moon System';
+                    focusEl.style.display = 'block';
+                } else {
+                    focusEl.innerText = '';
+                    focusEl.style.display = 'none';
+                }
+            }
             ['t-name','t-engine','t-body','t-time','t-lat','t-lon','t-alt','t-vel','t-period','t-life','t-drag','t-temp','t-j2'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.innerText = '—';
@@ -2275,6 +2401,10 @@
             document.getElementById('coord-reentry-card').style.display = 'none';
             document.getElementById('coord-impact-card').style.display = 'none';
             return;
+        }
+        if (focusEl) {
+            focusEl.innerText = 'Focus: ' + sat.name;
+            focusEl.style.display = 'block';
         }
         const b = sat.buf;
         const i = typeof idx === 'number' ? idx : (idx ? idx.lo : 0);
@@ -3288,8 +3418,12 @@
         const dt = wallDt * simSettings.playbackSpeed;
         simTime += dt;
 
-        // 1. Earth Rotation
+        // 1. Earth & Sun Rotation
         earth.rotation.y += 7.2921e-5 * dt;
+        if (sunGroupRef) {
+            sunGroupRef.children[0].rotation.y += 0.0003 * Math.min(dt, 10.0);
+            if (sunCoronaSpikes) sunCoronaSpikes.material.rotation += 0.0005 * Math.min(wallDt, 0.05);
+        }
 
         // 2. Moon Orbit Propagation (Real 384,400 km scale)
         const moonPos = getMoonPosition(simTime);
