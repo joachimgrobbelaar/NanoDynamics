@@ -152,6 +152,17 @@
         .legend-item { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
         .legend-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 
+        /* Hide simulation HUD / Sidebars on Splash Screen */
+        body.in-splash #top-nav,
+        body.in-splash #sidebar,
+        body.in-splash #sim-clock,
+        body.in-splash #legend,
+        body.in-splash #gui-container,
+        body.in-splash #collision-banner,
+        body.in-splash #floating-stat-box {
+            display: none !important;
+        }
+
         /* KSP1-style Splash Screen */
         #splash-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -204,9 +215,32 @@
         .splash-footer {
             font-size: 11px; color: #64748b; display: flex; justify-content: space-between; align-items: center;
         }
+
+        /* Mission Loading Transition Overlay */
+        #mission-loading-overlay {
+            display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(2, 6, 23, 0.94); backdrop-filter: blur(12px); z-index: 600;
+            flex-direction: column; justify-content: center; align-items: center; color: white;
+            transition: opacity 0.4s ease;
+        }
+        @keyframes pulse-ring {
+            0% { transform: scale(0.9); opacity: 0.8; }
+            50% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(0.9); opacity: 0.8; }
+        }
+        .loading-orbit-icon {
+            font-size: 40px; animation: pulse-ring 1.8s ease-in-out infinite; margin-bottom: 16px;
+        }
     </style>
 </head>
-<body>
+<body class="in-splash">
+    <!-- Brief Mission Loading Screen -->
+    <div id="mission-loading-overlay">
+        <div class="loading-orbit-icon">🛰️</div>
+        <div style="font-size:18px; font-weight:700; letter-spacing:0.05em; color:#38bdf8; margin-bottom:8px;">Initializing Orbital Mission...</div>
+        <div id="loading-subtext" style="font-size:12px; color:#94a3b8; font-family:monospace;">Propagating 8th-Order Runge-Kutta Ephemeris & Geopotential...</div>
+    </div>
+
     <!-- KSP1-style Splash Screen Overlay -->
     <div id="splash-screen">
         <div class="splash-header">
@@ -2917,78 +2951,177 @@
         }
     }
 
-    // ── KSP1-STYLE SPLASH SCREEN & HERO SATELLITE ────────────────────────────
+    // ── KSP1-STYLE SPLASH SCREEN & TEMPLATE CONSTELLATION ───────────────────
     let inSplashMode = true;
-    let heroSplashSatGroup = null;
-    let heroSplashSatLine = null;
+    let heroSplashElements = [];
+    let splashConstellationSats = [];
 
     function initHeroSplashSatellite() {
-        const group = new THREE.Group();
-        const { sprite } = createAvatarSprite('satellite', '#38bdf8');
-        const coreMesh = new THREE.Mesh(
-            new THREE.SphereGeometry(20, 16, 16),
-            new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
-        );
-        group.add(coreMesh);
-        group.add(sprite);
-        scene.add(group);
-        heroSplashSatGroup = group;
+        // Plane 1: LEO Equatorial Walker Cluster (Cyan - 450 km, inc=28.5°)
+        const r1 = R_EARTH_KM + 450.0;
+        const inc1 = 28.5 * Math.PI / 180.0;
+        const raan1 = 0.0;
+        createSplashOrbitPlane(r1, inc1, raan1, 0x38bdf8, 3, 'satellite');
 
-        // Visual orbital ring around Earth for splash hero
+        // Plane 2: Polar Sun-Synchronous Ring (Emerald Green - 720 km, inc=98.2°)
+        const r2 = R_EARTH_KM + 720.0;
+        const inc2 = 98.2 * Math.PI / 180.0;
+        const raan2 = Math.PI / 2.0;
+        createSplashOrbitPlane(r2, inc2, raan2, 0x22c55e, 3, 'satellite');
+
+        // Plane 3: Molniya / High-Eccentricity Arc (Violet - a=16,000 km, e=0.55, inc=63.4°)
+        const a3 = 16000.0;
+        const e3 = 0.55;
+        const inc3 = 63.4 * Math.PI / 180.0;
+        const raan3 = Math.PI / 4.0;
+        createSplashEllipticOrbit(a3, e3, inc3, raan3, 0xa855f7, 'rocket');
+    }
+
+    function createSplashOrbitPlane(r, inc, raan, colorNum, satCount, icon) {
         const ringGeo = new THREE.BufferGeometry();
         const pts = [];
-        const r_splash = R_EARTH_KM + 600.0;
-        const inc_splash = 51.6 * Math.PI / 180.0;
         for (let a = 0; a <= 360; a += 2) {
             const rad = a * Math.PI / 180.0;
-            const x = r_splash * Math.cos(rad);
-            const y = r_splash * Math.sin(rad) * Math.sin(inc_splash);
-            const z = r_splash * Math.sin(rad) * Math.cos(inc_splash);
+            const x0 = r * Math.cos(rad);
+            const y0 = r * Math.sin(rad);
+            const x = x0 * Math.cos(raan) - y0 * Math.cos(inc) * Math.sin(raan);
+            const z = x0 * Math.sin(raan) + y0 * Math.cos(inc) * Math.cos(raan);
+            const y = y0 * Math.sin(inc);
             pts.push(x, y, z);
         }
         ringGeo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
-        const ringMat = new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.45 });
-        heroSplashSatLine = new THREE.Line(ringGeo, ringMat);
-        scene.add(heroSplashSatLine);
+        const colorHex = '#' + colorNum.toString(16).padStart(6, '0');
+        const ringMat = new THREE.LineBasicMaterial({ color: colorNum, transparent: true, opacity: 0.45 });
+        const line = new THREE.Line(ringGeo, ringMat);
+        scene.add(line);
+        heroSplashElements.push(line);
+
+        for (let s = 0; s < satCount; s++) {
+            const phase = (s / satCount) * 2.0 * Math.PI;
+            const group = new THREE.Group();
+            const { sprite } = createAvatarSprite(icon, colorHex);
+            const core = new THREE.Mesh(new THREE.SphereGeometry(18, 8, 8), new THREE.MeshBasicMaterial({ color: colorNum }));
+            group.add(core);
+            group.add(sprite);
+            scene.add(group);
+            heroSplashElements.push(group);
+
+            splashConstellationSats.push({
+                group,
+                r,
+                inc,
+                raan,
+                speed: 0.0008 + (Math.random() * 0.0004),
+                phase
+            });
+        }
+    }
+
+    function createSplashEllipticOrbit(a, e, inc, raan, colorNum, icon) {
+        const p = a * (1 - e * e);
+        const ringGeo = new THREE.BufferGeometry();
+        const pts = [];
+        for (let a_deg = 0; a_deg <= 360; a_deg += 2) {
+            const nu = a_deg * Math.PI / 180.0;
+            const r = p / (1 + e * Math.cos(nu));
+            const x0 = r * Math.cos(nu);
+            const y0 = r * Math.sin(nu);
+            const x = x0 * Math.cos(raan) - y0 * Math.cos(inc) * Math.sin(raan);
+            const z = x0 * Math.sin(raan) + y0 * Math.cos(inc) * Math.cos(raan);
+            const y = y0 * Math.sin(inc);
+            pts.push(x, y, z);
+        }
+        ringGeo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+        const colorHex = '#' + colorNum.toString(16).padStart(6, '0');
+        const ringMat = new THREE.LineBasicMaterial({ color: colorNum, transparent: true, opacity: 0.55 });
+        const line = new THREE.Line(ringGeo, ringMat);
+        scene.add(line);
+        heroSplashElements.push(line);
+
+        const group = new THREE.Group();
+        const { sprite } = createAvatarSprite(icon, colorHex);
+        const core = new THREE.Mesh(new THREE.SphereGeometry(22, 8, 8), new THREE.MeshBasicMaterial({ color: colorNum }));
+        group.add(core);
+        group.add(sprite);
+        scene.add(group);
+        heroSplashElements.push(group);
+
+        splashConstellationSats.push({
+            group,
+            a,
+            e,
+            p,
+            inc,
+            raan,
+            isElliptic: true,
+            speed: 0.0005,
+            phase: 0.0
+        });
     }
 
     window.enterMissionMode = function() {
         inSplashMode = false;
+        document.body.classList.remove('in-splash');
         const splash = document.getElementById('splash-screen');
         if (splash) splash.classList.add('hidden');
-        if (heroSplashSatGroup) heroSplashSatGroup.visible = false;
-        if (heroSplashSatLine) heroSplashSatLine.visible = false;
+        heroSplashElements.forEach(el => { el.visible = false; });
         focusView('Earth');
     };
 
     window.returnToSplash = function() {
         inSplashMode = true;
+        document.body.classList.add('in-splash');
         const splash = document.getElementById('splash-screen');
         if (splash) splash.classList.remove('hidden');
-        if (heroSplashSatGroup) heroSplashSatGroup.visible = true;
-        if (heroSplashSatLine) heroSplashSatLine.visible = true;
+        heroSplashElements.forEach(el => { el.visible = true; });
+    };
+
+    window.transitionWithLoading = function(taskCallback, subtext = "Initializing Orbital Ephemeris...") {
+        const overlay = document.getElementById('mission-loading-overlay');
+        const textEl = document.getElementById('loading-subtext');
+        if (textEl) textEl.innerText = subtext;
+        if (overlay) {
+            overlay.style.display = 'flex';
+            overlay.style.opacity = '1';
+        }
+
+        setTimeout(() => {
+            enterMissionMode();
+            if (taskCallback) taskCallback();
+
+            setTimeout(() => {
+                if (overlay) {
+                    overlay.style.opacity = '0';
+                    setTimeout(() => { overlay.style.display = 'none'; }, 400);
+                }
+            }, 450);
+        }, 850);
     };
 
     window.splashStartNewMission = function() {
-        enterMissionMode();
-        if (activeSatellites.length === 0) {
-            openModal();
-        }
+        transitionWithLoading(() => {
+            if (activeSatellites.length === 0) {
+                openModal();
+            }
+        }, "Preparing Spacecraft Insertion Parameters...");
     };
 
     window.splashOpenLoadModal = function() {
-        enterMissionMode();
-        loadSim();
+        transitionWithLoading(() => {
+            loadSim();
+        }, "Retrieving Saved Telemetry & Ephemeris State...");
     };
 
     window.splashOpenLiveTracking = function() {
-        enterMissionMode();
-        openLiveTrackingModal();
+        transitionWithLoading(() => {
+            openLiveTrackingModal();
+        }, "Connecting to Live CelesTrak Satellite Telemetry...");
     };
 
     window.splashOpenExperimentLab = function() {
-        enterMissionMode();
-        openExperimentModal();
+        transitionWithLoading(() => {
+            openExperimentModal();
+        }, "Launching Numerical & ML Surrogate Lab...");
     };
 
     window.openSettingsModal = function() {
@@ -3002,6 +3135,7 @@
     window.toggleBackgroundStars = function(show) {
         // Starfield toggle handler
     };
+
 
     // ── Animation Loop ────────────────────────────────────────────────────────
     function animate() {
@@ -3103,25 +3237,61 @@
             }
         }
 
-        // 6. Camera Focus Modes & Splash Mode
+        // 6. Camera Focus Modes & Splash Mode (30s dynamic focus cycle on idle)
         if (inSplashMode) {
-            const t = Date.now() * 0.00015;
-            // Cinematic sweeping arc showcasing Earth and Moon
-            camera.position.x = Math.cos(t) * 26000;
-            camera.position.y = 7500 + Math.sin(t * 0.5) * 3500;
-            camera.position.z = Math.sin(t) * 26000;
-            camera.lookAt(0, 0, 0);
-
-            // Animate hero satellite
-            if (heroSplashSatGroup) {
-                const satAngle = Date.now() * 0.0012;
-                const r_splash = R_EARTH_KM + 600.0;
-                const inc_splash = 51.6 * Math.PI / 180.0;
-                const x = r_splash * Math.cos(satAngle);
-                const y = r_splash * Math.sin(satAngle) * Math.sin(inc_splash);
-                const z = r_splash * Math.sin(satAngle) * Math.cos(inc_splash);
-                heroSplashSatGroup.position.set(x, y, z);
+            const nowSec = Date.now() / 1000.0;
+            const cycleSec = nowSec % 90.0; // 90s total loop (30s Earth, 30s Moon, 30s Cislunar)
+            
+            if (cycleSec < 30.0) {
+                // Focus: Earth panoramic orbit
+                const t = nowSec * 0.08;
+                camera.position.x = Math.cos(t) * 24000;
+                camera.position.y = 7000 + Math.sin(t * 0.5) * 3000;
+                camera.position.z = Math.sin(t) * 24000;
+                camera.lookAt(0, 0, 0);
+            } else if (cycleSec < 60.0) {
+                // Focus: Moon polar close-up
+                const moonPos = getMoonPosition(simTime);
+                const t = (nowSec - 30.0) * 0.12;
+                const moonCamDist = 6500.0;
+                camera.position.x = moonPos.x + Math.cos(t) * moonCamDist;
+                camera.position.y = moonPos.y + 2000 + Math.sin(t * 0.5) * 1200;
+                camera.position.z = moonPos.z + Math.sin(t) * moonCamDist;
+                camera.lookAt(moonPos.x, moonPos.y, moonPos.z);
+            } else {
+                // Focus: Earth-Moon Cislunar system highway
+                const moonPos = getMoonPosition(simTime);
+                const t = (nowSec - 60.0) * 0.05;
+                const midX = moonPos.x * 0.35;
+                const midY = moonPos.y * 0.35;
+                const midZ = moonPos.z * 0.35;
+                camera.position.x = midX + Math.cos(t) * 90000;
+                camera.position.y = midY + 45000;
+                camera.position.z = midZ + Math.sin(t) * 90000;
+                camera.lookAt(midX, midY, midZ);
             }
+
+            // Animate all template constellation satellites
+            splashConstellationSats.forEach(sat => {
+                sat.phase += sat.speed;
+                let x, y, z;
+                if (sat.isElliptic) {
+                    const nu = sat.phase;
+                    const r = sat.p / (1 + sat.e * Math.cos(nu));
+                    const x0 = r * Math.cos(nu);
+                    const y0 = r * Math.sin(nu);
+                    x = x0 * Math.cos(sat.raan) - y0 * Math.cos(sat.inc) * Math.sin(sat.raan);
+                    z = x0 * Math.sin(sat.raan) + y0 * Math.cos(sat.inc) * Math.cos(sat.raan);
+                    y = y0 * Math.sin(sat.inc);
+                } else {
+                    const x0 = sat.r * Math.cos(sat.phase);
+                    const y0 = sat.r * Math.sin(sat.phase);
+                    x = x0 * Math.cos(sat.raan) - y0 * Math.cos(sat.inc) * Math.sin(sat.raan);
+                    z = x0 * Math.sin(sat.raan) + y0 * Math.cos(sat.inc) * Math.cos(sat.raan);
+                    y = y0 * Math.sin(sat.inc);
+                }
+                sat.group.position.set(x, y, z);
+            });
         } else {
             if (selectedSatIndex >= 0 && activeSatellites[selectedSatIndex]) {
                 const sat = activeSatellites[selectedSatIndex];
