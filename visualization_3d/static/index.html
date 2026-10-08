@@ -151,15 +151,112 @@
         }
         .legend-item { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
         .legend-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+        /* KSP1-style Splash Screen */
+        #splash-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at 75% 35%, rgba(15, 23, 42, 0.25) 0%, rgba(2, 6, 23, 0.88) 65%, rgba(0, 0, 0, 0.96) 100%);
+            z-index: 500; display: flex; flex-direction: column; justify-content: space-between;
+            padding: 40px 60px; box-sizing: border-box; color: white;
+            transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.6s;
+            pointer-events: auto;
+        }
+        #splash-screen.hidden {
+            opacity: 0; visibility: hidden; pointer-events: none;
+        }
+        .splash-header { max-width: 600px; }
+        .splash-title {
+            font-size: 40px; font-weight: 800; letter-spacing: 0.08em;
+            background: linear-gradient(135deg, #ffffff 0%, #38bdf8 50%, #818cf8 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            margin: 0 0 6px 0; text-transform: uppercase;
+        }
+        .splash-subtitle {
+            font-size: 14px; color: #94a3b8; letter-spacing: 0.04em; margin: 0 0 16px 0;
+            font-family: "SF Mono", Monaco, Consolas, monospace;
+        }
+        .splash-badge {
+            display: inline-block; background: rgba(56, 189, 248, 0.15); border: 1px solid #0284c7;
+            color: #38bdf8; font-size: 11px; padding: 3px 8px; border-radius: 4px; font-weight: 600;
+        }
+        .splash-menu {
+            display: flex; flex-direction: column; gap: 12px; width: 360px; margin-top: 24px;
+        }
+        .splash-btn {
+            background: rgba(30, 41, 59, 0.85); backdrop-filter: blur(8px);
+            color: white; border: 1px solid #334155; padding: 14px 18px;
+            border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer;
+            text-align: left; display: flex; align-items: center; justify-content: space-between;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        }
+        .splash-btn:hover {
+            background: rgba(37, 99, 235, 0.9); border-color: #60a5fa; transform: translateX(8px);
+            box-shadow: 0 6px 20px rgba(37, 99, 235, 0.5);
+        }
+        .splash-btn.primary {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8); border-color: #3b82f6;
+        }
+        .splash-btn.primary:hover {
+            background: linear-gradient(135deg, #3b82f6, #2563eb); transform: translateX(8px);
+        }
+        .splash-btn-icon { font-size: 18px; }
+        .splash-footer {
+            font-size: 11px; color: #64748b; display: flex; justify-content: space-between; align-items: center;
+        }
     </style>
 </head>
 <body>
+    <!-- KSP1-style Splash Screen Overlay -->
+    <div id="splash-screen">
+        <div class="splash-header">
+            <div class="splash-badge">🌌 ORBITAL DYNAMICS v2.0 BETA • WITS HONOURS</div>
+            <h1 class="splash-title">NanoDynamics</h1>
+            <div class="splash-subtitle">Real-Scale Earth-Moon Mechanics, PINN Surrogate & Live LEO Tracking</div>
+
+            <div class="splash-menu">
+                <button class="splash-btn primary" onclick="splashStartNewMission()">
+                    <span>🚀 Start New Mission</span>
+                    <span class="splash-btn-icon">→</span>
+                </button>
+                <button class="splash-btn" onclick="splashOpenLoadModal()">
+                    <span>📂 Load Mission / Scenario</span>
+                    <span class="splash-btn-icon">⇲</span>
+                </button>
+                <button class="splash-btn" onclick="splashOpenLiveTracking()">
+                    <span>🛰️ Live LEO Constellation Tracker</span>
+                    <span class="splash-btn-icon">📡</span>
+                </button>
+                <button class="splash-btn" onclick="openSettingsModal()">
+                    <span>⚙️ Project & Simulation Settings</span>
+                    <span class="splash-btn-icon">⚙</span>
+                </button>
+                <button class="splash-btn" onclick="splashOpenExperimentLab()">
+                    <span>🧪 Experimentation Lab & ML</span>
+                    <span class="splash-btn-icon">⚗</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="splash-footer">
+            <div>
+                <span>Physics: DOP853 8th-Order Integrator & PyTorch PINN Surrogate</span> •
+                <span style="color:#38bdf8;">Central Body: Earth-Moon Geopotential ($J_2$)</span>
+            </div>
+            <div>
+                <button onclick="enterMissionMode()" style="background:#334155; color:#94a3b8; border:none; padding:4px 10px; border-radius:4px; font-size:11px; cursor:pointer;">Skip to 3D Space &rarr;</button>
+            </div>
+        </div>
+    </div>
+
     <div id="top-nav">
+        <button onclick="returnToSplash()" style="background:#0f172a; border:1px solid #38bdf8; color:#38bdf8; font-weight:600;">🏠 Home Menu</button>
         <button onclick="newProject()">New Project</button>
         <button onclick="openModal()">+ New Satellite</button>
         <button class="lab-btn" onclick="openExperimentModal()">🧪 Experiment Lab</button>
         <button class="lab-btn" onclick="openMLModal()" style="background:#7c3aed;">🤖 ML Surrogate</button>
         <button class="lab-btn" onclick="openLiveTrackingModal()" style="background:#0284c7;">🛰️ Live LEO Tracking</button>
+        <button onclick="openSettingsModal()" style="background:#475569;">⚙️ Settings</button>
         <button onclick="exportData()" style="background:#059669;">Export CSV</button>
         <div class="nav-sep"></div>
         <button class="view-btn" onclick="focusView('Earth')">🌍 Earth View</button>
@@ -651,6 +748,60 @@
                 <div style="display:flex; gap:8px;">
                     <button onclick="closeLiveTrackingModal()" style="background:#475569; color:white; padding:6px 14px; border:none; border-radius:4px; cursor:pointer;">Close</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Project & Simulation Settings Modal -->
+    <div id="settings-modal-overlay" class="modal-overlay">
+        <div class="modal-content" style="width:520px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #334155; padding-bottom:8px; margin-bottom:14px;">
+                <h3 style="margin:0; border:none; padding:0; color:#38bdf8;">⚙️ Project & Simulation Settings</h3>
+                <button onclick="closeSettingsModal()" style="background:transparent; border:none; color:#94a3b8; font-size:16px; cursor:pointer;">✕</button>
+            </div>
+
+            <div class="form-section">
+                <div class="form-section-title">Orbital Mechanics & Perturbations</div>
+                <div style="display:flex; flex-direction:column; gap:8px; font-size:12px; color:#cbd5e1;">
+                    <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                        <input type="checkbox" id="cfg-j2" checked>
+                        <span><strong>Earth Oblateness ($J_2$):</strong> Include nodal regression and apsidal precession</span>
+                    </label>
+                    <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                        <input type="checkbox" id="cfg-drag" checked>
+                        <span><strong>Atmospheric Drag:</strong> US Standard 1976 model with thermospheric decay</span>
+                    </label>
+                    <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                        <input type="checkbox" id="cfg-moon-grav" checked>
+                        <span><strong>Lunar Third-Body Gravity:</strong> Real ephemeris perturbation</span>
+                    </label>
+                    <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                        <input type="checkbox" id="cfg-earth-rot" checked>
+                        <span><strong>Earth Diurnal Rotation:</strong> Ground track ground-relative drift</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-section" style="margin-top:12px;">
+                <div class="form-section-title">Visual Rendering & HUD</div>
+                <div style="display:flex; flex-direction:column; gap:8px; font-size:12px; color:#cbd5e1;">
+                    <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                        <input type="checkbox" id="cfg-show-stars" checked onchange="toggleBackgroundStars(this.checked)">
+                        <span>Deep-Space Starfield & Celestial Background</span>
+                    </label>
+                    <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                        <input type="checkbox" id="cfg-show-trails" checked>
+                        <span>Orbital Trajectory Trails & Glowing Nodes</span>
+                    </label>
+                    <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                        <input type="checkbox" id="cfg-high-res-earth" checked>
+                        <span>Atmospheric Scattering & Cloud Layer Glow</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="modal-buttons" style="margin-top:16px;">
+                <button onclick="closeSettingsModal()" style="background:#475569; color:white;">Save & Close</button>
             </div>
         </div>
     </div>
@@ -2766,6 +2917,92 @@
         }
     }
 
+    // ── KSP1-STYLE SPLASH SCREEN & HERO SATELLITE ────────────────────────────
+    let inSplashMode = true;
+    let heroSplashSatGroup = null;
+    let heroSplashSatLine = null;
+
+    function initHeroSplashSatellite() {
+        const group = new THREE.Group();
+        const { sprite } = createAvatarSprite('satellite', '#38bdf8');
+        const coreMesh = new THREE.Mesh(
+            new THREE.SphereGeometry(20, 16, 16),
+            new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
+        );
+        group.add(coreMesh);
+        group.add(sprite);
+        scene.add(group);
+        heroSplashSatGroup = group;
+
+        // Visual orbital ring around Earth for splash hero
+        const ringGeo = new THREE.BufferGeometry();
+        const pts = [];
+        const r_splash = R_EARTH_KM + 600.0;
+        const inc_splash = 51.6 * Math.PI / 180.0;
+        for (let a = 0; a <= 360; a += 2) {
+            const rad = a * Math.PI / 180.0;
+            const x = r_splash * Math.cos(rad);
+            const y = r_splash * Math.sin(rad) * Math.sin(inc_splash);
+            const z = r_splash * Math.sin(rad) * Math.cos(inc_splash);
+            pts.push(x, y, z);
+        }
+        ringGeo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+        const ringMat = new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.45 });
+        heroSplashSatLine = new THREE.Line(ringGeo, ringMat);
+        scene.add(heroSplashSatLine);
+    }
+
+    window.enterMissionMode = function() {
+        inSplashMode = false;
+        const splash = document.getElementById('splash-screen');
+        if (splash) splash.classList.add('hidden');
+        if (heroSplashSatGroup) heroSplashSatGroup.visible = false;
+        if (heroSplashSatLine) heroSplashSatLine.visible = false;
+        focusView('Earth');
+    };
+
+    window.returnToSplash = function() {
+        inSplashMode = true;
+        const splash = document.getElementById('splash-screen');
+        if (splash) splash.classList.remove('hidden');
+        if (heroSplashSatGroup) heroSplashSatGroup.visible = true;
+        if (heroSplashSatLine) heroSplashSatLine.visible = true;
+    };
+
+    window.splashStartNewMission = function() {
+        enterMissionMode();
+        if (activeSatellites.length === 0) {
+            openModal();
+        }
+    };
+
+    window.splashOpenLoadModal = function() {
+        enterMissionMode();
+        loadSim();
+    };
+
+    window.splashOpenLiveTracking = function() {
+        enterMissionMode();
+        openLiveTrackingModal();
+    };
+
+    window.splashOpenExperimentLab = function() {
+        enterMissionMode();
+        openExperimentModal();
+    };
+
+    window.openSettingsModal = function() {
+        document.getElementById('settings-modal-overlay').style.display = 'flex';
+    };
+
+    window.closeSettingsModal = function() {
+        document.getElementById('settings-modal-overlay').style.display = 'none';
+    };
+
+    window.toggleBackgroundStars = function(show) {
+        // Starfield toggle handler
+    };
+
     // ── Animation Loop ────────────────────────────────────────────────────────
     function animate() {
         requestAnimationFrame(animate);
@@ -2866,86 +3103,107 @@
             }
         }
 
-        // 6. Camera Focus Modes
-        if (selectedSatIndex >= 0 && activeSatellites[selectedSatIndex]) {
-            const sat = activeSatellites[selectedSatIndex];
-            if (controls) controls.target.copy(sat.mesh.position);
-            const buf = sat.buf;
-            const t = Math.min(simTime, buf.t[buf.t.length - 1]);
-            updateTelemetry(sat, interpAt(buf, t));
-        } else if (cameraFocusMode === 'Moon') {
-            if (controls) {
-                const prevTarget = controls.target.clone();
-                controls.target.copy(moon.position);
-                const delta = moon.position.clone().sub(prevTarget);
-                camera.position.add(delta);
-            }
-            updateTelemetry(null, 0);
-        } else if (cameraFocusMode === 'System') {
-            if (controls) controls.target.set(0, 0, 0);
-            updateTelemetry(null, 0);
-        } else {
-            // Earth focus default
-            if (controls) controls.target.set(0, 0, 0);
-            updateTelemetry(null, 0);
-        }
+        // 6. Camera Focus Modes & Splash Mode
+        if (inSplashMode) {
+            const t = Date.now() * 0.00015;
+            // Cinematic sweeping arc showcasing Earth and Moon
+            camera.position.x = Math.cos(t) * 26000;
+            camera.position.y = 7500 + Math.sin(t * 0.5) * 3500;
+            camera.position.z = Math.sin(t) * 26000;
+            camera.lookAt(0, 0, 0);
 
-        // --- Radial Camera Lock & Stat Box Update ---
-        const radialLockCheckbox = document.getElementById('camera-radial-lock');
-        const statBox = document.getElementById('floating-stat-box');
-        
-        if (selectedSatIndex >= 0 && activeSatellites[selectedSatIndex]) {
-            const sat = activeSatellites[selectedSatIndex];
-            
-            // 3D Stat Box Placement
-            if (statBox) {
-                statBox.style.display = 'block';
-                const fName = document.getElementById('fs-name');
-                if(fName) {
-                    fName.innerText = sat.name || 'Sat';
-                    const fsEng = document.getElementById('fs-engine');
-                    if (fsEng) {
-                        const isPinn = (sat.engine === 'pinn');
-                        fsEng.innerText = isPinn ? 'PINN' : 'RK45';
-                        fsEng.style.background = isPinn ? '#7c3aed' : '#0284c7';
-                    }
-                    document.getElementById('fs-alt').innerText = document.getElementById('t-alt').innerText;
-                    document.getElementById('fs-vel').innerText = document.getElementById('t-vel').innerText;
-                    const fsInc = document.getElementById('fs-inc');
-                    if (fsInc) {
-                        const incVal = (sat.params && sat.params.inclination_deg !== undefined) ? sat.params.inclination_deg.toFixed(1) + '°' : '—';
-                        fsInc.innerText = incVal;
-                    }
+            // Animate hero satellite
+            if (heroSplashSatGroup) {
+                const satAngle = Date.now() * 0.0012;
+                const r_splash = R_EARTH_KM + 600.0;
+                const inc_splash = 51.6 * Math.PI / 180.0;
+                const x = r_splash * Math.cos(satAngle);
+                const y = r_splash * Math.sin(satAngle) * Math.sin(inc_splash);
+                const z = r_splash * Math.sin(satAngle) * Math.cos(inc_splash);
+                heroSplashSatGroup.position.set(x, y, z);
+            }
+        } else {
+            if (selectedSatIndex >= 0 && activeSatellites[selectedSatIndex]) {
+                const sat = activeSatellites[selectedSatIndex];
+                if (controls) controls.target.copy(sat.mesh.position);
+                const buf = sat.buf;
+                const t = Math.min(simTime, buf.t[buf.t.length - 1]);
+                updateTelemetry(sat, interpAt(buf, t));
+            } else if (cameraFocusMode === 'Moon') {
+                if (controls) {
+                    const prevTarget = controls.target.clone();
+                    controls.target.copy(moon.position);
+                    const delta = moon.position.clone().sub(prevTarget);
+                    camera.position.add(delta);
                 }
-                
-                // Project 3D pos to 2D screen
-                const tempV = sat.mesh.position.clone();
-                tempV.project(camera);
-                const rect = renderer.domElement.getBoundingClientRect();
-                const x = (tempV.x *  .5 + .5) * rect.width;
-                const y = (tempV.y * -.5 + .5) * rect.height;
-                statBox.style.left = `${x + 15}px`;
-                statBox.style.top = `${y - 15}px`;
+                updateTelemetry(null, 0);
+            } else if (cameraFocusMode === 'System') {
+                if (controls) controls.target.set(0, 0, 0);
+                updateTelemetry(null, 0);
+            } else {
+                // Earth focus default
+                if (controls) controls.target.set(0, 0, 0);
+                updateTelemetry(null, 0);
             }
 
-            // Radial Lock Camera Adjustment
-            if (radialLockCheckbox && radialLockCheckbox.checked && controls) {
-                const planetPos = sat.parentBody === 'Moon' ? moon.position : new THREE.Vector3(0,0,0);
-                const radialDir = new THREE.Vector3().subVectors(sat.mesh.position, planetPos).normalize();
-                const dist = camera.position.distanceTo(sat.mesh.position);
-                const targetCamPos = sat.mesh.position.clone().add(radialDir.multiplyScalar(dist));
-                camera.position.lerp(targetCamPos, 0.05);
+            // --- Radial Camera Lock & Stat Box Update ---
+            const radialLockCheckbox = document.getElementById('camera-radial-lock');
+            const statBox = document.getElementById('floating-stat-box');
+            
+            if (selectedSatIndex >= 0 && activeSatellites[selectedSatIndex]) {
+                const sat = activeSatellites[selectedSatIndex];
+                
+                // 3D Stat Box Placement
+                if (statBox) {
+                    statBox.style.display = 'block';
+                    const fName = document.getElementById('fs-name');
+                    if(fName) {
+                        fName.innerText = sat.name || 'Sat';
+                        const fsEng = document.getElementById('fs-engine');
+                        if (fsEng) {
+                            const isPinn = (sat.engine === 'pinn');
+                            fsEng.innerText = isPinn ? 'PINN' : 'RK45';
+                            fsEng.style.background = isPinn ? '#7c3aed' : '#0284c7';
+                        }
+                        document.getElementById('fs-alt').innerText = document.getElementById('t-alt').innerText;
+                        document.getElementById('fs-vel').innerText = document.getElementById('t-vel').innerText;
+                        const fsInc = document.getElementById('fs-inc');
+                        if (fsInc) {
+                            const incVal = (sat.params && sat.params.inclination_deg !== undefined) ? sat.params.inclination_deg.toFixed(1) + '°' : '—';
+                            fsInc.innerText = incVal;
+                        }
+                    }
+                    
+                    // Project 3D pos to 2D screen
+                    const tempV = sat.mesh.position.clone();
+                    tempV.project(camera);
+                    const rect = renderer.domElement.getBoundingClientRect();
+                    const x = (tempV.x *  .5 + .5) * rect.width;
+                    const y = (tempV.y * -.5 + .5) * rect.height;
+                    statBox.style.left = `${x + 15}px`;
+                    statBox.style.top = `${y - 15}px`;
+                }
+
+                // Radial Lock Camera Adjustment
+                if (radialLockCheckbox && radialLockCheckbox.checked && controls) {
+                    const planetPos = sat.parentBody === 'Moon' ? moon.position : new THREE.Vector3(0,0,0);
+                    const radialDir = new THREE.Vector3().subVectors(sat.mesh.position, planetPos).normalize();
+                    const dist = camera.position.distanceTo(sat.mesh.position);
+                    const targetCamPos = sat.mesh.position.clone().add(radialDir.multiplyScalar(dist));
+                    camera.position.lerp(targetCamPos, 0.05);
+                }
+            } else {
+                if (statBox) statBox.style.display = 'none';
             }
-        } else {
-            if (statBox) statBox.style.display = 'none';
+            // --------------------------------------------
+
+            if (controls) controls.update();
         }
-        // --------------------------------------------
 
         // 7. HUD Clock
         document.getElementById('sim-clock').innerText = 
             `⏱ ${formatTime(simTime)} (${simSettings.playbackSpeed}×)`;
 
-        if (controls) controls.update();
         if (renderer) renderer.render(scene, camera);
     }
 
@@ -2955,6 +3213,7 @@
         if (renderer) renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
+    initHeroSplashSatellite();
     populateSaves();
     animate();
     
