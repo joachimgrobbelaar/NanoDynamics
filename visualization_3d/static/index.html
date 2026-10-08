@@ -27,12 +27,30 @@
         .lab-btn { background: #7c3aed !important; }
         .lab-btn:hover { background: #6d28d9 !important; }
 
-        /* Sidebar */
+        /* Sidebar & Collapse Toggle */
         #sidebar {
             position: absolute; top: 46px; left: 0; width: 310px; height: calc(100% - 46px);
-            background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(10px);
+            background: rgba(15, 23, 42, 0.92); backdrop-filter: blur(10px);
             color: #f8fafc; border-right: 1px solid #334155;
             padding: 14px; box-sizing: border-box; overflow-y: auto; z-index: 90;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        #sidebar.collapsed {
+            transform: translateX(-100%);
+        }
+        #sidebar-toggle-btn {
+            position: absolute; top: 54px; left: 310px; z-index: 95;
+            background: rgba(15, 23, 42, 0.92); border: 1px solid #334155; border-left: none;
+            color: #38bdf8; width: 22px; height: 38px; border-radius: 0 6px 6px 0;
+            display: flex; align-items: center; justify-content: center; cursor: pointer;
+            font-size: 11px; font-weight: bold; transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.15s;
+            backdrop-filter: blur(8px); box-shadow: 2px 2px 8px rgba(0,0,0,0.4);
+        }
+        #sidebar-toggle-btn:hover {
+            background: #2563eb; color: white; border-color: #3b82f6;
+        }
+        #sidebar.collapsed + #sidebar-toggle-btn {
+            left: 0px;
         }
         #sidebar h3 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; border-bottom: 1px solid #334155; padding-bottom: 6px; }
         
@@ -110,7 +128,7 @@
         /* Modals */
         .modal-overlay {
             display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.75); z-index: 200; justify-content: center; align-items: center;
+            background: rgba(0,0,0,0.8); z-index: 700 !important; justify-content: center; align-items: center;
         }
         .modal-content {
             background: #0f172a; color: white; padding: 22px; border-radius: 8px;
@@ -155,6 +173,7 @@
         /* Hide simulation HUD / Sidebars on Splash Screen */
         body.in-splash #top-nav,
         body.in-splash #sidebar,
+        body.in-splash #sidebar-toggle-btn,
         body.in-splash #sim-clock,
         body.in-splash #legend,
         body.in-splash #gui-container,
@@ -437,6 +456,7 @@
             <label><input type="checkbox" id="show-atm-layers" onchange="toggleAtmosphereLayers()"> ☁️ Show Atmospheric Layers</label>
         </div>
     </div>
+    <div id="sidebar-toggle-btn" onclick="toggleSidebarCollapse()" title="Toggle Sidebar Collapse">◀</div>
 
     <div id="floating-stat-box" style="display:none; position:absolute; pointer-events:none; z-index:110; background:rgba(15, 23, 42, 0.90); backdrop-filter:blur(6px); border:1px solid #38bdf8; border-radius:6px; padding:6px 10px; font-family:monospace; font-size:11px; color:#f8fafc; box-shadow:0 4px 12px rgba(0,0,0,0.5);">
         <div style="font-weight:bold; color:#38bdf8; margin-bottom:2px; display:flex; justify-content:space-between; gap:10px;">
@@ -872,10 +892,101 @@
         console.error("WebGL failed:", e);
     }
 
-    const sunLight = new THREE.DirectionalLight(0xffffff, 1.4);
-    sunLight.position.set(500000, 100000, 200000);
+    // ── Distant Sun & Celestial Illumination ──
+    const SUN_POS = new THREE.Vector3(750000, 150000, 300000);
+    const sunLight = new THREE.DirectionalLight(0xffffff, 1.65);
+    sunLight.position.copy(SUN_POS);
     scene.add(sunLight);
-    scene.add(new THREE.AmbientLight(0x2a2a35));
+
+    // Boosted ambient & fill illumination for clear satellite & trajectory visibility
+    const ambientLight = new THREE.AmbientLight(0x64748b, 0.95);
+    scene.add(ambientLight);
+    const hemiLight = new THREE.HemisphereLight(0x38bdf8, 0x1e293b, 0.55);
+    scene.add(hemiLight);
+
+    // ── Visual Glowing Sun in Distant Space ──
+    function buildVisualSun() {
+        const sunGroup = new THREE.Group();
+        sunGroup.position.copy(SUN_POS);
+
+        // Sun core sphere
+        const coreGeo = new THREE.SphereGeometry(14000, 32, 32);
+        const coreMat = new THREE.MeshBasicMaterial({ color: 0xfffbeb });
+        const sunCore = new THREE.Mesh(coreGeo, coreMat);
+        sunGroup.add(sunCore);
+
+        // Sun corona canvas glow sprite
+        const canvas = document.createElement('canvas');
+        canvas.width = 256; canvas.height = 256;
+        const ctx = canvas.getContext('2d');
+        const grad = ctx.createRadialGradient(128, 128, 10, 128, 128, 128);
+        grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+        grad.addColorStop(0.2, 'rgba(254, 240, 138, 0.85)');
+        grad.addColorStop(0.5, 'rgba(251, 146, 60, 0.35)');
+        grad.addColorStop(1, 'rgba(249, 115, 22, 0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 256, 256);
+
+        const tex = new THREE.CanvasTexture(canvas);
+        const spriteMat = new THREE.SpriteMaterial({ map: tex, transparent: true, blending: THREE.AdditiveBlending });
+        const corona = new THREE.Sprite(spriteMat);
+        corona.scale.set(120000, 120000, 1.0);
+        sunGroup.add(corona);
+
+        scene.add(sunGroup);
+    }
+    buildVisualSun();
+
+    // ── Deep-Space Multi-Colored Starfield ──
+    let starfieldPoints = null;
+    function buildDistantStarfield() {
+        const starGeo = new THREE.BufferGeometry();
+        const starCount = 9000;
+        const positions = new Float32Array(starCount * 3);
+        const colors = new Float32Array(starCount * 3);
+        const rStar = 1800000.0;
+
+        const palette = [
+            new THREE.Color(0xffffff), // White
+            new THREE.Color(0xbae6fd), // Cyan/Blue
+            new THREE.Color(0xfef08a), // Pale Yellow
+            new THREE.Color(0xfcd34d), // Amber
+            new THREE.Color(0xe9d5ff), // Violet
+        ];
+
+        for (let i = 0; i < starCount; i++) {
+            const u = Math.random();
+            const v = Math.random();
+            const theta = u * 2.0 * Math.PI;
+            const phi = Math.acos(2.0 * v - 1.0);
+            const sinPhi = Math.sin(phi);
+
+            positions[i * 3] = rStar * sinPhi * Math.cos(theta);
+            positions[i * 3 + 1] = rStar * sinPhi * Math.sin(theta);
+            positions[i * 3 + 2] = rStar * Math.cos(phi);
+
+            const c = palette[Math.floor(Math.random() * palette.length)];
+            const lum = 0.55 + Math.random() * 0.45;
+            colors[i * 3] = c.r * lum;
+            colors[i * 3 + 1] = c.g * lum;
+            colors[i * 3 + 2] = c.b * lum;
+        }
+
+        starGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        starGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+        const starMat = new THREE.PointsMaterial({
+            size: 2500,
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.88,
+            sizeAttenuation: true
+        });
+
+        starfieldPoints = new THREE.Points(starGeo, starMat);
+        scene.add(starfieldPoints);
+    }
+    buildDistantStarfield();
 
     const tl = new THREE.TextureLoader();
 
@@ -1363,6 +1474,18 @@
 
         if (sliceLen < 2) return;
 
+        const isSelected = (typeof selectedSatIndex !== 'undefined' && selectedSatIndex >= 0 && activeSatellites[selectedSatIndex] === sat);
+        if (isSelected) {
+            sat.line.material.opacity = 1.0;
+            sat.line.material.linewidth = 3;
+        } else if (typeof selectedSatIndex !== 'undefined' && selectedSatIndex >= 0) {
+            sat.line.material.opacity = 0.35;
+            sat.line.material.linewidth = 1;
+        } else {
+            sat.line.material.opacity = 0.88;
+            sat.line.material.linewidth = 2;
+        }
+
         const stride = Math.max(1, Math.ceil(sliceLen / MAX_TRAIL_PTS));
         const posAttr = sat.line.geometry.attributes.position;
         const colAttr = sat.line.geometry.attributes.color;
@@ -1370,6 +1493,7 @@
 
         const pts = [];
         let pIdx = 0;
+        const boost = isSelected ? 1.45 : 1.0;
         for (let i = startIdx; i < endIdx && pIdx < MAX_TRAIL_PTS; i += stride) {
             const x = b.x[i] * M_TO_KM;
             const y = b.y[i] * M_TO_KM;
@@ -1394,9 +1518,9 @@
                 brightness = 0.25 + 0.45 * frac;
             }
 
-            colAttr.array[pIdx * 3] = baseColor.r * brightness;
-            colAttr.array[pIdx * 3 + 1] = baseColor.g * brightness;
-            colAttr.array[pIdx * 3 + 2] = baseColor.b * brightness;
+            colAttr.array[pIdx * 3] = Math.min(1.0, baseColor.r * brightness * boost);
+            colAttr.array[pIdx * 3 + 1] = Math.min(1.0, baseColor.g * brightness * boost);
+            colAttr.array[pIdx * 3 + 2] = Math.min(1.0, baseColor.b * brightness * boost);
             pIdx++;
         }
 
@@ -3136,7 +3260,17 @@
     };
 
     window.toggleBackgroundStars = function(show) {
-        // Starfield toggle handler
+        if (typeof starfieldPoints !== 'undefined' && starfieldPoints) {
+            starfieldPoints.visible = show;
+        }
+    };
+
+    window.toggleSidebarCollapse = function() {
+        const sb = document.getElementById('sidebar');
+        const btn = document.getElementById('sidebar-toggle-btn');
+        if (!sb || !btn) return;
+        const collapsed = sb.classList.toggle('collapsed');
+        btn.innerText = collapsed ? '▶' : '◀';
     };
 
 
