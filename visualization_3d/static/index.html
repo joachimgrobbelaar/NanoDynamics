@@ -889,7 +889,6 @@
         })
     );
     scene.add(earth);
-    scene.add(new THREE.AxesHelper(R_EARTH_KM * 2.0));
 
     // High-Detail Latitude / Longitude Graticule Lines (Parallels & Meridians)
     function buildEarthGraticule() {
@@ -1040,6 +1039,7 @@
 
     // ── Coordinate Axes for Earth and Moon ──
     const axesHelperEarth = new THREE.AxesHelper(R_EARTH_KM * 1.5);
+    axesHelperEarth.visible = false;
     scene.add(axesHelperEarth);
 
     const axesHelperMoon = new THREE.AxesHelper(R_MOON_KM * 2.2);
@@ -1121,7 +1121,8 @@
     let lastExperimentCSV = null;
 
     function updateBodyAxes() {
-        if (!showAxesGlobal) {
+        if (!axesHelperEarth || !axesHelperMoon) return;
+        if ((typeof inSplashMode !== 'undefined' && inSplashMode) || !showAxesGlobal) {
             axesHelperEarth.visible = false;
             axesHelperMoon.visible = false;
             return;
@@ -3065,6 +3066,7 @@
         const splash = document.getElementById('splash-screen');
         if (splash) splash.classList.add('hidden');
         heroSplashElements.forEach(el => { el.visible = false; });
+        updateBodyAxes();
         focusView('Earth');
     };
 
@@ -3074,6 +3076,7 @@
         const splash = document.getElementById('splash-screen');
         if (splash) splash.classList.remove('hidden');
         heroSplashElements.forEach(el => { el.visible = true; });
+        updateBodyAxes();
     };
 
     window.transitionWithLoading = function(taskCallback, subtext = "Initializing Orbital Ephemeris...") {
