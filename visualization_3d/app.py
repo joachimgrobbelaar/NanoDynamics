@@ -6,7 +6,7 @@ import re
 import sys
 
 import numpy as np
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -41,7 +41,24 @@ from leo_simulator.tle_tracker import (
     get_satellite_by_norad,
 )
 
+
 app = FastAPI()
+
+active_hil_worker: WebSocket = None
+
+@app.websocket("/ws/hil-worker")
+async def websocket_hil_worker(websocket: WebSocket):
+    global active_hil_worker
+    await websocket.accept()
+    active_hil_worker = websocket
+    print("HIL worker connected.")
+    try:
+        while True:
+            # Keep alive
+            data = await websocket.receive_text()
+    except WebSocketDisconnect:
+        active_hil_worker = None
+        print("HIL worker disconnected.")
 
 
 @app.exception_handler(RequestValidationError)
@@ -269,6 +286,24 @@ def _log_sim_for_ml(params: SatelliteParams, dt_eval: float, chunk: dict) -> Non
         pass
 
 
+
+async def _propagate_chunk_async(prop, initial_state, t_start: float, chunk_duration: float, dt_eval: float = 10.0):
+    if hasattr(prop, 'propagate_async') and prop.network_ws is not None:
+        return await prop.propagate_async(
+            initial_state=np.asarray(initial_state, dtype=np.float64),
+            duration_seconds=chunk_duration,
+            t_start=t_start,
+            dt_eval=dt_eval,
+        )
+    else:
+        return await asyncio.to_thread(
+            prop.propagate,
+            initial_state=np.asarray(initial_state, dtype=np.float64),
+            duration_seconds=chunk_duration,
+            t_start=t_start,
+            dt_eval=dt_eval,
+        )
+
 def _propagate_chunk(prop: OrbitPropagator, initial_state, t_start: float,
                      chunk_duration: float, dt_eval: float = 10.0):
     """Propagate a chunk. Returns PropagationResult."""
@@ -395,6 +430,9 @@ async def simulate_satellite(params: SatelliteParams):
                 min_altitude_reentry=50_000.0,
             )
             prop.attach_hardware_agent()
+            global active_hil_worker
+            if active_hil_worker is not None:
+                prop.network_ws = active_hil_worker
         else:
             prop = _build_propagator(params)
         
@@ -411,9 +449,12 @@ async def simulate_satellite(params: SatelliteParams):
         chunk_duration = body["default_chunk_duration"]
         dt_eval = body["dt_eval"]
 
-        res = await asyncio.to_thread(
-            prop.propagate, orbit, chunk_duration, params.t_start, dt_eval
-        )
+        if is_pinn and hasattr(prop, 'propagate_async') and prop.network_ws is not None:
+            res = await prop.propagate_async(orbit=orbit, duration_seconds=chunk_duration, t_start=params.t_start, dt_eval=dt_eval)
+        else:
+            res = await asyncio.to_thread(
+                prop.propagate, orbit, chunk_duration, params.t_start, dt_eval
+            )
         chunk = _format_chunk(res, prop, body["radius_m"], include_forces=True)
 
         # Return final Cartesian state for /stream continuity
@@ -461,11 +502,13 @@ async def stream_chunk(req: StreamRequest):
                 min_altitude_reentry=50_000.0,
             )
             prop.attach_hardware_agent()
+            global active_hil_worker
+            if active_hil_worker is not None:
+                prop.network_ws = active_hil_worker
         else:
             prop = _build_propagator(req.params)
         dt_eval = req.dt_eval if req.dt_eval else body["dt_eval"]
-        res = await asyncio.to_thread(
-            _propagate_chunk, prop, req.state, req.t_start, req.chunk_duration, dt_eval
+        res = await _propagate_chunk_async( prop, req.state, req.t_start, req.chunk_duration, dt_eval
         )
         chunk = _format_chunk(res, prop, body["radius_m"], include_forces=True)
         last_state = res.r[-1].tolist() + res.v[-1].tolist()
@@ -521,8 +564,7 @@ async def preview_burn(req: BurnRequest, duration_s: float = 7200.0):
         
         dt_eval = max(20.0, min(300.0, preview_dur / 300.0))
 
-        res = await asyncio.to_thread(
-            _propagate_chunk, prop, new_state, req.t_burn, preview_dur, dt_eval
+        res = await _propagate_chunk_async( prop, new_state, req.t_burn, preview_dur, dt_eval
         )
         chunk = _format_chunk(res, prop, body["radius_m"], include_forces=False)
 
@@ -576,8 +618,7 @@ async def execute_burn(req: BurnRequest):
         
         dt_eval = max(body["dt_eval"], min(300.0, chunk_duration / 400.0))
 
-        res = await asyncio.to_thread(
-            _propagate_chunk, prop, new_state, req.t_burn, chunk_duration, dt_eval
+        res = await _propagate_chunk_async( prop, new_state, req.t_burn, chunk_duration, dt_eval
         )
         chunk = _format_chunk(res, prop, body["radius_m"], include_forces=True)
         last_state = res.r[-1].tolist() + res.v[-1].tolist()
@@ -634,6 +675,9 @@ async def resolve_collision(req: CollisionRequest):
                 mu=body1["mu"], r_earth=body1["radius_m"], omega_earth=body1["omega"], min_altitude_reentry=50_000.0,
             )
             prop1.attach_hardware_agent()
+            global active_hil_worker
+            if active_hil_worker is not None:
+                prop1.network_ws = active_hil_worker
         else:
             prop1 = _build_propagator(req.sat1_params)
 
@@ -643,6 +687,9 @@ async def resolve_collision(req: CollisionRequest):
                 mu=body2["mu"], r_earth=body2["radius_m"], omega_earth=body2["omega"], min_altitude_reentry=50_000.0,
             )
             prop2.attach_hardware_agent()
+            global active_hil_worker
+            if active_hil_worker is not None:
+                prop2.network_ws = active_hil_worker
         else:
             prop2 = _build_propagator(req.sat2_params)
 
