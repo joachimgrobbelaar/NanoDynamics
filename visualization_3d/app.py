@@ -394,6 +394,7 @@ async def simulate_satellite(params: SatelliteParams):
                 omega_earth=body["omega"],
                 min_altitude_reentry=50_000.0,
             )
+            prop.attach_hardware_agent()
         else:
             prop = _build_propagator(params)
         
@@ -459,6 +460,7 @@ async def stream_chunk(req: StreamRequest):
                 omega_earth=body["omega"],
                 min_altitude_reentry=50_000.0,
             )
+            prop.attach_hardware_agent()
         else:
             prop = _build_propagator(req.params)
         dt_eval = req.dt_eval if req.dt_eval else body["dt_eval"]
@@ -631,6 +633,7 @@ async def resolve_collision(req: CollisionRequest):
                 satellite=Satellite(name=req.sat1_params.name, mass=req.sat1_params.mass, drag_area=req.sat1_params.drag_area, cd=req.sat1_params.cd),
                 mu=body1["mu"], r_earth=body1["radius_m"], omega_earth=body1["omega"], min_altitude_reentry=50_000.0,
             )
+            prop1.attach_hardware_agent()
         else:
             prop1 = _build_propagator(req.sat1_params)
 
@@ -639,6 +642,7 @@ async def resolve_collision(req: CollisionRequest):
                 satellite=Satellite(name=req.sat2_params.name, mass=req.sat2_params.mass, drag_area=req.sat2_params.drag_area, cd=req.sat2_params.cd),
                 mu=body2["mu"], r_earth=body2["radius_m"], omega_earth=body2["omega"], min_altitude_reentry=50_000.0,
             )
+            prop2.attach_hardware_agent()
         else:
             prop2 = _build_propagator(req.sat2_params)
 

@@ -65,6 +65,7 @@ class PINNPropagator:
         self.r_earth = r_earth
         self.omega_earth = omega_earth
         self.min_altitude_reentry = min_altitude_reentry
+        self.hardware_agent = None
         self.satellite = satellite if satellite is not None else Satellite.cubesat_3u()
 
         # Dynamics instance for physical force vector computation along surrogate path
@@ -131,6 +132,22 @@ class PINNPropagator:
 
         self.model = model
         self.stats = stats
+
+    def attach_hardware_agent(self, port='/dev/ttyUSB0', baudrate=115200):
+        """Attaches an ESP32 hardware agent for Hardware-In-The-Loop simulation."""
+        import sys
+        import os
+        # Add the hardware_in_the_loop directory to the path so we can import esp32_bridge
+        hw_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "hardware_in_the_loop"))
+        if hw_dir not in sys.path:
+            sys.path.insert(0, hw_dir)
+        try:
+            from esp32_bridge import ESP32HardwareAgent
+            self.hardware_agent = ESP32HardwareAgent(port=port, baudrate=baudrate)
+            print("Hardware agent attached successfully.")
+        except Exception as e:
+            print(f"Failed to attach hardware agent: {e}")
+            self.hardware_agent = None
 
     def propagate(
         self,
@@ -204,8 +221,13 @@ class PINNPropagator:
                 state_norm = (
                     torch.tensor(np.concatenate([curr_r, curr_v]), dtype=torch.float32) / sc
                 ).unsqueeze(0)
-                next_norm = self.model(state_norm).squeeze(0)
-                unscaled = (next_norm * sc).numpy().astype(np.float64)
+                
+                if self.hardware_agent is not None:
+                    next_norm_np = self.hardware_agent.step(state_norm.squeeze(0).numpy().tolist())
+                    unscaled = (next_norm_np * sc.numpy()).astype(np.float64)
+                else:
+                    next_norm = self.model(state_norm).squeeze(0)
+                    unscaled = (next_norm * sc).numpy().astype(np.float64)
 
                 r_nn = unscaled[0:3]
                 v_nn = unscaled[3:6]
