@@ -430,7 +430,6 @@ async def simulate_satellite(params: SatelliteParams):
                 min_altitude_reentry=50_000.0,
             )
             prop.attach_hardware_agent()
-            global active_hil_worker
             if active_hil_worker is not None:
                 prop.network_ws = active_hil_worker
         else:
@@ -502,7 +501,6 @@ async def stream_chunk(req: StreamRequest):
                 min_altitude_reentry=50_000.0,
             )
             prop.attach_hardware_agent()
-            global active_hil_worker
             if active_hil_worker is not None:
                 prop.network_ws = active_hil_worker
         else:
@@ -675,7 +673,6 @@ async def resolve_collision(req: CollisionRequest):
                 mu=body1["mu"], r_earth=body1["radius_m"], omega_earth=body1["omega"], min_altitude_reentry=50_000.0,
             )
             prop1.attach_hardware_agent()
-            global active_hil_worker
             if active_hil_worker is not None:
                 prop1.network_ws = active_hil_worker
         else:
@@ -687,7 +684,6 @@ async def resolve_collision(req: CollisionRequest):
                 mu=body2["mu"], r_earth=body2["radius_m"], omega_earth=body2["omega"], min_altitude_reentry=50_000.0,
             )
             prop2.attach_hardware_agent()
-            global active_hil_worker
             if active_hil_worker is not None:
                 prop2.network_ws = active_hil_worker
         else:
