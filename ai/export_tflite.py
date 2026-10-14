@@ -14,7 +14,7 @@ from transition_model import TransitionMLP
 
 def main():
     # 1. Load PyTorch model
-    ckpt_path = os.path.join(AI_DIR, "checkpoints", "transition.pt")
+    ckpt_path = os.path.join(AI_DIR, "checkpoints", "agent", "transition.pt")
     ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
     hidden = ckpt["config"]["hidden_dim"]
     layers = ckpt["config"]["hidden_layers"]
