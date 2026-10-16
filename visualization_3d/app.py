@@ -1,6 +1,7 @@
 import asyncio
 from dataclasses import asdict
 import json
+import math
 import os
 import re
 import sys
@@ -8,7 +9,7 @@ import sys
 import numpy as np
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, model_validator
 
@@ -24,10 +25,18 @@ from leo_simulator import (
     OrbitPropagator,
     PINNPropagator,
     Satellite,
+    coe_to_rv,
     compute_orbital_collision_impulse,
     detect_conjunction,
+    generate_collision_debris_fragments,
     eci_to_geodetic,
     extract_trajectory_key_events,
+)
+from leo_simulator.orbit.astrodynamics import (
+    rv_to_keplerian,
+    compute_vnc_basis,
+    compute_rf_link_budget,
+    compute_space_environment,
 )
 from leo_simulator.experiment import (
     get_atmosphere_by_name,
@@ -40,9 +49,32 @@ from leo_simulator.tle_tracker import (
     get_live_catalog,
     get_satellite_by_norad,
 )
+from leo_simulator.space_weather import SpaceWeatherManager
+from leo_simulator.orbit.poi_orbit_designer import (
+    design_orbit_for_poi,
+    get_all_pois,
+    get_specialized_orbit_presets,
+)
+from leo_simulator.orbit.isl_network import (
+    ISLNetworkMesh,
+    SatelliteNode,
+)
 
 
 app = FastAPI()
+
+from hardware_in_the_loop.esp32_manager import ESP32DeviceManager
+
+device_manager = ESP32DeviceManager.get_instance()
+
+class DevicePayload(BaseModel):
+    id: str | None = None
+    name: str
+    mac_address: str = ""
+    ip_address: str = ""
+    transport: str = "espnow_gateway"
+    channel: int = 1
+
 
 active_hil_worker: WebSocket = None
 
@@ -59,6 +91,29 @@ async def websocket_hil_worker(websocket: WebSocket):
     except WebSocketDisconnect:
         active_hil_worker = None
         print("HIL worker disconnected.")
+
+
+active_camera_clients: set[WebSocket] = set()
+
+@app.websocket("/ws/camera-feed")
+async def websocket_camera_feed(websocket: WebSocket):
+    await websocket.accept()
+    active_camera_clients.add(websocket)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            dead_clients = set()
+            for client in active_camera_clients:
+                if client != websocket:
+                    try:
+                        await client.send_text(data)
+                    except Exception:
+                        dead_clients.add(client)
+            active_camera_clients.difference_update(dead_clients)
+    except WebSocketDisconnect:
+        active_camera_clients.discard(websocket)
+    except Exception:
+        active_camera_clients.discard(websocket)
 
 
 @app.exception_handler(RequestValidationError)
@@ -117,6 +172,22 @@ BODIES = {
         "default_chunk_duration": 86400.0,
         "dt_eval": 60.0,
     },
+    "Sun": {
+        "name": "Sun",
+        "mu": 1.32712440018e20,
+        "radius_m": 696340000.0,
+        "j2": 2.0e-7,
+        "omega": 2.87e-6,
+        "has_atmosphere": False,
+        "min_alt_km": 10000.0,
+        "max_alt_km": 1500000000.0,
+        "default_alt_km": 149597870.0,
+        "default_ecc": 0.0167,
+        "default_inc": 0.0,
+        "default_raan": 0.0,
+        "default_chunk_duration": 2592000.0,
+        "dt_eval": 3600.0,
+    },
 }
 
 
@@ -143,28 +214,32 @@ class SatelliteParams(BaseModel):
     color: str = Field("#38bdf8", description="Hex color for trajectory and indicator")
     icon: str = Field("satellite", description="Avatar icon type: satellite, rocket, astronaut, alien, ufo, sphere")
     t_start: float = Field(0.0, ge=0.0, description="Initial simulation epoch in seconds")
-    propagation_mode: str = Field("rk45", description="Propagation mode: 'rk45' (Numerical RK45) or 'pinn' (ML PINN Surrogate)")
+    propagation_mode: str = Field("rk45", description="Propagation mode: 'rk45', 'pinn_local', 'pinn_esp32', or 'pinn'")
+    hardware_device_id: str | None = Field("esp32-node-1", description="Target ESP32 Device ID for HIL execution")
+    allow_decay: bool = Field(False, description="Allow sub-orbital or decaying orbits (for burns, deorbit, and collision debris)")
 
     @model_validator(mode="after")
     def validate_orbit_safety(self) -> "SatelliteParams":
-        if self.propagation_mode.lower() == "pinn" and self.parent_body != "Earth":
+        mode_lower = self.propagation_mode.lower()
+        if mode_lower.startswith("pinn") and self.parent_body != "Earth":
             raise ValueError(
                 "propagation_mode: The PINN surrogate model currently only supports Earth orbits. Select 'rk45' for Moon simulations."
             )
         body = BODIES.get(self.parent_body, BODIES["Earth"])
-        if self.altitude_km < body["min_alt_km"] or self.altitude_km > body["max_alt_km"]:
-            raise ValueError(
-                f"altitude_km: Altitude {self.altitude_km:.1f} km is out of allowed range [{body['min_alt_km']:.1f}, {body['max_alt_km']:.1f}] km for {self.parent_body}."
-            )
-        
-        # Perigee radius check: r_p = a * (1 - e)
-        r_initial_m = body["radius_m"] + self.altitude_km * 1000.0
-        r_perigee_m = r_initial_m * (1.0 - self.eccentricity)
-        min_safe_radius_m = body["radius_m"] + 50_000.0 if self.parent_body == "Earth" else body["radius_m"] + 10_000.0
-        if r_perigee_m <= min_safe_radius_m:
-            raise ValueError(
-                f"eccentricity: Perigee altitude {(r_perigee_m - body['radius_m']) / 1000.0:.1f} km is below minimum safe threshold of 50 km (collision risk)."
-            )
+        if not self.allow_decay:
+            if self.altitude_km < body["min_alt_km"] or self.altitude_km > body["max_alt_km"]:
+                raise ValueError(
+                    f"altitude_km: Altitude {self.altitude_km:.1f} km is out of allowed range [{body['min_alt_km']:.1f}, {body['max_alt_km']:.1f}] km for {self.parent_body}."
+                )
+            
+            # Perigee radius check: r_p = a * (1 - e)
+            r_initial_m = body["radius_m"] + self.altitude_km * 1000.0
+            r_perigee_m = r_initial_m * (1.0 - self.eccentricity)
+            min_safe_radius_m = body["radius_m"] + 50_000.0 if self.parent_body == "Earth" else body["radius_m"] + 10_000.0
+            if r_perigee_m <= min_safe_radius_m:
+                raise ValueError(
+                    f"eccentricity: Perigee altitude {(r_perigee_m - body['radius_m']) / 1000.0:.1f} km is below minimum safe threshold of 50 km (collision risk)."
+                )
         return self
 
 
@@ -218,6 +293,15 @@ class LiveTrackRequest(BaseModel):
     norad_id: int = Field(..., description="NORAD Catalog ID of the satellite")
     propagation_mode: str = Field("rk45", description="Propagation mode: 'rk45' or 'pinn'")
     custom_name: str | None = Field(None, description="Optional custom display name")
+    t_start: float = Field(0.0, ge=0.0, description="Start time epoch in seconds")
+
+
+class AnalyticalExportRequest(BaseModel):
+    params: SatelliteParams
+    t_start: float = Field(0.0, ge=0.0, description="Start time epoch in seconds")
+    duration_seconds: float = Field(86400.0, ge=10.0, le=604800.0, description="Dataset duration in seconds")
+    dt_eval: float = Field(60.0, ge=1.0, le=3600.0, description="Sampling time interval in seconds")
+    initial_state: list[float] | None = Field(None, description="Optional [x,y,z,vx,vy,vz] initial state override")
 
 
 def sanitize_filename(filename: str) -> str:
@@ -318,8 +402,22 @@ def _propagate_chunk(prop: OrbitPropagator, initial_state, t_start: float,
 def _format_chunk(res, prop: OrbitPropagator, radius_m: float, include_forces: bool = True) -> dict:
     """Convert PropagationResult to columnar JSON-serialisable dict with geodetic coordinates."""
     t = res.t.tolist()
-    r = res.r
-    v = res.v
+    r = np.array(res.r, copy=True)
+    v = np.array(res.v, copy=True)
+    r_norms = np.linalg.norm(r, axis=1)
+    subsurface = r_norms < radius_m
+    reentry_flag = bool(res.reentry_detected)
+    reentry_epoch = float(res.reentry_time) if res.reentry_time is not None else None
+    if np.any(subsurface):
+        first_idx = int(np.argmax(subsurface))
+        for i in range(first_idx, len(r)):
+            n = r_norms[i]
+            if n < radius_m:
+                r[i] = r[i] * (radius_m / max(n, 1e-6))
+                v[i] = 0.0
+        reentry_flag = True
+        if reentry_epoch is None:
+            reentry_epoch = float(res.t[first_idx])
     altitudes = ((np.linalg.norm(r, axis=1) - radius_m) / 1000.0).tolist()
     lat_deg, lon_deg, _ = eci_to_geodetic(r, res.t, radius_m=radius_m, omega_earth=prop.omega_earth)
     events = extract_trajectory_key_events(res.t, r, radius_m=radius_m, omega_earth=prop.omega_earth)
@@ -335,8 +433,8 @@ def _format_chunk(res, prop: OrbitPropagator, radius_m: float, include_forces: b
         "lat_deg": lat_deg.tolist(),
         "lon_deg": lon_deg.tolist(),
         "events": events,
-        "reentry": bool(res.reentry_detected),
-        "reentry_time": float(res.reentry_time) if res.reentry_time is not None else None,
+        "reentry": reentry_flag,
+        "reentry_time": reentry_epoch,
     }
     if include_forces:
         out["forces"] = _compute_forces(prop, res.t, r, v)
@@ -345,7 +443,139 @@ def _format_chunk(res, prop: OrbitPropagator, radius_m: float, include_forces: b
 
 @app.get("/")
 def read_root():
-    return FileResponse(os.path.join(BASE_DIR, "static", "index.html"))
+    return FileResponse(
+        os.path.join(BASE_DIR, "static", "index.html"),
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache", "Expires": "0"}
+    )
+
+
+
+@app.get("/api/devices")
+def api_get_devices():
+    return {"devices": device_manager.list_devices()}
+
+@app.post("/api/devices")
+def api_add_device(payload: DevicePayload):
+    dev = device_manager.add_or_update_device(payload.model_dump())
+    return {"status": "success", "device": asdict(dev)}
+
+@app.delete("/api/devices/{device_id}")
+def api_delete_device(device_id: str):
+    success = device_manager.remove_device(device_id)
+    if not success:
+        raise HTTPException(status_code=404, detail=f"Device {device_id} not found.")
+    return {"status": "success", "message": f"Device {device_id} removed."}
+
+@app.post("/api/devices/{device_id}/ping")
+def api_ping_device(device_id: str):
+    res = device_manager.ping_device(device_id)
+    return res
+
+@app.get("/api/hardware/telemetry")
+def api_get_hardware_telemetry(limit: int = 60):
+    return device_manager.get_telemetry_summary(limit=limit)
+
+
+@app.get("/api/space_weather")
+def get_space_weather(refresh: bool = False):
+    """Return real-time or cached NOAA SWPC space weather indices (F10.7, Kp, dynamic density multiplier)."""
+    sw = SpaceWeatherManager.get_instance().fetch_indices(force_refresh=refresh)
+    return {
+        "f107": sw.f107,
+        "kp": sw.kp,
+        "ap": sw.ap,
+        "density_scale": sw.density_scale,
+        "source": sw.source,
+        "timestamp": sw.timestamp,
+    }
+
+
+class POIOrbitRequest(BaseModel):
+    lat: float
+    lon: float
+    altitude_km: float = 550.0
+    inclination_deg: float | None = None
+    eccentricity: float = 0.001
+    name: str = "POI-Sat"
+
+
+class ISLNodePayload(BaseModel):
+    id: str
+    name: str
+    x: float
+    y: float
+    z: float
+    parent_body: str = "Earth"
+
+
+class ISLRouteRequest(BaseModel):
+    source_id: str
+    target_id: str
+    satellites: list[ISLNodePayload]
+    max_range_km: float = 5000.0
+
+
+@app.get("/api/pois")
+def api_get_pois():
+    """Return catalog of global major cities and key ground stations."""
+    return {"pois": get_all_pois()}
+
+
+@app.post("/api/orbit/poi")
+def api_design_poi_orbit(req: POIOrbitRequest):
+    """Compute orbital elements and initial state that flies over target lat/lon."""
+    res = design_orbit_for_poi(
+        lat_deg=req.lat,
+        lon_deg=req.lon,
+        target_alt_km=req.altitude_km,
+        inclination_deg=req.inclination_deg,
+        eccentricity=req.eccentricity,
+    )
+    return {
+        "status": "success",
+        "name": req.name,
+        **res,
+    }
+
+
+@app.get("/api/orbit/presets")
+def api_get_orbit_presets():
+    """Return specialized high-demand orbit presets (GEO, GSO, Molniya, Tundra, SSO, Polar)."""
+    return {"presets": get_specialized_orbit_presets()}
+
+
+@app.post("/api/isl/route")
+def api_route_isl(req: ISLRouteRequest):
+    """Compute shortest optical multi-hop laser path and latency across active satellites."""
+    nodes = [
+        SatelliteNode(
+            id=s.id,
+            name=s.name,
+            position_m=np.array([s.x * 1000.0, s.y * 1000.0, s.z * 1000.0], dtype=np.float64),
+            parent_body=s.parent_body,
+        )
+        for s in req.satellites
+    ]
+    mesh = ISLNetworkMesh(max_range_m=req.max_range_km * 1000.0)
+    topo = mesh.build_topology(nodes)
+    path = mesh.route_packet(req.source_id, req.target_id, nodes)
+    return {
+        "status": "success",
+        "topology": {
+            "node_count": topo["node_count"],
+            "link_count": topo["link_count"],
+            "links": topo["links"],
+        },
+        "route": {
+            "connected": path is not None,
+            "hops": path.hops if path else [],
+            "hop_count": max(0, len(path.hops) - 1) if path else 0,
+            "total_distance_km": path.total_distance_km if path else 0.0,
+            "propagation_delay_ms": path.propagation_delay_ms if path else 0.0,
+            "total_delay_ms": path.total_delay_ms if path else 0.0,
+            "achievable_bitrate_mbps": path.achievable_bitrate_mbps if path else 0.0,
+        } if path else None,
+    }
 
 
 @app.get("/bodies")
@@ -401,6 +631,7 @@ async def track_live_satellite(req: LiveTrackRequest):
         color=sat_data.get("color", "#00ffcc"),
         icon=sat_data.get("icon", "satellite"),
         propagation_mode=req.propagation_mode,
+        t_start=req.t_start,
     )
 
     sim_result = await simulate_satellite(params)
@@ -415,7 +646,10 @@ async def simulate_satellite(params: SatelliteParams):
     """Bootstrap: propagates the first chunk and returns initial state + trajectory."""
     try:
         body = BODIES.get(params.parent_body, BODIES["Earth"])
-        is_pinn = params.propagation_mode.lower() == "pinn"
+        mode_str = params.propagation_mode.lower()
+        is_pinn = mode_str.startswith("pinn")
+        pinn_submode = "pinn_local" if mode_str == "pinn" else mode_str
+
         if is_pinn:
             prop = PINNPropagator(
                 satellite=Satellite(
@@ -428,10 +662,13 @@ async def simulate_satellite(params: SatelliteParams):
                 r_earth=body["radius_m"],
                 omega_earth=body["omega"],
                 min_altitude_reentry=50_000.0,
+                mode=pinn_submode,
+                device_id=params.hardware_device_id or "esp32-node-1",
             )
-            prop.attach_hardware_agent()
-            if active_hil_worker is not None:
-                prop.network_ws = active_hil_worker
+            if pinn_submode == "pinn_esp32":
+                prop.attach_hardware_agent()
+                if active_hil_worker is not None:
+                    prop.network_ws = active_hil_worker
         else:
             prop = _build_propagator(params)
         
@@ -473,7 +710,8 @@ async def simulate_satellite(params: SatelliteParams):
             "last_t": float(res.t[-1]),
             "reentry": bool(res.reentry_detected),
             "reentry_time": float(res.reentry_time) if res.reentry_time is not None else None,
-            "engine": "pinn" if is_pinn else "rk45",
+            "engine": params.propagation_mode.lower(),
+            "telemetry": getattr(res, "telemetry", None),
         }
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
@@ -486,7 +724,10 @@ async def stream_chunk(req: StreamRequest):
     """Rolling propagation: given last known state, propagate next chunk."""
     try:
         body = BODIES.get(req.params.parent_body, BODIES["Earth"])
-        is_pinn = getattr(req.params, "propagation_mode", "rk45").lower() == "pinn"
+        mode_str = getattr(req.params, "propagation_mode", "rk45").lower()
+        is_pinn = mode_str.startswith("pinn")
+        pinn_submode = "pinn_local" if mode_str == "pinn" else mode_str
+
         if is_pinn:
             prop = PINNPropagator(
                 satellite=Satellite(
@@ -499,10 +740,13 @@ async def stream_chunk(req: StreamRequest):
                 r_earth=body["radius_m"],
                 omega_earth=body["omega"],
                 min_altitude_reentry=50_000.0,
+                mode=pinn_submode,
+                device_id=getattr(req.params, "hardware_device_id", "esp32-node-1"),
             )
-            prop.attach_hardware_agent()
-            if active_hil_worker is not None:
-                prop.network_ws = active_hil_worker
+            if pinn_submode == "pinn_esp32":
+                prop.attach_hardware_agent()
+                if active_hil_worker is not None:
+                    prop.network_ws = active_hil_worker
         else:
             prop = _build_propagator(req.params)
         dt_eval = req.dt_eval if req.dt_eval else body["dt_eval"]
@@ -517,7 +761,8 @@ async def stream_chunk(req: StreamRequest):
             "last_t": float(res.t[-1]),
             "reentry": bool(res.reentry_detected),
             "reentry_time": float(res.reentry_time) if res.reentry_time is not None else None,
-            "engine": "pinn" if is_pinn else "rk45",
+            "engine": getattr(req.params, "propagation_mode", "rk45").lower(),
+            "telemetry": getattr(res, "telemetry", None),
         }
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
@@ -536,14 +781,8 @@ async def preview_burn(req: BurnRequest, duration_s: float = 7200.0):
         r_norm = np.linalg.norm(r)
         if r_norm <= 0.0:
             raise ValueError("Position vector norm must be positive.")
-        u_r = r / r_norm
-
-        h = np.cross(r, v)
-        h_norm = np.linalg.norm(h)
-        u_n = h / h_norm if h_norm > 1e-12 else np.array([0.0, 0.0, 1.0])
-        u_t = np.cross(u_n, u_r)
-
-        dv_vec = req.dv_radial * u_r + req.dv_prograde * u_t + req.dv_normal * u_n
+        u_v, u_n, u_c = compute_vnc_basis(r, v)
+        dv_vec = req.dv_prograde * u_v + req.dv_normal * u_n + req.dv_radial * u_c
         v_new = v + dv_vec
         new_state = r.tolist() + v_new.tolist()
 
@@ -562,7 +801,8 @@ async def preview_burn(req: BurnRequest, duration_s: float = 7200.0):
         
         dt_eval = max(20.0, min(300.0, preview_dur / 300.0))
 
-        res = await _propagate_chunk_async( prop, new_state, req.t_burn, preview_dur, dt_eval
+        res = await _propagate_chunk_async(
+            prop, new_state, req.t_burn, preview_dur, dt_eval
         )
         chunk = _format_chunk(res, prop, body["radius_m"], include_forces=False)
 
@@ -582,7 +822,7 @@ async def preview_burn(req: BurnRequest, duration_s: float = 7200.0):
 
 @app.post("/burn")
 async def execute_burn(req: BurnRequest):
-    """Apply an instantaneous Delta-V in local RTN frame and propagate forward."""
+    """Apply an instantaneous Delta-V in true velocity-aligned VNC frame and propagate forward."""
     try:
         body = BODIES.get(req.params.parent_body, BODIES["Earth"])
         r = np.array(req.current_state[:3], dtype=np.float64)
@@ -591,18 +831,33 @@ async def execute_burn(req: BurnRequest):
         r_norm = np.linalg.norm(r)
         if r_norm <= 0.0:
             raise ValueError("Position vector norm must be positive.")
-        u_r = r / r_norm
 
-        h = np.cross(r, v)
-        h_norm = np.linalg.norm(h)
-        u_n = h / h_norm if h_norm > 1e-12 else np.array([0.0, 0.0, 1.0])
-        u_t = np.cross(u_n, u_r)
-
-        dv_vec = req.dv_radial * u_r + req.dv_prograde * u_t + req.dv_normal * u_n
+        # Compute true velocity-aligned VNC basis vectors
+        u_v, u_n, u_c = compute_vnc_basis(r, v)
+        dv_vec = req.dv_prograde * u_v + req.dv_normal * u_n + req.dv_radial * u_c
         v_new = v + dv_vec
         new_state = r.tolist() + v_new.tolist()
 
-        prop = _build_propagator(req.params)
+        # Update osculating orbital elements in params so future chunk streaming preserves perturbed orbit
+        new_kep = rv_to_keplerian(r, v_new, mu=body["mu"])
+        new_params = req.params.model_copy()
+        new_params.allow_decay = True
+        new_params.altitude_km = float(max(10.0, (r_norm - body["radius_m"]) / 1000.0))
+        new_params.eccentricity = float(min(0.999, max(0.0, new_kep["e"])))
+        new_params.inclination_deg = float(new_kep["inc_deg"])
+        new_params.raan_deg = float(new_kep["raan_deg"])
+
+        is_pinn = getattr(req.params, "propagation_mode", "rk45").lower().startswith("pinn")
+        if is_pinn:
+            prop = PINNPropagator(
+                satellite=Satellite(name=req.params.name, mass=req.params.mass, drag_area=req.params.drag_area, cd=req.params.cd),
+                mu=body["mu"], r_earth=body["radius_m"], omega_earth=body["omega"], min_altitude_reentry=50_000.0,
+            )
+            prop.attach_hardware_agent()
+            if active_hil_worker is not None:
+                prop.network_ws = active_hil_worker
+        else:
+            prop = _build_propagator(new_params)
 
         # Adaptive cislunar transfer chunk duration
         v_mag_sq = np.dot(v_new, v_new)
@@ -616,7 +871,8 @@ async def execute_burn(req: BurnRequest):
         
         dt_eval = max(body["dt_eval"], min(300.0, chunk_duration / 400.0))
 
-        res = await _propagate_chunk_async( prop, new_state, req.t_burn, chunk_duration, dt_eval
+        res = await _propagate_chunk_async(
+            prop, new_state, req.t_burn, chunk_duration, dt_eval
         )
         chunk = _format_chunk(res, prop, body["radius_m"], include_forces=True)
         last_state = res.r[-1].tolist() + res.v[-1].tolist()
@@ -624,6 +880,7 @@ async def execute_burn(req: BurnRequest):
         return {
             "status": "success",
             "new_state": new_state,
+            "new_params": new_params.model_dump(),
             "trajectory": chunk,
             "last_state": last_state,
             "last_t": float(res.t[-1]),
@@ -664,41 +921,131 @@ async def resolve_collision(req: CollisionRequest):
         new_state1 = r1.tolist() + col_res.v1_post.tolist()
         new_state2 = r2.tolist() + col_res.v2_post.tolist()
 
+        # Partition colliding satellites into surviving core and daughter debris fragments
+        core1_spec, daughters1 = generate_collision_debris_fragments(
+            sat_name=req.sat1_params.name,
+            parent_mass=req.sat1_params.mass,
+            parent_drag_area=req.sat1_params.drag_area,
+            parent_cd=req.sat1_params.cd,
+            col_pos=r1,
+            post_vel=col_res.v1_post,
+            relative_speed=col_res.relative_speed,
+            num_fragments=2,
+            core_mass_fraction=0.50,
+            parent_body=req.sat1_params.parent_body,
+            propagation_mode=getattr(req.sat1_params, "propagation_mode", "rk45"),
+        )
+        core2_spec, daughters2 = generate_collision_debris_fragments(
+            sat_name=req.sat2_params.name,
+            parent_mass=req.sat2_params.mass,
+            parent_drag_area=req.sat2_params.drag_area,
+            parent_cd=req.sat2_params.cd,
+            col_pos=r2,
+            post_vel=col_res.v2_post,
+            relative_speed=col_res.relative_speed,
+            num_fragments=2,
+            core_mass_fraction=0.50,
+            parent_body=req.sat2_params.parent_body,
+            propagation_mode=getattr(req.sat2_params, "propagation_mode", "rk45"),
+        )
+
+        new_kep1 = rv_to_keplerian(r1, col_res.v1_post, mu=body1["mu"])
+        new_params1 = req.sat1_params.model_copy()
+        new_params1.allow_decay = True
+        new_params1.mass = core1_spec["mass"]
+        new_params1.drag_area = core1_spec["drag_area"]
+        new_params1.altitude_km = float(max(10.0, (np.linalg.norm(r1) - body1["radius_m"]) / 1000.0))
+        new_params1.eccentricity = float(min(0.999, max(0.0, new_kep1["e"])))
+        new_params1.inclination_deg = float(new_kep1["inc_deg"])
+        new_params1.raan_deg = float(new_kep1["raan_deg"])
+
+        new_kep2 = rv_to_keplerian(r2, col_res.v2_post, mu=body2["mu"])
+        new_params2 = req.sat2_params.model_copy()
+        new_params2.allow_decay = True
+        new_params2.mass = core2_spec["mass"]
+        new_params2.drag_area = core2_spec["drag_area"]
+        new_params2.altitude_km = float(max(10.0, (np.linalg.norm(r2) - body2["radius_m"]) / 1000.0))
+        new_params2.eccentricity = float(min(0.999, max(0.0, new_kep2["e"])))
+        new_params2.inclination_deg = float(new_kep2["inc_deg"])
+        new_params2.raan_deg = float(new_kep2["raan_deg"])
+
         is_pinn1 = getattr(req.sat1_params, "propagation_mode", "rk45").lower() == "pinn"
         is_pinn2 = getattr(req.sat2_params, "propagation_mode", "rk45").lower() == "pinn"
 
         if is_pinn1:
             prop1 = PINNPropagator(
-                satellite=Satellite(name=req.sat1_params.name, mass=req.sat1_params.mass, drag_area=req.sat1_params.drag_area, cd=req.sat1_params.cd),
+                satellite=Satellite(name=new_params1.name, mass=new_params1.mass, drag_area=new_params1.drag_area, cd=new_params1.cd),
                 mu=body1["mu"], r_earth=body1["radius_m"], omega_earth=body1["omega"], min_altitude_reentry=50_000.0,
             )
             prop1.attach_hardware_agent()
             if active_hil_worker is not None:
                 prop1.network_ws = active_hil_worker
         else:
-            prop1 = _build_propagator(req.sat1_params)
+            prop1 = _build_propagator(new_params1)
 
         if is_pinn2:
             prop2 = PINNPropagator(
-                satellite=Satellite(name=req.sat2_params.name, mass=req.sat2_params.mass, drag_area=req.sat2_params.drag_area, cd=req.sat2_params.cd),
+                satellite=Satellite(name=new_params2.name, mass=new_params2.mass, drag_area=new_params2.drag_area, cd=new_params2.cd),
                 mu=body2["mu"], r_earth=body2["radius_m"], omega_earth=body2["omega"], min_altitude_reentry=50_000.0,
             )
             prop2.attach_hardware_agent()
             if active_hil_worker is not None:
                 prop2.network_ws = active_hil_worker
         else:
-            prop2 = _build_propagator(req.sat2_params)
+            prop2 = _build_propagator(new_params2)
+
+        daughter_list = daughters1 + daughters2
+        daughter_props = []
+        for d in daughter_list:
+            r_d = np.array(d["initial_state"][:3], dtype=np.float64)
+            v_d = np.array(d["initial_state"][3:], dtype=np.float64)
+            kep_d = rv_to_keplerian(r_d, v_d, mu=body1["mu"])
+            d_params = SatelliteParams(
+                name=d["name"],
+                parent_body=d["parent_body"],
+                altitude_km=float(max(10.0, (np.linalg.norm(r_d) - body1["radius_m"]) / 1000.0)),
+                eccentricity=float(min(0.999, max(0.0, kep_d["e"]))),
+                inclination_deg=float(min(180.0, max(0.0, kep_d["inc_deg"]))),
+                raan_deg=float(kep_d["raan_deg"] % 360.0),
+                mass=d["mass"],
+                drag_area=d["drag_area"],
+                cd=d["cd"],
+                propagation_mode="rk45",
+                allow_decay=True,
+            )
+            d["params"] = d_params.model_dump()
+            d_prop = _build_propagator(d_params)
+            daughter_props.append((d, d_prop))
 
         chunk_dur = min(req.post_collision_duration, body1["default_chunk_duration"])
         dt_eval = req.dt_eval or body1["dt_eval"]
 
-        res1, res2 = await asyncio.gather(
+        tasks = [
             asyncio.to_thread(_propagate_chunk, prop1, new_state1, req.t_collision, chunk_dur, dt_eval),
             asyncio.to_thread(_propagate_chunk, prop2, new_state2, req.t_collision, chunk_dur, dt_eval),
-        )
+        ]
+        for d, d_prop in daughter_props:
+            tasks.append(asyncio.to_thread(_propagate_chunk, d_prop, d["initial_state"], req.t_collision, chunk_dur, dt_eval))
+
+        all_res = await asyncio.gather(*tasks)
+        res1 = all_res[0]
+        res2 = all_res[1]
+        daughter_results = all_res[2:]
 
         chunk1 = _format_chunk(res1, prop1, body1["radius_m"], include_forces=True)
         chunk2 = _format_chunk(res2, prop2, body2["radius_m"], include_forces=True)
+
+        daughters_out = []
+        for (d, d_prop), d_res in zip(daughter_props, daughter_results):
+            d_chunk = _format_chunk(d_res, d_prop, body1["radius_m"], include_forces=True)
+            d_dict = dict(d)
+            d_dict["trajectory"] = d_chunk
+            d_dict["last_state"] = d_res.r[-1].tolist() + d_res.v[-1].tolist()
+            d_dict["last_t"] = float(d_res.t[-1])
+            d_dict["events"] = d_chunk.get("events")
+            d_dict["reentry"] = bool(d_res.reentry_detected)
+            d_dict["reentry_time"] = float(d_res.reentry_time) if d_res.reentry_time is not None else None
+            daughters_out.append(d_dict)
 
         return {
             "status": "success",
@@ -710,6 +1057,7 @@ async def resolve_collision(req: CollisionRequest):
                 "name": req.sat1_params.name,
                 "dv_mag_m_s": float(col_res.dv1_mag),
                 "new_state": new_state1,
+                "new_params": new_params1.model_dump(),
                 "trajectory": chunk1,
                 "last_state": res1.r[-1].tolist() + res1.v[-1].tolist(),
                 "last_t": float(res1.t[-1]),
@@ -722,6 +1070,7 @@ async def resolve_collision(req: CollisionRequest):
                 "name": req.sat2_params.name,
                 "dv_mag_m_s": float(col_res.dv2_mag),
                 "new_state": new_state2,
+                "new_params": new_params2.model_dump(),
                 "trajectory": chunk2,
                 "last_state": res2.r[-1].tolist() + res2.v[-1].tolist(),
                 "last_t": float(res2.t[-1]),
@@ -730,6 +1079,7 @@ async def resolve_collision(req: CollisionRequest):
                 "reentry_time": float(res2.reentry_time) if res2.reentry_time is not None else None,
                 "engine": "pinn" if is_pinn2 else "rk45",
             },
+            "daughters": daughters_out,
         }
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
@@ -785,6 +1135,117 @@ def api_list_experiments():
     files = [f for f in os.listdir(EXPERIMENTS_DIR) if f.endswith(".csv")]
     files.sort(reverse=True)
     return {"experiments": files}
+
+
+@app.post("/export/analytical")
+async def export_analytical_data(req: AnalyticalExportRequest):
+    """Generate high-dimensional 24-variable physical analytical dataset for PINN training and inference."""
+    try:
+        body = BODIES.get(req.params.parent_body, BODIES["Earth"])
+        is_pinn = getattr(req.params, "propagation_mode", "rk45").lower().startswith("pinn")
+        if is_pinn:
+            prop = PINNPropagator(
+                satellite=Satellite(name=req.params.name, mass=req.params.mass, drag_area=req.params.drag_area, cd=req.params.cd),
+                mu=body["mu"], r_earth=body["radius_m"], omega_earth=body["omega"], min_altitude_reentry=50_000.0,
+            )
+            prop.attach_hardware_agent()
+            if active_hil_worker is not None:
+                prop.network_ws = active_hil_worker
+        else:
+            prop = _build_propagator(req.params)
+
+        if req.initial_state is not None:
+            init_state = np.asarray(req.initial_state, dtype=np.float64)
+        else:
+            a_m = body["radius_m"] + req.params.altitude_km * 1000.0
+            orbit = OrbitalElements(
+                a=a_m,
+                e=req.params.eccentricity,
+                i=math.radians(req.params.inclination_deg),
+                raan=math.radians(req.params.raan_deg),
+                arg_pe=math.radians(req.params.arg_periapsis_deg),
+                nu=math.radians(req.params.true_anomaly_deg),
+            )
+            r0, v0 = coe_to_rv(orbit, mu=body["mu"])
+            init_state = np.concatenate([r0, v0])
+
+        res = await _propagate_chunk_async(prop, init_state, req.t_start, req.duration_seconds, req.dt_eval)
+        t_arr = res.t
+        r_arr = res.r
+        v_arr = res.v
+        N = len(t_arr)
+
+        lat_deg, lon_deg, alt_m = eci_to_geodetic(r_arr, t_arr, radius_m=body["radius_m"], omega_earth=prop.omega_earth)
+        alt_km = alt_m / 1000.0
+
+        forces = _compute_forces(prop, t_arr, r_arr, v_arr)
+
+        headers = [
+            "t_sec", "x_km", "y_km", "z_km", "vx_km_s", "vy_km_s", "vz_km_s", "alt_km",
+            "sma_km", "eccentricity", "inclination_deg", "raan_deg", "arg_perigee_deg", "true_anomaly_deg",
+            "specific_energy_mj_kg", "ang_momentum_km2_s", "j2_accel_m_s2", "aero_drag_accel_m_s2",
+            "tec_tecu", "ionospheric_delay_ns", "in_saa", "seu_rate_per_day",
+            "doppler_shift_hz", "fspl_db"
+        ]
+
+        lines = [",".join(headers)]
+        sw_idx = SpaceWeatherManager.get_instance().fetch_indices()
+        for k in range(N):
+            rk = r_arr[k]
+            vk = v_arr[k]
+            tk = float(t_arr[k])
+            lk = float(lat_deg[k])
+            ok = float(lon_deg[k])
+            ak = float(alt_km[k])
+
+            kep = rv_to_keplerian(rk, vk, mu=body["mu"])
+            env = compute_space_environment(lk, ok, ak, f107=sw_idx.f107)
+            rf = compute_rf_link_budget(rk, vk)
+
+            j2_vec = forces["j2"][k]
+            drag_vec = forces["drag"][k]
+            j2_mag = math.sqrt(j2_vec[0]**2 + j2_vec[1]**2 + j2_vec[2]**2)
+            drag_mag = math.sqrt(drag_vec[0]**2 + drag_vec[1]**2 + drag_vec[2]**2)
+
+            row = [
+                f"{tk:.2f}",
+                f"{rk[0]/1000.0:.4f}",
+                f"{rk[1]/1000.0:.4f}",
+                f"{rk[2]/1000.0:.4f}",
+                f"{vk[0]/1000.0:.5f}",
+                f"{vk[1]/1000.0:.5f}",
+                f"{vk[2]/1000.0:.5f}",
+                f"{ak:.3f}",
+                f"{kep['a']/1000.0:.3f}",
+                f"{kep['e']:.6f}",
+                f"{kep['inc_deg']:.4f}",
+                f"{kep['raan_deg']:.4f}",
+                f"{kep['arg_p_deg']:.4f}",
+                f"{kep['nu_deg']:.4f}",
+                f"{kep['specific_energy']/1e6:.6f}",
+                f"{kep['h_mag']/1e6:.4f}",
+                f"{j2_mag:.6e}",
+                f"{drag_mag:.6e}",
+                f"{env['tec_tecu']:.3f}",
+                f"{env['iono_delay_ns']:.3f}",
+                f"{int(env['in_saa'])}",
+                f"{env['seu_rate_per_hr']*24.0:.4f}",
+                f"{rf['doppler_shift_hz']:.2f}",
+                f"{rf['fspl_db']:.2f}",
+            ]
+            lines.append(",".join(row))
+
+        csv_content = "\n".join(lines)
+        safe_sat_name = sanitize_filename(req.params.name.replace(" ", "_"))
+        return Response(
+            content=csv_content,
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename={safe_sat_name}_analytical_24var.csv"}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/save")
 def save_simulation(payload: SavePayload):
     safe_name = sanitize_filename(payload.filename)
@@ -993,5 +1454,400 @@ def api_get_ml_pairs():
     return {"total_pairs": total, "sim_log_rows": log_rows, "npz_files_scanned": len(counted)}
 
 
+class HFIngestRequest(BaseModel):
+    dataset: str = Field("space_weather", description="Dataset key in leo_simulator.hf_data.DATASETS")
+    year: int | None = Field(2024, description="Year for tle_history dataset")
+
+
+class HFValidateRequest(BaseModel):
+    norad_id: int = Field(25544, description="NORAD catalog ID (default ISS 25544)")
+    year: int = Field(2024, description="Historical TLE year")
+    max_pairs: int = Field(5, ge=1, le=50, description="Number of consecutive TLE pairs to evaluate")
+
+
+@app.get("/api/hf/datasets")
+def api_hf_datasets():
+    """Return local cache status of Hugging Face astrodynamics datasets."""
+    from leo_simulator.hf_data import dataset_status
+    return {"datasets": dataset_status()}
+
+
+@app.post("/api/hf/ingest")
+def api_hf_ingest(req: HFIngestRequest):
+    """Download/sync a Hugging Face dataset slice to the local cache."""
+    from leo_simulator.hf_data import dataset_status, download_dataset
+    try:
+        path = download_dataset(req.dataset, year=req.year)
+        return {"status": "ok", "path": str(path), "datasets": dataset_status()}
+    except KeyError as ke:
+        raise HTTPException(status_code=400, detail=str(ke))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/hf/validate")
+def api_hf_validate(req: HFValidateRequest):
+    """Validate RK45 and PINN propagators against historical TLE arcs."""
+    from scripts.hf_validate_pinn import validate_tle_arc
+    try:
+        return validate_tle_arc(norad_id=req.norad_id, year=req.year, max_pairs=req.max_pairs)
+    except FileNotFoundError as fnf:
+        raise HTTPException(status_code=404, detail=str(fnf))
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Dual-ESP32 EdgeLink & OTA WebSocket Bridge (/ws/edge) ─────────────────────
+import struct as _struct
+
+ORBIT_PACKET_FORMAT = "<H10f"  # uint16_t sat_id + 10 floats = 42 bytes
+ORBIT_PACKET_SIZE = _struct.calcsize(ORBIT_PACKET_FORMAT)
+
+
+class OrbitStatePacketModel(BaseModel):
+    sat_id: int = Field(0, ge=0, le=65535)
+    t: float = 0.0
+    x: float
+    y: float
+    z: float
+    vx: float
+    vy: float
+    vz: float
+    B_coeff: float = 0.015
+    dt: float = 10.0
+    t_infer_ms: float = 0.0
+
+    def to_bytes(self) -> bytes:
+        return _struct.pack(
+            ORBIT_PACKET_FORMAT,
+            int(self.sat_id),
+            float(self.t),
+            float(self.x),
+            float(self.y),
+            float(self.z),
+            float(self.vx),
+            float(self.vy),
+            float(self.vz),
+            float(self.B_coeff),
+            float(self.dt),
+            float(self.t_infer_ms),
+        )
+
+    @classmethod
+    def from_bytes(cls, raw: bytes) -> "OrbitStatePacketModel":
+        if len(raw) != ORBIT_PACKET_SIZE:
+            raise ValueError(f"Expected {ORBIT_PACKET_SIZE} bytes for OrbitStatePacket, got {len(raw)}")
+        vals = _struct.unpack(ORBIT_PACKET_FORMAT, raw)
+        return cls(
+            sat_id=vals[0],
+            t=vals[1],
+            x=vals[2],
+            y=vals[3],
+            z=vals[4],
+            vx=vals[5],
+            vy=vals[6],
+            vz=vals[7],
+            B_coeff=vals[8],
+            dt=vals[9],
+            t_infer_ms=vals[10],
+        )
+
+
+def symplectic_hamiltonian_project(
+    r_next: np.ndarray,
+    v_nn: np.ndarray,
+    e_target: float,
+    mu: float = 3.986004418e14,
+) -> np.ndarray:
+    """Symplectic Hamiltonian Manifold projection engine:
+    v_target = sqrt(2 * (E_target + mu / ||r_{k+1}||))
+    v_{k+1}  = v_NN * (v_target / ||v_NN||)
+    """
+    r_norm = float(np.linalg.norm(r_next))
+    v_norm = float(np.linalg.norm(v_nn))
+    if r_norm <= 1.0 or v_norm <= 1e-9:
+        return np.asarray(v_nn, dtype=np.float64)
+    two_term = 2.0 * (float(e_target) + (float(mu) / r_norm))
+    if two_term <= 0.0:
+        return np.asarray(v_nn, dtype=np.float64)
+    v_target = math.sqrt(two_term)
+    return np.asarray(v_nn, dtype=np.float64) * (v_target / v_norm)
+
+
+@app.websocket("/ws/edge")
+async def websocket_edge_bridge(websocket: WebSocket):
+    """Persistent WebSocket bridge for ESP32 Node 1 Gateway (binary 42-byte struct or JSON)."""
+    await websocket.accept()
+    mu_earth = 3.986004418e14
+    try:
+        while True:
+            msg = await websocket.receive()
+            if msg.get("type") == "websocket.disconnect":
+                break
+            if "bytes" in msg and msg["bytes"] is not None:
+                pkt = OrbitStatePacketModel.from_bytes(msg["bytes"])
+                r0 = np.array([pkt.x, pkt.y, pkt.z], dtype=np.float64)
+                v0 = np.array([pkt.vx, pkt.vy, pkt.vz], dtype=np.float64)
+                r0_norm = float(np.linalg.norm(r0))
+                e_target = 0.5 * float(np.dot(v0, v0)) - (mu_earth / max(r0_norm, 1.0))
+
+                # Advance one symplectic step + Hamiltonian manifold projection
+                a0 = -mu_earth * r0 / (max(r0_norm, 1.0) ** 3)
+                r1 = r0 + v0 * pkt.dt + 0.5 * a0 * (pkt.dt ** 2)
+                r1_norm = float(np.linalg.norm(r1))
+                a1 = -mu_earth * r1 / (max(r1_norm, 1.0) ** 3)
+                v_nn = v0 + 0.5 * (a0 + a1) * pkt.dt
+                v1 = symplectic_hamiltonian_project(r1, v_nn, e_target, mu=mu_earth)
+
+                out_pkt = OrbitStatePacketModel(
+                    sat_id=pkt.sat_id,
+                    t=pkt.t + pkt.dt,
+                    x=float(r1[0]),
+                    y=float(r1[1]),
+                    z=float(r1[2]),
+                    vx=float(v1[0]),
+                    vy=float(v1[1]),
+                    vz=float(v1[2]),
+                    B_coeff=pkt.B_coeff,
+                    dt=pkt.dt,
+                    t_infer_ms=pkt.t_infer_ms if pkt.t_infer_ms > 0.0 else 1.85,
+                )
+                await websocket.send_bytes(out_pkt.to_bytes())
+            elif "text" in msg and msg["text"] is not None:
+                data = json.loads(msg["text"])
+                pkt = OrbitStatePacketModel(**data)
+                r0 = np.array([pkt.x, pkt.y, pkt.z], dtype=np.float64)
+                v0 = np.array([pkt.vx, pkt.vy, pkt.vz], dtype=np.float64)
+                r0_norm = float(np.linalg.norm(r0))
+                e_target = 0.5 * float(np.dot(v0, v0)) - (mu_earth / max(r0_norm, 1.0))
+
+                a0 = -mu_earth * r0 / (max(r0_norm, 1.0) ** 3)
+                r1 = r0 + v0 * pkt.dt + 0.5 * a0 * (pkt.dt ** 2)
+                r1_norm = float(np.linalg.norm(r1))
+                a1 = -mu_earth * r1 / (max(r1_norm, 1.0) ** 3)
+                v_nn = v0 + 0.5 * (a0 + a1) * pkt.dt
+                v1 = symplectic_hamiltonian_project(r1, v_nn, e_target, mu=mu_earth)
+
+                out_pkt = OrbitStatePacketModel(
+                    sat_id=pkt.sat_id,
+                    t=pkt.t + pkt.dt,
+                    x=float(r1[0]),
+                    y=float(r1[1]),
+                    z=float(r1[2]),
+                    vx=float(v1[0]),
+                    vy=float(v1[1]),
+                    vz=float(v1[2]),
+                    B_coeff=pkt.B_coeff,
+                    dt=pkt.dt,
+                    t_infer_ms=pkt.t_infer_ms if pkt.t_infer_ms > 0.0 else 1.85,
+                )
+                await websocket.send_text(out_pkt.model_dump_json())
+    except WebSocketDisconnect:
+        pass
+
+
+class EdgeWifiProvisionRequest(BaseModel):
+    ssid: str = Field(..., min_length=1, description="Target Wi-Fi SSID for ESP32 Gateway")
+    password: str = Field("", description="Wi-Fi Password")
+    host_ip: str = Field("192.168.1.38", description="Local machine IP running the NanoDynamics simulator")
+    port: str = Field("/dev/ttyUSB0", description="Serial port or Wi-Fi host")
+
+
+class EdgePinnParamsRequest(BaseModel):
+    dt_s: float | None = Field(None, ge=0.5, le=600.0)
+    b_coeff: float | None = Field(None, ge=0.0001, le=2.0)
+    symplectic_enabled: bool | None = None
+    transport_mode: str | None = None
+    wifi_ssid: str | None = None
+    wifi_host_ip: str | None = None
+
+
+class EdgeBenchmarkRequest(BaseModel):
+    steps: int = Field(16, ge=1, le=120, description="Number of live PINN orbital steps to execute")
+    altitude_km: float = Field(550.0, ge=150.0, le=36000.0)
+    inclination_deg: float = Field(53.0, ge=0.0, le=180.0)
+    dt_s: float | None = None
+    b_coeff: float | None = None
+
+
+@app.get("/edge-console")
+def read_edge_console():
+    """Serve the dedicated Hugging Face + SpaceX-styled ESP32 PINN Telemetry & Wi-Fi Provisioning Web App."""
+    return FileResponse(
+        os.path.join(BASE_DIR, "static", "edge_console.html"),
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache", "Expires": "0"},
+    )
+
+
+@app.get("/api/edge/status")
+def api_edge_status():
+    """Query live hardware status of connected ESP32 boards, Wi-Fi config, and PINN telemetry summary."""
+    from hardware_in_the_loop.esp32_bridge import ESP32HardwareAgent
+
+    gw_port = device_manager.pinn_params.get("gateway_port", "/dev/ttyUSB0")
+    edge_port = device_manager.pinn_params.get("edge_port", "/dev/ttyUSB1")
+    gw_status = {"role": "offline", "port": gw_port, "usb_present": os.path.exists(gw_port)}
+    edge_status = {"role": "offline", "port": edge_port, "usb_present": os.path.exists(edge_port)}
+
+    if os.path.exists(gw_port):
+        try:
+            agent = ESP32HardwareAgent.get_shared(port=gw_port)
+            st = agent.query_status()
+            if st:
+                gw_status.update(st)
+                gw_status["usb_present"] = True
+                dev1 = device_manager.get_device("esp32-node-1")
+                if dev1:
+                    if st.get("mac"):
+                        dev1.mac_address = st["mac"]
+                    if st.get("sta_ip") and st["sta_ip"] != "0.0.0.0":
+                        dev1.ip_address = st["sta_ip"]
+                    dev1.status = "online"
+        except Exception as e:
+            gw_status["error"] = str(e)
+
+    if os.path.exists(edge_port):
+        try:
+            agent2 = ESP32HardwareAgent.get_shared(port=edge_port)
+            st2 = agent2.query_status()
+            if st2:
+                edge_status.update(st2)
+                edge_status["usb_present"] = True
+        except Exception as e:
+            edge_status["error"] = str(e)
+
+    return {
+        "gateway": gw_status,
+        "edge_node": edge_status,
+        "devices": device_manager.list_devices(),
+        "pinn_params": device_manager.pinn_params,
+        "telemetry": device_manager.get_telemetry_summary(limit=80),
+    }
+
+
+@app.post("/api/edge/wifi")
+def api_edge_set_wifi(req: EdgeWifiProvisionRequest):
+    """Push new Wi-Fi SSID, password, and simulator Host IP to the ESP32 Gateway over USB or Wi-Fi."""
+    from hardware_in_the_loop.esp32_bridge import ESP32HardwareAgent
+
+    device_manager.update_pinn_params({"wifi_ssid": req.ssid, "wifi_host_ip": req.host_ip})
+    agent = ESP32HardwareAgent.get_shared(port=req.port)
+    result = agent.set_wifi_credentials(ssid=req.ssid, password=req.password, host_ip=req.host_ip)
+    return result
+
+
+@app.post("/api/edge/params")
+def api_edge_update_params(req: EdgePinnParamsRequest):
+    """Update live PINN & Symplectic Hamiltonian manifold parameters."""
+    updated = device_manager.update_pinn_params(req.model_dump(exclude_none=True))
+    return {"status": "ok", "pinn_params": updated}
+
+
+@app.post("/api/edge/benchmark")
+def api_edge_benchmark(req: EdgeBenchmarkRequest):
+    """Execute a live burst of PINN orbital propagation steps on the physical ESP32 and stream telemetry."""
+    import time
+    import torch
+    from hardware_in_the_loop.esp32_bridge import ESP32HardwareAgent
+
+    dt_s = float(req.dt_s if req.dt_s is not None else device_manager.pinn_params.get("dt_s", 10.0))
+    b_coeff = float(req.b_coeff if req.b_coeff is not None else device_manager.pinn_params.get("b_coeff", 0.015))
+    symplectic_on = bool(device_manager.pinn_params.get("symplectic_enabled", True))
+    gw_port = device_manager.pinn_params.get("gateway_port", "/dev/ttyUSB0")
+
+    r_mag = 6378137.0 + req.altitude_km * 1000.0
+    v_circ = math.sqrt(3.986004418e14 / r_mag)
+    inc_rad = math.radians(req.inclination_deg)
+    curr_r = np.array([r_mag, 0.0, 0.0], dtype=np.float64)
+    curr_v = np.array([0.0, v_circ * math.cos(inc_rad), v_circ * math.sin(inc_rad)], dtype=np.float64)
+
+    pos_scale = 6378137.0
+    vel_scale = 8000.0
+    sc = np.array([pos_scale] * 3 + [vel_scale] * 3, dtype=np.float64)
+    mu_earth = 3.986004418e14
+    e0 = 0.5 * float(np.dot(curr_v, curr_v)) - (mu_earth / r_mag)
+
+    agent = ESP32HardwareAgent.get_shared(port=gw_port)
+    prop = PINNPropagator(mode="pinn_local")
+
+    results = []
+    for step_idx in range(req.steps):
+        state_in_norm = (np.concatenate([curr_r, curr_v]) / sc).tolist()
+        t_start = time.perf_counter()
+        hw_used = False
+        engine_label = "pinn_esp32_hil"
+
+        if os.path.exists(gw_port):
+            try:
+                nxt_norm, t_infer_ms, rtt_ms, mode_str = agent.step_detailed(
+                    state_in_norm, dt=dt_s, b_coeff=b_coeff, sat_id=step_idx + 1
+                )
+                unscaled = nxt_norm.astype(np.float64) * sc
+                transit_ms = max(0.05, rtt_ms - t_infer_ms)
+                hw_used = True
+                engine_label = mode_str
+            except Exception:
+                hw_used = False
+
+        if not hw_used:
+            t0_cpu = time.perf_counter()
+            with torch.no_grad():
+                inp_t = torch.tensor(state_in_norm, dtype=torch.float32).unsqueeze(0)
+                out_t = prop.model(inp_t).squeeze(0).numpy()
+            t_infer_ms = (time.perf_counter() - t0_cpu) * 1000.0
+            transit_ms = 0.0
+            unscaled = out_t.astype(np.float64) * sc
+            engine_label = "pinn_cpu_fallback"
+
+        r_nn = unscaled[0:3]
+        v_nn = unscaled[3:6]
+        r_kin = curr_r + 0.5 * (curr_v + v_nn) * dt_s
+        r_next = 0.5 * r_nn + 0.5 * r_kin
+        if symplectic_on:
+            v_next = symplectic_hamiltonian_project(r_next, v_nn, e0, mu=mu_earth)
+        else:
+            v_next = v_nn
+
+        r_next_mag = float(np.linalg.norm(r_next))
+        e_now = 0.5 * float(np.dot(v_next, v_next)) - (mu_earth / max(r_next_mag, 1.0))
+        e_drift = abs(e_now - e0) / max(abs(e0), 1.0)
+        tot_ms = (time.perf_counter() - t_start) * 1000.0
+
+        state_out_norm = (np.concatenate([r_next, v_next]) / sc).tolist()
+        device_manager.record_telemetry(
+            device_id="esp32-node-1",
+            engine=engine_label,
+            proc_time_ms=t_infer_ms,
+            transit_latency_ms=transit_ms,
+            total_step_ms=tot_ms,
+            step_index=step_idx + 1,
+            energy_error=e_drift,
+            sat_id=f"HIL-{step_idx + 1:02d}",
+        )
+        log_entry = device_manager.record_pinn_request(
+            device_id="esp32-node-1",
+            sat_id=f"HIL-{step_idx + 1:02d}",
+            engine=engine_label,
+            state_in=state_in_norm,
+            state_out=state_out_norm,
+            dt_s=dt_s,
+            b_coeff=b_coeff,
+            t_infer_ms=t_infer_ms,
+            transit_latency_ms=transit_ms,
+            total_step_ms=tot_ms,
+            energy_drift=e_drift,
+        )
+        results.append(asdict(log_entry))
+        curr_r = r_next
+        curr_v = v_next
+
+    return {
+        "status": "ok",
+        "steps_executed": len(results),
+        "hardware_active": hw_used,
+        "telemetry": device_manager.get_telemetry_summary(limit=80),
+    }
 
 

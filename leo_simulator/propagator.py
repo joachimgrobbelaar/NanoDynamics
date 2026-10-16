@@ -47,6 +47,7 @@ class PropagationResult:
     message: str
     reentry_detected: bool = False
     reentry_time: float | None = None
+    telemetry: dict | None = None
 
     @property
     def final_altitude(self) -> float:

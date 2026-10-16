@@ -49,7 +49,32 @@ def sample_initial_orbit(rng, alt_min_m, alt_max_m):
     )
 
 
-def _propagate_many(n_traj, orbits, dt, alt_min_km, alt_max_km, seed):
+def sample_sobol_orbits(n_samples, alt_min_m, alt_max_m, seed=0):
+    """Draw n_samples quasi-random orbits using a 6D scrambled Sobol sequence."""
+    try:
+        from scipy.stats import qmc
+        sampler = qmc.Sobol(d=6, scramble=True, seed=seed)
+        samples = sampler.random(n=n_samples)
+    except Exception:
+        rng = np.random.default_rng(seed)
+        samples = rng.uniform(0.0, 1.0, size=(n_samples, 6))
+
+    orbits = []
+    for row in samples:
+        alt = alt_min_m + row[0] * (alt_max_m - alt_min_m)
+        oe = OrbitalElements(
+            a=R_EARTH + alt,
+            e=float(row[1] * 0.01),
+            i=float(row[2] * np.radians(98.0)),
+            raan=float(row[3] * 2 * np.pi),
+            arg_pe=float(row[4] * 2 * np.pi),
+            nu=float(row[5] * 2 * np.pi),
+        )
+        orbits.append(oe)
+    return orbits
+
+
+def _propagate_many(n_traj, orbits, dt, alt_min_km, alt_max_km, seed, sampler="uniform"):
     """Propagate n_traj random orbits; yield (t, r, v) per trajectory."""
     rng = np.random.default_rng(seed)
     sat = Satellite.cubesat_3u()
@@ -57,8 +82,14 @@ def _propagate_many(n_traj, orbits, dt, alt_min_km, alt_max_km, seed):
     prop = OrbitPropagator(satellite=sat, atmosphere=atm,
                            include_central_gravity=True, include_j2=True,
                            include_drag=True)
+    if sampler == "sobol":
+        orbit_list = sample_sobol_orbits(n_traj, alt_min_km * 1000.0, alt_max_km * 1000.0, seed=seed)
+
     for k in range(n_traj):
-        oe = sample_initial_orbit(rng, alt_min_km * 1000.0, alt_max_km * 1000.0)
+        if sampler == "sobol":
+            oe = orbit_list[k]
+        else:
+            oe = sample_initial_orbit(rng, alt_min_km * 1000.0, alt_max_km * 1000.0)
         duration = float(orbits * oe.period)
         res = prop.propagate(oe, duration_seconds=duration, dt_eval=dt)
         print(f"  traj {k + 1}/{n_traj}: alt0={res.initial_altitude / 1000:.1f}km "
@@ -67,7 +98,7 @@ def _propagate_many(n_traj, orbits, dt, alt_min_km, alt_max_km, seed):
 
 
 def generate(n_traj=20, orbits=1.0, dt=60.0, alt_min_km=300.0, alt_max_km=600.0,
-             seed=0, out_dir=None, mode="trajectory"):
+             seed=0, out_dir=None, mode="trajectory", sampler="uniform"):
     """Build a training dataset from propagated random orbits.
 
     mode="trajectory": rows follow (t, initial_state) -> state (pinn_model).
@@ -82,14 +113,14 @@ def generate(n_traj=20, orbits=1.0, dt=60.0, alt_min_km=300.0, alt_max_km=600.0,
 
     if mode == "one_step":
         x_list, y_list = [], []
-        for res in _propagate_many(n_traj, orbits, dt, alt_min_km, alt_max_km, seed):
+        for res in _propagate_many(n_traj, orbits, dt, alt_min_km, alt_max_km, seed, sampler=sampler):
             y = np.hstack([res.r, res.v])
             x_list.append(y[:-1])
             y_list.append(y[1:])
         data = {"x": np.vstack(x_list), "y": np.vstack(y_list)}
     elif mode == "trajectory":
         t_list, init_list, state_list = [], [], []
-        for res in _propagate_many(n_traj, orbits, dt, alt_min_km, alt_max_km, seed):
+        for res in _propagate_many(n_traj, orbits, dt, alt_min_km, alt_max_km, seed, sampler=sampler):
             y0 = np.concatenate([res.r[0], res.v[0]])
             n = len(res.t)
             t_list.append(res.t.reshape(n, 1))
@@ -123,11 +154,12 @@ def main():
     ap.add_argument("--alt-max-km", type=float, default=600.0)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--mode", choices=("trajectory", "one_step"), default="trajectory")
+    ap.add_argument("--sampler", choices=("uniform", "sobol"), default="uniform")
     ap.add_argument("--out", default=os.path.join(AI_DIR, "data"))
     args = ap.parse_args()
     generate(n_traj=args.n_traj, orbits=args.orbits, dt=args.dt,
              alt_min_km=args.alt_min_km, alt_max_km=args.alt_max_km,
-             seed=args.seed, out_dir=args.out, mode=args.mode)
+             seed=args.seed, out_dir=args.out, mode=args.mode, sampler=args.sampler)
 
 
 if __name__ == "__main__":

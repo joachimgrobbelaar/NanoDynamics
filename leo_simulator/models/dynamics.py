@@ -6,7 +6,7 @@ and atmospheric drag.
 
 import numpy as np
 
-from leo_simulator.constants import J2_EARTH, MU_EARTH, MU_MOON, OMEGA_EARTH, R_EARTH
+from leo_simulator.constants import J2_EARTH, MU_EARTH, MU_MOON, MU_SUN, OMEGA_EARTH, R_EARTH, R_MOON
 from leo_simulator.models.drag import (
     BaseAtmosphere,
     ExponentialAtmosphere,
@@ -15,7 +15,9 @@ from leo_simulator.models.drag import (
 from leo_simulator.models.gravity import (
     central_gravity_acceleration,
     j2_perturbation_acceleration,
+    lunar_harmonics_acceleration,
     moon_position,
+    sun_position,
     third_body_acceleration,
 )
 
@@ -38,11 +40,14 @@ class OrbitalDynamics:
         include_drag: bool = True,
         include_earth_rotation: bool = True,
         include_moon: bool = False,
+        include_sun: bool = False,
+        include_lunar_harmonics: bool = False,
         mu: float = MU_EARTH,
         r_earth: float = R_EARTH,
         j2: float = J2_EARTH,
         omega_earth: float = OMEGA_EARTH,
         mu_moon: float = MU_MOON,
+        mu_sun: float = MU_SUN,
     ) -> None:
         if not np.isfinite(mass) or mass <= 0.0:
             raise ValueError(f"Mass must be strictly positive and finite, got {mass}")
@@ -70,11 +75,14 @@ class OrbitalDynamics:
         self.include_drag = include_drag
         self.include_earth_rotation = include_earth_rotation
         self.include_moon = include_moon
+        self.include_sun = include_sun
+        self.include_lunar_harmonics = include_lunar_harmonics
         self.mu = float(mu)
         self.r_earth = float(r_earth)
         self.j2 = float(j2)
         self.omega_earth = float(omega_earth)
         self.mu_moon = float(mu_moon)
+        self.mu_sun = float(mu_sun)
 
     def compute_accelerations(
         self,
@@ -90,7 +98,7 @@ class OrbitalDynamics:
             t: Current simulation time in seconds (sets Moon ephemeris phase).
 
         Returns:
-            dict containing 'central', 'j2', 'drag', 'moon', and 'total'
+            dict containing 'central', 'j2', 'drag', 'moon', 'sun', 'lunar_harmonics', and 'total'
             acceleration vectors.
         """
         a_central = (
@@ -121,19 +129,34 @@ class OrbitalDynamics:
             else np.zeros(3, dtype=np.float64)
         )
 
+        r_m = moon_position(t) if (self.include_moon or self.include_lunar_harmonics) else None
         a_moon = (
-            third_body_acceleration(r_vec, moon_position(t), mu_moon=self.mu_moon)
-            if self.include_moon
+            third_body_acceleration(r_vec, r_m, mu_moon=self.mu_moon)
+            if self.include_moon and r_m is not None
             else np.zeros(3, dtype=np.float64)
         )
 
-        a_total = a_central + a_j2 + a_drag + a_moon
+        a_sun = (
+            third_body_acceleration(r_vec, sun_position(t), mu_moon=self.mu_sun)
+            if self.include_sun
+            else np.zeros(3, dtype=np.float64)
+        )
+
+        if self.include_lunar_harmonics:
+            r_sel = (r_vec - r_m) if (self.include_moon and r_m is not None) else np.asarray(r_vec, dtype=np.float64)
+            a_lunar_harm = lunar_harmonics_acceleration(r_sel, mu_moon=self.mu_moon, r_moon=R_MOON)
+        else:
+            a_lunar_harm = np.zeros(3, dtype=np.float64)
+
+        a_total = a_central + a_j2 + a_drag + a_moon + a_sun + a_lunar_harm
 
         return {
             "central": a_central,
             "j2": a_j2,
             "drag": a_drag,
             "moon": a_moon,
+            "sun": a_sun,
+            "lunar_harmonics": a_lunar_harm,
             "total": a_total,
         }
 

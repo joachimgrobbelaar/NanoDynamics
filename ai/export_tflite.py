@@ -18,12 +18,13 @@ def main():
     ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
     hidden = ckpt["config"]["hidden_dim"]
     layers = ckpt["config"]["hidden_layers"]
-    model = TransitionMLP(hidden_dim=hidden, hidden_layers=layers)
+    in_dim = ckpt["config"].get("in_dim", 6)
+    model = TransitionMLP(in_dim=in_dim, hidden_dim=hidden, hidden_layers=layers)
     model.load_state_dict(ckpt["state_dict"])
     model.eval()
 
     # 2. Convert PyTorch to TFLite via litert-torch
-    dummy_input = torch.zeros(1, 6)
+    dummy_input = torch.zeros(1, in_dim)
     edge_model = litert_torch.convert(model, (dummy_input,))
     tflite_path = os.path.join(AI_DIR, "checkpoints", "transition.tflite")
     edge_model.export(tflite_path)

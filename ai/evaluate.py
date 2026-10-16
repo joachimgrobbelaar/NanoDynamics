@@ -80,7 +80,8 @@ def evaluate_rollout(ckpt_path, alt_km=420.0, inc_deg=60.0, orbits=1.0):
     ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
     stats = ckpt["stats"]
     cfg = ckpt["config"]
-    model = TransitionMLP(hidden_dim=cfg["hidden_dim"],
+    in_dim = cfg.get("in_dim", 6)
+    model = TransitionMLP(in_dim=in_dim, hidden_dim=cfg["hidden_dim"],
                           hidden_layers=cfg["hidden_layers"])
     model.load_state_dict(ckpt["state_dict"])
     model.eval()
@@ -114,6 +115,75 @@ def evaluate_rollout(ckpt_path, alt_km=420.0, inc_deg=60.0, orbits=1.0):
           f"({'PASS' if drift_pct[-1] < 5.0 else 'FAIL'} vs 5% tolerance)")
     print(f"  mean drift: {drift_pct.mean():.3f}% | max drift: {drift_pct.max():.3f}%")
     return {"drift_pct": drift_pct}
+
+
+def evaluate_multi_orbit_rollout(ckpt_path, orbit_counts=(1.0, 5.0, 10.0), alt_km=420.0, inc_deg=60.0):
+    """Benchmark multi-orbit rollout degradation across 1, 5, 10 orbits."""
+    results = {}
+    for orb in orbit_counts:
+        out = evaluate_rollout(ckpt_path, alt_km=alt_km, inc_deg=inc_deg, orbits=orb)
+        results[orb] = {
+            "final_drift_pct": float(out["drift_pct"][-1]),
+            "mean_drift_pct": float(out["drift_pct"].mean()),
+            "max_drift_pct": float(out["drift_pct"].max()),
+        }
+    return results
+
+
+def mine_hard_negatives(ckpt_path, n_candidates=20, threshold_pct=1.0, out_path=None):
+    """Active learning: mine orbit segments where model rollout drift exceeds threshold."""
+    from generate_dataset import sample_sobol_orbits
+    from transition_model import TransitionMLP
+
+    ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+    stats = ckpt["stats"]
+    cfg = ckpt["config"]
+    in_dim = cfg.get("in_dim", 6)
+    model = TransitionMLP(in_dim=in_dim, hidden_dim=cfg["hidden_dim"], hidden_layers=cfg["hidden_layers"])
+    model.load_state_dict(ckpt["state_dict"])
+    model.eval()
+
+    sc = np.array([stats["pos_scale"]] * 3 + [stats["vel_scale"]] * 3, dtype=np.float32)
+    dt = float(stats["dt"])
+
+    candidates = sample_sobol_orbits(n_candidates, 300_000.0, 600_000.0)
+    prop = OrbitPropagator(
+        satellite=Satellite.cubesat_3u(),
+        atmosphere=ExponentialAtmosphere(),
+        include_central_gravity=True,
+        include_j2=True,
+        include_drag=True,
+    )
+
+    hard_neg_x, hard_neg_y = [], []
+    for k, oe in enumerate(candidates):
+        res = prop.propagate(oe, duration_seconds=float(oe.period), dt_eval=dt)
+        with torch.no_grad():
+            x = torch.tensor(np.concatenate([res.r[0], res.v[0]]) / sc, dtype=torch.float32).unsqueeze(0)
+            preds = []
+            for _ in range(len(res.t) - 1):
+                x = model(x)
+                preds.append(x.squeeze(0).numpy())
+        preds = np.array(preds) * sc
+        pos_err = np.linalg.norm(preds[:, 0:3] - res.r[1:], axis=1)
+        drift_pct = 100.0 * pos_err / np.linalg.norm(res.r[1:], axis=1)
+
+        failing_idx = np.where(drift_pct > threshold_pct)[0]
+        if len(failing_idx) > 0:
+            y_all = np.hstack([res.r, res.v])
+            for idx in failing_idx:
+                hard_neg_x.append(y_all[idx])
+                hard_neg_y.append(y_all[idx + 1])
+
+    if hard_neg_x and out_path:
+        os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
+        np.savez_compressed(out_path, x=np.array(hard_neg_x), y=np.array(hard_neg_y))
+        print(f"Mined {len(hard_neg_x)} hard negative step pairs -> {out_path}")
+
+    return {
+        "mined_count": len(hard_neg_x),
+        "total_evaluated": n_candidates,
+    }
 
 
 def main():

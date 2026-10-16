@@ -288,6 +288,38 @@ def get_live_catalog(
             except Exception as e:
                 logger.info(f"CelesTrak online fetch for {grp} failed ({e}), using cached fallback.")
 
+        if not sats and grp == "starlink":
+            try:
+                from leo_simulator import hf_data
+
+                for rec in hf_data.load_starlink_tles(limit=limit):
+                    l2 = rec.get("line2", "")
+                    if len(l2) >= 68:
+                        norad = int(l2[2:7].strip())
+                        inc = float(l2[8:16].strip())
+                        raan = float(l2[17:25].strip())
+                        ecc = float("0." + l2[26:33].strip())
+                        argp = float(l2[34:42].strip())
+                        ma = float(l2[43:51].strip())
+                        mm = float(l2[52:63].strip())
+                        a_m = hf_data.mean_motion_to_sma_m(mm)
+                        alt_km = max(120.0, (a_m - R_EARTH) / 1000.0)
+                        sats.append({
+                            "name": rec.get("name", f"STARLINK-{norad}").strip(),
+                            "norad_id": norad,
+                            "group": "starlink",
+                            "altitude_km": round(alt_km, 2),
+                            "inclination_deg": round(inc, 4),
+                            "eccentricity": round(ecc, 6),
+                            "raan_deg": round(raan, 4),
+                            "arg_periapsis_deg": round(argp, 4),
+                            "true_anomaly_deg": round(ma, 4),
+                            "mean_motion": round(mm, 6),
+                            "bstar": 0.0001,
+                        })
+            except Exception:
+                pass
+
         all_sats.extend(sats)
 
     # Filter by search query if provided

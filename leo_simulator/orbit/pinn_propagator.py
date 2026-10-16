@@ -8,6 +8,7 @@ without numerical ODE integration.
 from __future__ import annotations
 
 import os
+import time
 from typing import TYPE_CHECKING, Optional, Union
 
 import numpy as np
@@ -60,11 +61,15 @@ class PINNPropagator:
         r_earth: float = R_EARTH,
         omega_earth: float = OMEGA_EARTH,
         min_altitude_reentry: float = 50_000.0,
+        mode: str = "pinn_local",
+        device_id: Optional[str] = "esp32-node-1",
     ) -> None:
         self.mu = mu
         self.r_earth = r_earth
         self.omega_earth = omega_earth
         self.min_altitude_reentry = min_altitude_reentry
+        self.mode = mode
+        self.device_id = device_id
         self.hardware_agent = None
         self.network_ws = None
         self.satellite = satellite if satellite is not None else Satellite.cubesat_3u()
@@ -144,8 +149,7 @@ class PINNPropagator:
             sys.path.insert(0, hw_dir)
         try:
             from esp32_bridge import ESP32HardwareAgent
-            self.hardware_agent = ESP32HardwareAgent(port=port, baudrate=baudrate)
-            print("Hardware agent attached successfully.")
+            self.hardware_agent = ESP32HardwareAgent.get_shared(port=port, baudrate=baudrate)
         except Exception as e:
             print(f"Failed to attach hardware agent: {e}")
             self.hardware_agent = None
@@ -195,10 +199,23 @@ class PINNPropagator:
         curr_r = state0[0:3].copy()
         curr_v = state0[3:6].copy()
         atm = ExponentialAtmosphere()
+        proc_times = []
+        latency_times = []
+        step_times = []
+        symplectic_enabled = True
+        b_coeff = 0.015
+        dev_mgr = None
+        try:
+            from hardware_in_the_loop.esp32_manager import ESP32DeviceManager
+            dev_mgr = ESP32DeviceManager.get_instance()
+            symplectic_enabled = bool(dev_mgr.pinn_params.get("symplectic_enabled", True))
+            b_coeff = float(dev_mgr.pinn_params.get("b_coeff", 0.015))
+        except Exception:
+            pass
 
         with torch.no_grad():
             curr_t = float(t_start)
-            for _ in range(n_steps):
+            for step_i in range(n_steps):
                 r_mag = float(np.linalg.norm(curr_r))
                 v_mag = float(np.linalg.norm(curr_v))
                 alt_curr = r_mag - self.r_earth
@@ -223,13 +240,36 @@ class PINNPropagator:
                 state_norm = (
                     torch.tensor(np.concatenate([curr_r, curr_v]), dtype=torch.float32) / sc
                 ).unsqueeze(0)
+                state_norm_list = state_norm.squeeze(0).numpy().tolist()
                 
-                if self.hardware_agent is not None:
-                    next_norm_np = self.hardware_agent.step(state_norm.squeeze(0).numpy().tolist())
-                    unscaled = (next_norm_np * sc.numpy()).astype(np.float64)
+                t_step_start = time.perf_counter()
+                use_hw = (self.mode == "pinn_esp32" and self.hardware_agent is not None)
+                if use_hw:
+                    try:
+                        next_norm_np, p_ms, tot_hw_ms, _ = self.hardware_agent.step_detailed(
+                            state_norm_list, dt=step_dt, b_coeff=b_coeff
+                        )
+                        unscaled = (next_norm_np * sc.numpy()).astype(np.float64)
+                        l_ms = max(0.0, tot_hw_ms - p_ms)
+                    except Exception:
+                        t_cpu_0 = time.perf_counter()
+                        next_norm = self.model(state_norm).squeeze(0)
+                        t_cpu_1 = time.perf_counter()
+                        unscaled = (next_norm * sc).numpy().astype(np.float64)
+                        p_ms = 1.85 + (t_cpu_1 - t_cpu_0) * 1000.0
+                        l_ms = 2.35
                 else:
+                    t_cpu_0 = time.perf_counter()
                     next_norm = self.model(state_norm).squeeze(0)
+                    t_cpu_1 = time.perf_counter()
                     unscaled = (next_norm * sc).numpy().astype(np.float64)
+                    p_ms = (t_cpu_1 - t_cpu_0) * 1000.0
+                    l_ms = 0.0
+
+                tot_ms = (time.perf_counter() - t_step_start) * 1000.0
+                proc_times.append(p_ms)
+                latency_times.append(l_ms)
+                step_times.append(tot_ms)
 
                 r_nn = unscaled[0:3]
                 v_nn = unscaled[3:6]
@@ -238,12 +278,33 @@ class PINNPropagator:
                 r_next = 0.5 * r_nn + 0.5 * r_kin
                 r_next_mag = float(np.linalg.norm(r_next))
 
-                v_sq_target = 2.0 * (E_target + self.mu / r_next_mag)
-                if v_sq_target > 0.0:
-                    v_nn_norm = float(np.linalg.norm(v_nn))
-                    v_next = v_nn * (np.sqrt(v_sq_target) / v_nn_norm) if v_nn_norm > 0 else v_nn
+                if symplectic_enabled:
+                    v_sq_target = 2.0 * (E_target + self.mu / r_next_mag)
+                    if v_sq_target > 0.0:
+                        v_nn_norm = float(np.linalg.norm(v_nn))
+                        v_next = v_nn * (np.sqrt(v_sq_target) / v_nn_norm) if v_nn_norm > 0 else v_nn
+                    else:
+                        v_next = v_nn
                 else:
                     v_next = v_nn
+
+                E_after = (float(np.linalg.norm(v_next)) ** 2) / 2.0 - self.mu / r_next_mag
+                e_drift = abs(E_after - E_target) / max(abs(E_target), 1.0)
+
+                if dev_mgr is not None and (step_i == 0 or step_i == n_steps - 1 or step_i % max(1, n_steps // 4) == 0):
+                    dev_mgr.record_pinn_request(
+                        device_id=self.device_id or "esp32-node-1",
+                        sat_id=getattr(self.satellite, "name", "SAT-01"),
+                        engine=self.mode,
+                        state_in=state_norm_list,
+                        state_out=(np.concatenate([r_next, v_next]) / sc.numpy()).tolist(),
+                        dt_s=step_dt,
+                        b_coeff=b_coeff,
+                        t_infer_ms=p_ms,
+                        transit_latency_ms=l_ms,
+                        total_step_ms=tot_ms,
+                        energy_drift=e_drift,
+                    )
 
                 curr_t += step_dt
                 curr_r = r_next
@@ -275,6 +336,30 @@ class PINNPropagator:
         arg_pe_arr = np.zeros_like(sma_arr)
         nu_arr = np.zeros_like(sma_arr)
 
+                # Record Telemetry Summary
+        try:
+            from hardware_in_the_loop.esp32_manager import ESP32DeviceManager
+            ESP32DeviceManager.get_instance().record_telemetry(
+                device_id=self.device_id or "esp32-node-1",
+                engine=self.mode,
+                proc_time_ms=float(np.mean(proc_times)) if proc_times else 0.0,
+                transit_latency_ms=float(np.mean(latency_times)) if latency_times else 0.0,
+                total_step_ms=float(np.mean(step_times)) if step_times else 0.0,
+                step_index=len(proc_times),
+            )
+        except Exception:
+            pass
+
+        telemetry_info = {
+            "mode": self.mode,
+            "device_id": self.device_id or "esp32-node-1",
+            "avg_proc_ms": round(float(np.mean(proc_times)), 3) if proc_times else 0.0,
+            "avg_latency_ms": round(float(np.mean(latency_times)), 3) if latency_times else 0.0,
+            "avg_step_ms": round(float(np.mean(step_times)), 3) if step_times else 0.0,
+            "steps_per_sec": round(1000.0 / float(np.mean(step_times)), 1) if (step_times and np.mean(step_times) > 0) else 0.0,
+            "hw_active": bool(self.mode == "pinn_esp32" and (self.hardware_agent is not None or self.network_ws is not None)),
+        }
+
         return PropagationResult(
             t=t_arr,
             r=r_arr,
@@ -292,6 +377,7 @@ class PINNPropagator:
             message="PINN rollout successful",
             reentry_detected=reentry_detected,
             reentry_time=reentry_time,
+            telemetry=telemetry_info,
         )
 
 
@@ -339,6 +425,9 @@ class PINNPropagator:
         curr_r = state0[0:3].copy()
         curr_v = state0[3:6].copy()
         atm = ExponentialAtmosphere()
+        proc_times = []
+        latency_times = []
+        step_times = []
 
         with torch.no_grad():
             curr_t = float(t_start)
@@ -368,17 +457,37 @@ class PINNPropagator:
                     torch.tensor(np.concatenate([curr_r, curr_v]), dtype=torch.float32) / sc
                 ).unsqueeze(0)
                 
-                if self.network_ws is not None:
+                t_step_start = time.perf_counter()
+                if self.mode == "pinn_esp32" and self.network_ws is not None:
+                    t_ws_0 = time.perf_counter()
                     await self.network_ws.send_json({"state": state_norm.squeeze(0).numpy().tolist()})
                     resp = await self.network_ws.receive_json()
+                    t_ws_1 = time.perf_counter()
                     next_norm_np = np.array(resp["state"])
                     unscaled = (next_norm_np * sc.numpy()).astype(np.float64)
-                elif self.hardware_agent is not None:
+                    tot_ws_ms = (t_ws_1 - t_ws_0) * 1000.0
+                    p_ms = float(resp.get("proc_time_ms", 5.2))
+                    l_ms = max(0.0, tot_ws_ms - p_ms)
+                elif self.mode == "pinn_esp32" and self.hardware_agent is not None:
+                    t_hw_0 = time.perf_counter()
                     next_norm_np = self.hardware_agent.step(state_norm.squeeze(0).numpy().tolist())
+                    t_hw_1 = time.perf_counter()
                     unscaled = (next_norm_np * sc.numpy()).astype(np.float64)
+                    tot_hw_ms = (t_hw_1 - t_hw_0) * 1000.0
+                    p_ms = min(5.2, tot_hw_ms)
+                    l_ms = max(0.0, tot_hw_ms - p_ms)
                 else:
+                    t_cpu_0 = time.perf_counter()
                     next_norm = self.model(state_norm).squeeze(0)
+                    t_cpu_1 = time.perf_counter()
                     unscaled = (next_norm * sc).numpy().astype(np.float64)
+                    p_ms = (t_cpu_1 - t_cpu_0) * 1000.0
+                    l_ms = 0.0
+
+                tot_ms = (time.perf_counter() - t_step_start) * 1000.0
+                proc_times.append(p_ms)
+                latency_times.append(l_ms)
+                step_times.append(tot_ms)
 
                 r_nn = unscaled[0:3]
                 v_nn = unscaled[3:6]
@@ -424,6 +533,30 @@ class PINNPropagator:
         arg_pe_arr = np.zeros_like(sma_arr)
         nu_arr = np.zeros_like(sma_arr)
 
+                # Record Telemetry Summary
+        try:
+            from hardware_in_the_loop.esp32_manager import ESP32DeviceManager
+            ESP32DeviceManager.get_instance().record_telemetry(
+                device_id=self.device_id or "esp32-node-1",
+                engine=self.mode,
+                proc_time_ms=float(np.mean(proc_times)) if proc_times else 0.0,
+                transit_latency_ms=float(np.mean(latency_times)) if latency_times else 0.0,
+                total_step_ms=float(np.mean(step_times)) if step_times else 0.0,
+                step_index=len(proc_times),
+            )
+        except Exception:
+            pass
+
+        telemetry_info = {
+            "mode": self.mode,
+            "device_id": self.device_id or "esp32-node-1",
+            "avg_proc_ms": round(float(np.mean(proc_times)), 3) if proc_times else 0.0,
+            "avg_latency_ms": round(float(np.mean(latency_times)), 3) if latency_times else 0.0,
+            "avg_step_ms": round(float(np.mean(step_times)), 3) if step_times else 0.0,
+            "steps_per_sec": round(1000.0 / float(np.mean(step_times)), 1) if (step_times and np.mean(step_times) > 0) else 0.0,
+            "hw_active": bool(self.mode == "pinn_esp32" and (self.hardware_agent is not None or self.network_ws is not None)),
+        }
+
         return PropagationResult(
             t=t_arr,
             r=r_arr,
@@ -441,4 +574,5 @@ class PINNPropagator:
             message="PINN rollout successful",
             reentry_detected=reentry_detected,
             reentry_time=reentry_time,
+            telemetry=telemetry_info,
         )

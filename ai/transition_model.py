@@ -9,10 +9,11 @@ from torch import nn
 
 
 class TransitionMLP(nn.Module):
-    def __init__(self, hidden_dim=32, hidden_layers=2):
+    def __init__(self, in_dim=6, hidden_dim=32, hidden_layers=2):
         super().__init__()
+        self.in_dim = in_dim
         layers = []
-        dim = 6
+        dim = in_dim
         for _ in range(hidden_layers):
             layers.append(nn.Linear(dim, hidden_dim))
             layers.append(nn.Tanh())
@@ -21,8 +22,8 @@ class TransitionMLP(nn.Module):
         self.net = nn.Sequential(*layers)
 
     def forward(self, x):
-        # x: [batch, 6] normalized state -> normalized next state
-        return x + self.net(x)
+        # x: [batch, in_dim] normalized state -> normalized next 6D state
+        return x[:, :6] + self.net(x)
 
 
 def param_count(model):

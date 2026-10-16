@@ -11,7 +11,13 @@ ai/checkpoints/*
 !ai/checkpoints/agent/training_history.jsonl
 !ai/checkpoints/transition.pt
 
+functions/venv
 functions/venv/
+ai/venv
+ai/venv/
+ai/nc/
+hardware_in_the_loop/venv/
+hardware_in_the_loop/.pio/
 firestore-debug.log
 *.log
 .agents/

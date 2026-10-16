@@ -39,6 +39,7 @@ from leo_simulator.orbit.collision import (
     CollisionResult,
     compute_orbital_collision_impulse,
     detect_conjunction,
+    generate_collision_debris_fragments,
 )
 from leo_simulator.orbit.pinn_propagator import PINNPropagator
 from leo_simulator.orbit.satellite import Satellite
@@ -49,6 +50,7 @@ from leo_simulator.coordinates import (
     eci_to_geodetic,
     extract_trajectory_key_events,
 )
+from leo_simulator.space_weather import SpaceWeatherIndices, SpaceWeatherManager
 
 __version__ = "0.1.0"
 
@@ -87,5 +89,7 @@ __all__ = [
     "rv_to_coe",
     "third_body_acceleration",
     "total_gravity_acceleration",
+    "SpaceWeatherIndices",
+    "SpaceWeatherManager",
 ]
 
