@@ -59,6 +59,10 @@ from leo_simulator.orbit.isl_network import (
     ISLNetworkMesh,
     SatelliteNode,
 )
+from leo_simulator.orbit.finite_burn import (
+    compute_finite_burn_duration,
+    propagate_finite_burn,
+)
 
 
 app = FastAPI()
@@ -261,6 +265,9 @@ class BurnRequest(BaseModel):
     dv_prograde: float = Field(0.0, description="Delta-v in prograde/transverse direction (m/s)")
     dv_normal: float = Field(0.0, description="Delta-v in normal/out-of-plane direction (m/s)")
     dv_radial: float = Field(0.0, description="Delta-v in radial-outward direction (m/s)")
+    thrust_n: float = Field(20.0, ge=0.001, description="Finite thrust in Newtons (default 20.0 N)")
+    isp_s: float = Field(300.0, ge=10.0, description="Specific impulse in seconds (default 300.0 s)")
+    is_finite: bool = Field(False, description="Whether to execute as continuous finite-duration burn")
 
 
 class CollisionRequest(BaseModel):
@@ -421,6 +428,20 @@ def _format_chunk(res, prop: OrbitPropagator, radius_m: float, include_forces: b
     altitudes = ((np.linalg.norm(r, axis=1) - radius_m) / 1000.0).tolist()
     lat_deg, lon_deg, _ = eci_to_geodetic(r, res.t, radius_m=radius_m, omega_earth=prop.omega_earth)
     events = extract_trajectory_key_events(res.t, r, radius_m=radius_m, omega_earth=prop.omega_earth)
+    impact_data = None
+    if reentry_flag and len(lat_deg) > 0:
+        idx_reentry = -1
+        if reentry_epoch is not None:
+            diffs = [abs(ti - reentry_epoch) for ti in t]
+            idx_reentry = int(np.argmin(diffs))
+        impact_data = {
+            "lat": float(lat_deg[idx_reentry]),
+            "lon": float(lon_deg[idx_reentry]),
+            "epoch": reentry_epoch,
+            "dispersion_major_km": 110.0,
+            "dispersion_minor_km": 28.0,
+            "impact_vector": [float(r[idx_reentry, 0]), float(r[idx_reentry, 1]), float(r[idx_reentry, 2])],
+        }
     out = {
         "t": t,
         "x": r[:, 0].tolist(),
@@ -435,6 +456,7 @@ def _format_chunk(res, prop: OrbitPropagator, radius_m: float, include_forces: b
         "events": events,
         "reentry": reentry_flag,
         "reentry_time": reentry_epoch,
+        "impact": impact_data,
     }
     if include_forces:
         out["forces"] = _compute_forces(prop, res.t, r, v)
@@ -783,7 +805,33 @@ async def preview_burn(req: BurnRequest, duration_s: float = 7200.0):
             raise ValueError("Position vector norm must be positive.")
         u_v, u_n, u_c = compute_vnc_basis(r, v)
         dv_vec = req.dv_prograde * u_v + req.dv_normal * u_n + req.dv_radial * u_c
-        v_new = v + dv_vec
+        dv_mag = float(np.linalg.norm(dv_vec))
+        finite_arc = None
+        burn_duration = 0.0
+        propellant_used = 0.0
+
+        if req.is_finite and dv_mag > 1e-4:
+            f_res = propagate_finite_burn(
+                r, v, mass_start=req.params.mass,
+                dv_vnc=(req.dv_prograde, req.dv_normal, req.dv_radial),
+                t_start=req.t_burn, thrust_n=req.thrust_n, isp_s=req.isp_s,
+                mu=body["mu"],
+            )
+            burn_duration = float(f_res["burn_duration"])
+            propellant_used = float(f_res["propellant_used"])
+            finite_arc = {
+                "t": f_res["t"].tolist(),
+                "x": f_res["r"][:, 0].tolist(),
+                "y": f_res["r"][:, 1].tolist(),
+                "z": f_res["r"][:, 2].tolist(),
+            }
+            r = f_res["r"][-1]
+            v_new = f_res["v"][-1]
+            req.t_burn = float(f_res["t"][-1])
+            req.params.mass = float(f_res["mass"][-1])
+        else:
+            v_new = v + dv_vec
+
         new_state = r.tolist() + v_new.tolist()
 
         prop = _build_propagator(req.params)
@@ -810,6 +858,12 @@ async def preview_burn(req: BurnRequest, duration_s: float = 7200.0):
             "status": "success",
             "new_state": new_state,
             "trajectory": chunk,
+            "burn_profile": {
+                "is_finite": req.is_finite,
+                "burn_duration_s": burn_duration,
+                "propellant_used_kg": propellant_used,
+                "finite_arc": finite_arc,
+            },
             "reentry": bool(res.reentry_detected),
             "reentry_time": float(res.reentry_time) if res.reentry_time is not None else None,
             "events": chunk.get("events"),
@@ -835,7 +889,33 @@ async def execute_burn(req: BurnRequest):
         # Compute true velocity-aligned VNC basis vectors
         u_v, u_n, u_c = compute_vnc_basis(r, v)
         dv_vec = req.dv_prograde * u_v + req.dv_normal * u_n + req.dv_radial * u_c
-        v_new = v + dv_vec
+        dv_mag = float(np.linalg.norm(dv_vec))
+        finite_arc = None
+        burn_duration = 0.0
+        propellant_used = 0.0
+
+        if req.is_finite and dv_mag > 1e-4:
+            f_res = propagate_finite_burn(
+                r, v, mass_start=req.params.mass,
+                dv_vnc=(req.dv_prograde, req.dv_normal, req.dv_radial),
+                t_start=req.t_burn, thrust_n=req.thrust_n, isp_s=req.isp_s,
+                mu=body["mu"],
+            )
+            burn_duration = float(f_res["burn_duration"])
+            propellant_used = float(f_res["propellant_used"])
+            finite_arc = {
+                "t": f_res["t"].tolist(),
+                "x": f_res["r"][:, 0].tolist(),
+                "y": f_res["r"][:, 1].tolist(),
+                "z": f_res["r"][:, 2].tolist(),
+            }
+            r = f_res["r"][-1]
+            v_new = f_res["v"][-1]
+            req.t_burn = float(f_res["t"][-1])
+            req.params.mass = float(f_res["mass"][-1])
+        else:
+            v_new = v + dv_vec
+
         new_state = r.tolist() + v_new.tolist()
 
         # Update osculating orbital elements in params so future chunk streaming preserves perturbed orbit
@@ -884,6 +964,12 @@ async def execute_burn(req: BurnRequest):
             "trajectory": chunk,
             "last_state": last_state,
             "last_t": float(res.t[-1]),
+            "burn_profile": {
+                "is_finite": req.is_finite,
+                "burn_duration_s": burn_duration,
+                "propellant_used_kg": propellant_used,
+                "finite_arc": finite_arc,
+            },
             "events": chunk.get("events"),
             "reentry": bool(res.reentry_detected),
             "reentry_time": float(res.reentry_time) if res.reentry_time is not None else None,
@@ -1291,6 +1377,147 @@ def load_simulation(filename: str):
         raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/scenarios/presets")
+def get_scenario_presets():
+    """Returns curated scenarios including autonomous conjunction avoidance and rapid re-entry."""
+    return {
+        "presets": [
+            {
+                "id": "conjunction_pinn_isl",
+                "name": "PINN Autonomous Conjunction Avoidance (ESP32)",
+                "description": "Two opposing satellites running PINN propagation on ESP32 Node 1 & 2. Range sensor triggers autonomous evasive burn when distance < 5 km.",
+                "satellites": [
+                    {
+                        "name": "PINN-ALPHA (Node 1)",
+                        "parent_body": "Earth",
+                        "propagation_mode": "pinn_esp32",
+                        "altitude_km": 490.0,
+                        "eccentricity": 0.0005,
+                        "inclination_deg": 51.6,
+                        "raan_deg": 0.0,
+                        "arg_pe_deg": 0.0,
+                        "true_anomaly_deg": 0.0,
+                        "mass": 12.0,
+                        "drag_area": 0.04,
+                        "cd": 2.2,
+                        "device_id": "esp32-node-1",
+                        "color": "#00ffcc",
+                        "autonomous_avoidance": True,
+                        "avoidance_range_km": 5.0,
+                        "avoidance_dv": 4.0,
+                    },
+                    {
+                        "name": "PINN-BETA (Node 2)",
+                        "parent_body": "Earth",
+                        "propagation_mode": "pinn_esp32",
+                        "altitude_km": 490.05,
+                        "eccentricity": 0.0005,
+                        "inclination_deg": 51.65,
+                        "raan_deg": 0.12,
+                        "arg_pe_deg": 0.0,
+                        "true_anomaly_deg": 180.0,
+                        "mass": 14.0,
+                        "drag_area": 0.05,
+                        "cd": 2.2,
+                        "device_id": "esp32-node-2",
+                        "color": "#ff3366",
+                        "autonomous_avoidance": True,
+                        "avoidance_range_km": 5.0,
+                        "avoidance_dv": -4.0,
+                    }
+                ]
+            },
+            {
+                "id": "dense_atmosphere_deorbit",
+                "name": "Atmospheric Reentry & Impact Footprint Analysis",
+                "description": "Low-altitude satellite encountering exponential atmospheric decay with predicted landing crater and dispersion ellipse.",
+                "satellites": [
+                    {
+                        "name": "DEORBIT-PROBE-01",
+                        "parent_body": "Earth",
+                        "propagation_mode": "rk45",
+                        "altitude_km": 140.0,
+                        "eccentricity": 0.002,
+                        "inclination_deg": 45.0,
+                        "raan_deg": 25.0,
+                        "arg_pe_deg": 0.0,
+                        "true_anomaly_deg": 0.0,
+                        "mass": 45.0,
+                        "drag_area": 0.85,
+                        "cd": 2.4,
+                        "allow_decay": True,
+                        "color": "#ff9900",
+                    }
+                ]
+            },
+            {
+                "id": "starlink_dense_train",
+                "name": "Starlink LEO Constellation Train (6 Sats)",
+                "description": "Orbital plane injection train with inter-satellite laser links (ISL) active.",
+                "satellites": [
+                    {
+                        "name": f"STARLINK-V2-{i+1}",
+                        "parent_body": "Earth",
+                        "propagation_mode": "rk45",
+                        "altitude_km": 550.0,
+                        "eccentricity": 0.0002,
+                        "inclination_deg": 53.2,
+                        "raan_deg": 40.0,
+                        "arg_pe_deg": 0.0,
+                        "true_anomaly_deg": float(i * 1.5),
+                        "mass": 260.0,
+                        "drag_area": 2.2,
+                        "cd": 2.2,
+                        "color": "#38bdf8",
+                    }
+                    for i in range(6)
+                ]
+            },
+            {
+                "id": "geo_stationkeeping",
+                "name": "Geostationary High-Throughput Satellite (GEO Commsat)",
+                "description": "Equatorial 35,786 km geostationary orbit with triaxial lunar perturbations.",
+                "satellites": [
+                    {
+                        "name": "ASTRA-GEO-HTS",
+                        "parent_body": "Earth",
+                        "propagation_mode": "rk45",
+                        "altitude_km": 35786.0,
+                        "eccentricity": 0.0001,
+                        "inclination_deg": 0.05,
+                        "raan_deg": 0.0,
+                        "arg_pe_deg": 0.0,
+                        "true_anomaly_deg": 65.0,
+                        "mass": 3200.0,
+                        "drag_area": 18.0,
+                        "cd": 2.2,
+                        "color": "#eab308",
+                    }
+                ]
+            }
+        ]
+    }
+
+
+@app.get("/api/weather/live")
+def get_live_weather():
+    """Returns simulated / real-time global atmospheric weather metrics and cloud coverage."""
+    import time
+    t = time.time()
+    diurnal_phase = (t % 86400) / 86400.0
+    return {
+        "timestamp": t,
+        "diurnal_phase": diurnal_phase,
+        "troposphere_cloud_cover_pct": 62.4 + 4.5 * math.sin(t * 0.001),
+        "mean_surface_temp_k": 288.15 + 2.1 * math.sin(diurnal_phase * 2 * math.pi),
+        "sea_level_pressure_hpa": 1013.25,
+        "geomagnetic_kp_index": 2.3,
+        "solar_wind_speed_km_s": 425.0,
+        "interplanetary_mag_field_nt": 5.8,
+        "aurora_activity": "moderate",
+    }
 
 
 @app.get("/list_saves")

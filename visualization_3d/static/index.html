@@ -407,6 +407,7 @@
                     <div class="win-dropdown-item" onclick="returnToSplash()"><span class="item-icon">🚀</span><span>Launchpad (Splash)</span></div>
                     <div class="win-dropdown-item" onclick="newProject()"><span class="item-icon">📄</span><span>New Simulation Session</span><span class="item-shortcut">Ctrl+N</span></div>
                     <div class="win-dropdown-item" onclick="loadSim()"><span class="item-icon">📂</span><span>Load Simulation Session</span></div>
+                    <div class="win-dropdown-item" onclick="openPresetScenariosModal()"><span class="item-icon">⚡</span><span>Preset Scenarios (Collision Avoidance, Deorbit)...</span></div>
                     <div class="win-dropdown-sep"></div>
                     <div class="win-dropdown-item" onclick="exportData()"><span class="item-icon">📥</span><span>Export Flight Telemetry CSV</span></div>
                     <div class="win-dropdown-item" onclick="exportAnalyticalData()"><span class="item-icon">📊</span><span>Export 24-Var Analytical Dataset</span></div>
@@ -947,6 +948,23 @@
                 <button id="launch-btn" onclick="submitNewSatellite()" style="background:#2563eb;color:white;">Launch</button>
             </div>
             <div style="text-align:center; font-size:10px; color:#64748b; margin-top:12px; padding-top:8px; border-top:1px solid #1e293b;">Created by <strong style="color:#38bdf8;">Joachim Grobbelaar</strong> • LEO Simulator v2</div>
+        </div>
+    </div>
+
+    <!-- Curated Preset Scenarios Modal -->
+    <div id="presets-scenarios-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 680px; width: 92%;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid #334155; padding-bottom:8px;">
+                <h3 style="margin:0; font-size:16px; color:#38bdf8;">⚡ Curated Astrodynamics Scenarios</h3>
+                <button onclick="closePresetScenariosModal()" style="background:transparent; border:none; color:#94a3b8; font-size:18px; cursor:pointer;">&times;</button>
+            </div>
+            <p style="font-size:12px; color:#94a3b8; margin-top:0;">Select a pre-loaded mission profile to immediately initialize 3D orbits, sensors, collision avoidance, and de-orbit physics.</p>
+            <div id="presets-scenario-list" style="max-height: 420px; overflow-y: auto; display:flex; flex-direction:column; gap:10px; margin-bottom:16px;">
+                <div style="text-align:center; padding:20px; color:#64748b;">Loading mission presets...</div>
+            </div>
+            <div class="modal-buttons">
+                <button onclick="closePresetScenariosModal()" style="background:#475569; color:white;">Close</button>
+            </div>
         </div>
     </div>
 
@@ -1642,6 +1660,15 @@
     const earthSpecTex = tl.load('https://unpkg.com/three-globe/example/img/earth-water.png');
     const earthNightTex = tl.load('https://unpkg.com/three-globe/example/img/earth-night.jpg');
 
+    [earthDayTex, earthBumpTex, earthSpecTex, earthNightTex].forEach(tex => {
+        if (tex) {
+            tex.anisotropy = 16;
+            tex.minFilter = THREE.LinearMipmapLinearFilter;
+            tex.magFilter = THREE.LinearFilter;
+            tex.generateMipmaps = true;
+        }
+    });
+
     const earth = new THREE.Mesh(
         new THREE.SphereGeometry(R_EARTH_KM, 96, 96),
         new THREE.MeshPhongMaterial({
@@ -1944,35 +1971,154 @@
     const atmLayersGroup = new THREE.Group();
     atmLayersGroup.visible = false;
     
-    function buildAtmosphereSpheres() {
-        const layers = [
-            ['Troposphere (12km)', 12, 0x38bdf8, 0.25],
-            ['Stratosphere (50km)', 50, 0x818cf8, 0.15],
-            ['Mesosphere (85km)', 85, 0xa78bfa, 0.1],
-            ['Thermosphere (600km)', 600, 0xc084fc, 0.05],
-            ['Exosphere (2000km)', 2000, 0xf472b6, 0.02]
-        ];
-        layers.forEach((lyr) => {
-            const mesh = new THREE.Mesh(
-                new THREE.SphereGeometry(R_EARTH_KM + lyr[1], 48, 48),
-                new THREE.MeshBasicMaterial({
-                    color: lyr[2],
-                    transparent: true,
-                    opacity: lyr[3],
-                    side: THREE.DoubleSide,
-                    depthWrite: false
-                })
-            );
-            atmLayersGroup.add(mesh);
+    // ── Non-Patchy Multi-Band Scientific Atmospheric Shader Shell ──
+    function buildAtmosphereShaderShell() {
+        const atmGeo = new THREE.SphereGeometry(R_EARTH_KM + 600.0, 96, 96);
+        const atmMat = new THREE.ShaderMaterial({
+            uniforms: {
+                uSunDir: { value: new THREE.Vector3(-1.0, 0.1, 0.2).normalize() },
+                uIntensity: { value: 1.0 }
+            },
+            vertexShader: `
+                varying vec3 vNormal;
+                varying vec3 vWorldPos;
+                void main() {
+                    vNormal = normalize(normalMatrix * normal);
+                    vec4 wp = modelMatrix * vec4(position, 1.0);
+                    vWorldPos = wp.xyz;
+                    gl_Position = projectionMatrix * viewMatrix * wp;
+                }
+            `,
+            fragmentShader: `
+                uniform vec3 uSunDir;
+                uniform float uIntensity;
+                varying vec3 vNormal;
+                varying vec3 vWorldPos;
+                void main() {
+                    vec3 viewDir = normalize(cameraPosition - vWorldPos);
+                    float rim = 1.0 - max(0.0, dot(vNormal, viewDir));
+                    
+                    // Multi-Band Atmospheric Altitudes Gradient:
+                    // Band 1: Troposphere (0-12km) cyan
+                    // Band 2: Stratosphere (12-50km) electric blue
+                    // Band 3: Mesosphere (50-85km) deep violet
+                    // Band 4: Thermosphere (85-600km) magenta / emerald auroral fringe
+                    float rimTropo = pow(rim, 6.0);
+                    float rimStrato = pow(rim, 4.0);
+                    float rimMeso = pow(rim, 2.5);
+                    float rimThermo = pow(rim, 1.5);
+                    
+                    vec3 colTropo = vec3(0.05, 0.75, 1.0) * rimTropo * 1.4;
+                    vec3 colStrato = vec3(0.18, 0.45, 1.0) * (rimStrato - rimTropo * 0.6);
+                    vec3 colMeso = vec3(0.55, 0.20, 0.95) * (rimMeso - rimStrato * 0.5);
+                    vec3 colThermo = vec3(0.75, 0.10, 0.65) * (rimThermo - rimMeso * 0.5);
+                    
+                    vec3 finalCol = (colTropo + colStrato + colMeso + colThermo) * uIntensity;
+                    float alpha = clamp((rimTropo * 0.9 + rimStrato * 0.6 + rimMeso * 0.4 + rimThermo * 0.25) * uIntensity, 0.0, 0.92);
+                    gl_FragColor = vec4(finalCol, alpha);
+                }
+            `,
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            side: THREE.BackSide,
+            depthWrite: false
         });
+        const shellMesh = new THREE.Mesh(atmGeo, atmMat);
+        atmLayersGroup.add(shellMesh);
         return atmLayersGroup;
     }
-    earth.add(buildAtmosphereSpheres());
+    earth.add(buildAtmosphereShaderShell());
 
     window.toggleAtmosphereLayers = function() {
-        if (atmLayersGroup) {
-            atmLayersGroup.visible = document.getElementById('show-atm-layers').checked;
-        }
+        const chk = document.getElementById('show-atm-layers');
+        const active = chk ? chk.checked : !atmLayersGroup.visible;
+        if (atmLayersGroup) atmLayersGroup.visible = active;
+        const statusEl = document.getElementById('menu-atm-status');
+        if (statusEl) statusEl.innerText = active ? 'Atmospheric Layers (Active)' : 'Atmospheric Scientific Layers (Color Mode)';
+    };
+    window.toggleAtmosphereShaderLayers = window.toggleAtmosphereLayers;
+
+    // ── Dynamic Weather & Cloud Layer ──
+    const weatherCloudsGroup = new THREE.Group();
+    const cloudTex = tl.load('https://unpkg.com/three-globe/example/img/earth-clouds.png');
+    cloudTex.anisotropy = 16;
+    const weatherCloudsMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(R_EARTH_KM + 6.0, 96, 96),
+        new THREE.MeshPhongMaterial({
+            map: cloudTex,
+            transparent: true,
+            opacity: 0.58,
+            depthWrite: false,
+            blending: THREE.NormalBlending
+        })
+    );
+    weatherCloudsGroup.add(weatherCloudsMesh);
+    weatherCloudsGroup.visible = true;
+    earth.add(weatherCloudsGroup);
+
+    window.toggleLiveWeatherClouds = function() {
+        weatherCloudsGroup.visible = !weatherCloudsGroup.visible;
+        const statusEl = document.getElementById('menu-weather-status');
+        if (statusEl) statusEl.innerText = weatherCloudsGroup.visible ? 'Live Weather & Clouds (Active)' : 'Live Weather & Dynamic Cloud Layer';
+    };
+
+    // ── Flowing Earth Geomagnetic Dipole Field Lines (L-Shells) ──
+    const geomagneticFieldGroup = new THREE.Group();
+    const magLineDashes = [];
+    function buildGeomagneticFieldLines() {
+        const lShells = [1.8, 2.4, 3.2, 4.2];
+        const numMeridians = 16;
+        const ptsPerLine = 48;
+        const dipoleTiltRad = THREE.MathUtils.degToRad(11.5);
+
+        lShells.forEach((L, lIdx) => {
+            const hue = 0.55 + lIdx * 0.10;
+            const mat = new THREE.LineDashedMaterial({
+                color: new THREE.Color().setHSL(hue, 0.9, 0.65),
+                transparent: true,
+                opacity: 0.65 - lIdx * 0.08,
+                dashSize: 120,
+                gapSize: 60,
+                depthWrite: false
+            });
+
+            for (let m = 0; m < numMeridians; m++) {
+                const phi = (m / numMeridians) * Math.PI * 2.0;
+                const points = [];
+                const thetaMin = Math.asin(Math.min(0.99, Math.sqrt(1.0 / L)));
+                const thetaMax = Math.PI - thetaMin;
+
+                for (let i = 0; i <= ptsPerLine; i++) {
+                    const theta = thetaMin + (i / ptsPerLine) * (thetaMax - thetaMin);
+                    const r = (R_EARTH_KM + 10.0) * L * Math.sin(theta) * Math.sin(theta);
+                    
+                    // Un-tilted dipole vector
+                    const x = r * Math.sin(theta) * Math.cos(phi);
+                    const y = r * Math.cos(theta);
+                    const z = r * Math.sin(theta) * Math.sin(phi);
+
+                    // Apply Earth's 11.5-degree geomagnetic dipole tilt
+                    const pos = new THREE.Vector3(x, y, z);
+                    pos.applyAxisAngle(new THREE.Vector3(1, 0, 0), dipoleTiltRad);
+                    points.push(pos);
+                }
+
+                const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
+                const line = new THREE.Line(lineGeo, mat);
+                line.computeLineDistances();
+                geomagneticFieldGroup.add(line);
+                magLineDashes.push(mat);
+            }
+        });
+        geomagneticFieldGroup.visible = false;
+        return geomagneticFieldGroup;
+    }
+    earth.add(buildGeomagneticFieldLines());
+
+    window.toggleGeomagneticField = function() {
+        geomagneticFieldGroup.visible = !geomagneticFieldGroup.visible;
+        const statusEl = document.getElementById('menu-mag-status');
+        if (statusEl) statusEl.innerText = geomagneticFieldGroup.visible ? 'Geomagnetic Field (Active)' : 'Flowing Geomagnetic Field (L-Shells)';
     };
 
     // ── Moon Mesh ──
@@ -2080,10 +2226,93 @@
     const activeShockwaves = [];
     const collisionCooldowns = new Map();
 
+    // ── Earth Impact Crater & Debris Field FX ──
+    const earthImpactGroup = new THREE.Group();
+    earth.add(earthImpactGroup);
+    const activeImpactMarkers = [];
+
+    function spawnEarthImpactCrater(sat, impactData) {
+        if (!impactData || typeof impactData.lat === 'undefined') return;
+        const lat = impactData.lat;
+        const lon = impactData.lon;
+        const surfacePos = latLonToEarthVector3(lat, lon, 1.5);
+        const normal = surfacePos.clone().normalize();
+
+        const craterGroup = new THREE.Group();
+        craterGroup.position.copy(surfacePos);
+        craterGroup.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+
+        // 1. Outer blast crater rim
+        const rimGeo = new THREE.RingGeometry(18, 55, 32);
+        const rimMat = new THREE.MeshBasicMaterial({ color: 0xef4444, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
+        const rimMesh = new THREE.Mesh(rimGeo, rimMat);
+        craterGroup.add(rimMesh);
+
+        // 2. Inner high-temperature crater core
+        const coreGeo = new THREE.CircleGeometry(18, 24);
+        const coreMat = new THREE.MeshBasicMaterial({ color: 0xf97316, side: THREE.DoubleSide, transparent: true, opacity: 0.95 });
+        const coreMesh = new THREE.Mesh(coreGeo, coreMat);
+        craterGroup.add(coreMesh);
+
+        // 3. Ground footprint dispersion ellipse
+        const dispMaj = (impactData.dispersion_major_km || 100.0) * 0.8;
+        const dispMin = (impactData.dispersion_minor_km || 30.0) * 0.8;
+        const curve = new THREE.EllipseCurve(0, 0, dispMaj, dispMin, 0, 2 * Math.PI, false, 0);
+        const pts = curve.getPoints(40);
+        const ellGeo = new THREE.BufferGeometry().setFromPoints(pts);
+        const ellMat = new THREE.LineDashedMaterial({ color: 0xfacc15, dashSize: 10, gapSize: 6, transparent: true, opacity: 0.8 });
+        const ellLine = new THREE.Line(ellGeo, ellMat);
+        ellLine.computeLineDistances();
+        craterGroup.add(ellLine);
+
+        // 4. Vertical beacon pillar
+        const beaconH = 260.0;
+        const beaconGeo = new THREE.CylinderGeometry(2, 8, beaconH, 12);
+        const beaconMat = new THREE.MeshBasicMaterial({ color: 0xff3b30, transparent: true, opacity: 0.75 });
+        const beaconMesh = new THREE.Mesh(beaconGeo, beaconMat);
+        beaconMesh.position.set(0, 0, beaconH * 0.5);
+        beaconMesh.rotation.x = Math.PI / 2;
+        craterGroup.add(beaconMesh);
+
+        // 5. Billboard Sprite Badge
+        const cCanvas = document.createElement('canvas');
+        cCanvas.width = 384;
+        cCanvas.height = 128;
+        const ctx = cCanvas.getContext('2d');
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.roundRect(10, 10, 364, 108, 12);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#ef4444';
+        ctx.font = 'bold 22px monospace';
+        ctx.fillText('💥 DE-ORBIT GROUND IMPACT', 24, 46);
+        ctx.fillStyle = '#f8fafc';
+        ctx.font = '16px monospace';
+        ctx.fillText(`${sat.name || 'Satellite'}`, 24, 74);
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '14px monospace';
+        ctx.fillText(`Landing: ${lat.toFixed(2)}°, ${lon.toFixed(2)}°`, 24, 98);
+
+        const badgeTex = new THREE.CanvasTexture(cCanvas);
+        badgeTex.minFilter = THREE.LinearFilter;
+        const badgeMat = new THREE.SpriteMaterial({ map: badgeTex, transparent: true, depthWrite: false });
+        const badgeSprite = new THREE.Sprite(badgeMat);
+        badgeSprite.scale.set(380, 126, 1.0);
+        badgeSprite.position.set(0, 0, beaconH + 70.0);
+        craterGroup.add(badgeSprite);
+
+        earthImpactGroup.add(craterGroup);
+        activeImpactMarkers.push({ group: craterGroup, rimMesh, phase: 0.0 });
+    }
+
     function spawnCollisionShockwave(pos) {
-        const geom = new THREE.SphereGeometry(25, 24, 24);
+        // 1. Expanding luminous plasma sphere
+        const geom = new THREE.SphereGeometry(30, 24, 24);
         const mat = new THREE.MeshBasicMaterial({
-            color: 0xff3b30,
+            color: 0xff4500,
             wireframe: true,
             transparent: true,
             opacity: 1.0
@@ -2091,7 +2320,15 @@
         const mesh = new THREE.Mesh(geom, mat);
         mesh.position.copy(pos);
         scene.add(mesh);
-        activeShockwaves.push({ mesh, scale: 1.0, opacity: 1.0 });
+
+        // 2. Intense central collision flash
+        const coreGeo = new THREE.SphereGeometry(15, 16, 16);
+        const coreMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1.0 });
+        const coreMesh = new THREE.Mesh(coreGeo, coreMat);
+        coreMesh.position.copy(pos);
+        scene.add(coreMesh);
+
+        activeShockwaves.push({ mesh, coreMesh, scale: 1.0, opacity: 1.0 });
     }
 
     function showCollisionBanner(htmlText, durMs = 5000) {
@@ -2582,6 +2819,9 @@
                 sat.deorbitEpoch = data.reentry_time || sat.lastT;
                 sat.lifetimeSeconds = sat.deorbitEpoch;
                 sat.deorbitTime = formatTime(sat.lifetimeSeconds);
+                if (data.impact) {
+                    spawnEarthImpactCrater(sat, data.impact);
+                }
                 renderSidebar();
             }
         } catch (e) {
@@ -2593,8 +2833,8 @@
 
     function createAvatarSprite(iconType, hexColor) {
         const canvas = document.createElement('canvas');
-        canvas.width = 128;
-        canvas.height = 128;
+        canvas.width = 512;
+        canvas.height = 512;
         const ctx = canvas.getContext('2d');
 
         const glyphMap = {
@@ -2611,29 +2851,32 @@
         const c = new THREE.Color(hexColor);
         const rgbStr = `${Math.floor(c.r * 255)}, ${Math.floor(c.g * 255)}, ${Math.floor(c.b * 255)}`;
 
-        // Glowing radial aura
-        const grad = ctx.createRadialGradient(64, 64, 8, 64, 64, 58);
-        grad.addColorStop(0, `rgba(${rgbStr}, 0.85)`);
-        grad.addColorStop(0.5, `rgba(${rgbStr}, 0.25)`);
+        // High-definition glowing radial halo without blur artifacts
+        const grad = ctx.createRadialGradient(256, 256, 30, 256, 256, 220);
+        grad.addColorStop(0, `rgba(${rgbStr}, 0.88)`);
+        grad.addColorStop(0.4, `rgba(${rgbStr}, 0.32)`);
         grad.addColorStop(1, `rgba(${rgbStr}, 0.0)`);
         ctx.fillStyle = grad;
         ctx.beginPath();
-        ctx.arc(64, 64, 58, 0, Math.PI * 2);
+        ctx.arc(256, 256, 220, 0, Math.PI * 2);
         ctx.fill();
 
-        // High-res emoji glyph
-        ctx.font = '60px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
+        // High-res emoji glyph at native font size
+        ctx.font = '220px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.shadowColor = `rgba(${rgbStr}, 0.9)`;
-        ctx.shadowBlur = 10;
-        ctx.fillText(glyph, 64, 64);
+        ctx.shadowColor = `rgba(${rgbStr}, 0.95)`;
+        ctx.shadowBlur = 18;
+        ctx.fillText(glyph, 256, 256);
 
         const texture = new THREE.CanvasTexture(canvas);
+        texture.generateMipmaps = true;
+        texture.minFilter = THREE.LinearMipmapLinearFilter;
+        texture.magFilter = THREE.LinearFilter;
         texture.needsUpdate = true;
-        const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
+        const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false });
         const sprite = new THREE.Sprite(spriteMat);
-        const scale = 750;
+        const scale = 550;
         sprite.scale.set(scale, scale, 1.0);
         return { sprite, glyph };
     }
@@ -2641,113 +2884,147 @@
     function createDetailedSatelliteMesh(params, colorHex) {
         const satGroup = new THREE.Group();
         const p = params || {};
-        const mass = p.mass_kg || 500.0;
+        const mass = p.mass_kg || p.mass || 500.0;
         const dragArea = p.drag_area || 2.0;
+        const accentCol = parseInt(colorHex.replace('#', '0x'), 16) || 0x38bdf8;
 
-        // Physical dimensions in kilometers (1 m = 0.001 km)
-        // Bus characteristic size scaled with mass
-        const busSize = Math.max(0.0006, Math.min(0.009, Math.cbrt(mass / 150.0) * 0.001));
-        const busW = busSize;
-        const busH = busSize * 1.35;
-        const busD = busSize;
+        if (mass < 40.0) {
+            // ── CLASS 1: CubeSat / NanoSat (< 40 kg) ──
+            const busW = 6.0, busH = 14.0, busD = 6.0;
+            const busMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9, roughness: 0.25 });
+            const busMesh = new THREE.Mesh(new THREE.BoxGeometry(busW, busH, busD), busMat);
+            satGroup.add(busMesh);
 
-        // 1. Central Bus with Multi-Layer Insulation (MLI Gold Foil)
-        const busGeo = new THREE.BoxGeometry(busW, busH, busD);
-        const busMat = new THREE.MeshStandardMaterial({
-            color: 0xd97706, // Amber gold MLI foil
-            metalness: 0.88,
-            roughness: 0.28,
-            emissive: 0x78350f,
-            emissiveIntensity: 0.12
-        });
-        const busMesh = new THREE.Mesh(busGeo, busMat);
-        satGroup.add(busMesh);
+            // Gold MLI inset panels
+            const foilMat = new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.85, roughness: 0.3, emissive: 0x78350f, emissiveIntensity: 0.15 });
+            const foilMesh = new THREE.Mesh(new THREE.BoxGeometry(busW * 0.9, busH * 0.85, busD * 1.01), foilMat);
+            satGroup.add(foilMesh);
 
-        // Silver Thermal Radiator on back face
-        const radGeo = new THREE.PlaneGeometry(busW * 0.85, busH * 0.85);
-        const radMat = new THREE.MeshStandardMaterial({
-            color: 0xf1f5f9,
-            metalness: 0.92,
-            roughness: 0.15,
-            side: THREE.DoubleSide
-        });
-        const radMesh = new THREE.Mesh(radGeo, radMat);
-        radMesh.position.set(0, 0, -busD * 0.501);
-        satGroup.add(radMesh);
+            // 4 Angled Deployable Solar Panels
+            const spMat = new THREE.MeshStandardMaterial({ color: 0x1e3a8a, metalness: 0.8, roughness: 0.2, emissive: 0x172554, emissiveIntensity: 0.1, side: THREE.DoubleSide });
+            const spGeo = new THREE.BoxGeometry(10.0, 5.0, 0.4);
+            [1, -1].forEach(side => {
+                const sp = new THREE.Mesh(spGeo, spMat);
+                sp.position.set(side * (busW * 0.5 + 5.0), 0, 0);
+                sp.rotation.y = side * 0.25;
+                satGroup.add(sp);
+            });
 
-        // 2. Deployed Solar Array Wings (scaled to drag_area)
-        const totalWingAreaM2 = Math.max(0.3, dragArea * 0.75);
-        const wingSpanM = Math.sqrt(totalWingAreaM2 * 2.8);
-        const wingChordM = (totalWingAreaM2 * 0.5) / (wingSpanM * 0.5);
-        const wingSpanKm = Math.max(0.0015, Math.min(0.026, wingSpanM * 0.5 * 0.001));
-        const wingChordKm = Math.max(0.0006, Math.min(0.008, wingChordM * 0.001));
+            // Whip Dipole Antennas
+            const antMat = new THREE.MeshBasicMaterial({ color: 0xe2e8f0 });
+            const antGeo = new THREE.CylinderGeometry(0.12, 0.12, 16.0, 6);
+            const ant1 = new THREE.Mesh(antGeo, antMat);
+            ant1.position.set(0, busH * 0.5 + 8.0, 0);
+            satGroup.add(ant1);
 
-        const wingGeo = new THREE.BoxGeometry(wingSpanKm, 0.00003, wingChordKm);
-        const wingMat = new THREE.MeshStandardMaterial({
-            color: 0x1e3a8a, // Deep photovoltaic blue
-            metalness: 0.75,
-            roughness: 0.22,
-            emissive: 0x172554,
-            emissiveIntensity: 0.08
-        });
+            // Optical Aperture
+            const lensMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.95, roughness: 0.1 });
+            const lens = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 0.8, 16), lensMat);
+            lens.position.set(0, -busH * 0.5 - 0.4, 0);
+            satGroup.add(lens);
 
-        // Left wing (+X)
-        const leftWing = new THREE.Mesh(wingGeo, wingMat);
-        leftWing.position.set(busW * 0.5 + wingSpanKm * 0.5 + 0.0002, 0, 0);
-        satGroup.add(leftWing);
+        } else if (mass < 1500.0) {
+            // ── CLASS 2: Standard LEO / Earth Observation / Starlink (40 - 1500 kg) ──
+            const busW = 12.0, busH = 18.0, busD = 12.0;
+            const busMat = new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.88, roughness: 0.28, emissive: 0x78350f, emissiveIntensity: 0.12 });
+            const busMesh = new THREE.Mesh(new THREE.BoxGeometry(busW, busH, busD), busMat);
+            satGroup.add(busMesh);
 
-        // Right wing (-X)
-        const rightWing = new THREE.Mesh(wingGeo, wingMat);
-        rightWing.position.set(-(busW * 0.5 + wingSpanKm * 0.5 + 0.0002), 0, 0);
-        satGroup.add(rightWing);
+            // Thermal Radiator
+            const radMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, metalness: 0.95, roughness: 0.15, side: THREE.DoubleSide });
+            const radMesh = new THREE.Mesh(new THREE.PlaneGeometry(busW * 0.85, busH * 0.85), radMat);
+            radMesh.position.set(0, 0, -busD * 0.505);
+            satGroup.add(radMesh);
 
-        // Solar Array Carbon Composite Booms / Hinges
-        const boomGeo = new THREE.CylinderGeometry(0.00008, 0.00008, wingSpanKm * 2.0 + busW, 8);
-        const boomMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.8, roughness: 0.4 });
-        const boom = new THREE.Mesh(boomGeo, boomMat);
-        boom.rotation.z = Math.PI / 2;
-        satGroup.add(boom);
+            // High-Gain Deployed Solar Array Wings
+            const wingSpan = Math.max(28.0, Math.min(56.0, Math.sqrt(dragArea * 180.0)));
+            const wingChord = 10.0;
+            const wingMat = new THREE.MeshStandardMaterial({ color: 0x1d4ed8, metalness: 0.8, roughness: 0.22, emissive: 0x1e3a8a, emissiveIntensity: 0.1, side: THREE.DoubleSide });
+            const wingGeo = new THREE.BoxGeometry(wingSpan * 0.5, 0.4, wingChord);
 
-        // 3. High-Gain Communications Dish (Parabolic Nadir Antenna)
-        const dishRadius = Math.max(0.0004, busSize * 0.65);
-        const dishGeo = new THREE.SphereGeometry(dishRadius, 20, 10, 0, Math.PI * 2, 0, Math.PI * 0.45);
-        const dishMat = new THREE.MeshStandardMaterial({
-            color: 0xffffff,
-            metalness: 0.4,
-            roughness: 0.35,
-            side: THREE.DoubleSide
-        });
-        const dish = new THREE.Mesh(dishGeo, dishMat);
-        dish.position.set(0, busH * 0.5 + dishRadius * 0.5, 0);
-        dish.rotation.x = Math.PI; // Face outwards
-        satGroup.add(dish);
+            [-1, 1].forEach(side => {
+                const wing = new THREE.Mesh(wingGeo, wingMat);
+                wing.position.set(side * (busW * 0.5 + wingSpan * 0.25 + 1.0), 0, 0);
+                satGroup.add(wing);
+            });
 
-        // Dish Feed Horn Mast
-        const hornGeo = new THREE.CylinderGeometry(0.00004, 0.00004, dishRadius * 0.8, 6);
-        const hornMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
-        const horn = new THREE.Mesh(hornGeo, hornMat);
-        horn.position.set(0, busH * 0.5 + dishRadius * 0.9, 0);
-        satGroup.add(horn);
+            // Structural Truss Boom
+            const boomMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8, roughness: 0.4 });
+            const boom = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, wingSpan + busW, 8), boomMat);
+            boom.rotation.z = Math.PI / 2;
+            satGroup.add(boom);
 
-        // 4. Propulsion Thruster Nozzle (-Y Base)
-        const nozRadius = busSize * 0.22;
-        const nozHeight = busSize * 0.35;
-        const nozGeo = new THREE.ConeGeometry(nozRadius, nozHeight, 16, 1, true);
-        const nozMat = new THREE.MeshStandardMaterial({
-            color: 0x0f172a, // Dark titanium/niobium
-            metalness: 0.95,
-            roughness: 0.25,
-            side: THREE.DoubleSide
-        });
-        const nozzle = new THREE.Mesh(nozGeo, nozMat);
-        nozzle.position.set(0, -busH * 0.5 - nozHeight * 0.5, 0);
-        satGroup.add(nozzle);
+            // Parabolic High-Gain Antenna Dish
+            const dishMat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.5, roughness: 0.3, side: THREE.DoubleSide });
+            const dish = new THREE.Mesh(new THREE.SphereGeometry(6.5, 20, 10, 0, Math.PI * 2, 0, Math.PI * 0.45), dishMat);
+            dish.position.set(0, busH * 0.5 + 3.0, 0);
+            dish.rotation.x = Math.PI;
+            satGroup.add(dish);
 
-        // 5. Star Tracker & Identification Stripe
-        const stripeGeo = new THREE.BoxGeometry(busW * 1.02, busH * 0.15, busD * 1.02);
-        const stripeMat = new THREE.MeshBasicMaterial({ color: parseInt(colorHex.replace('#', '0x'), 16) || 0x38bdf8 });
-        const stripe = new THREE.Mesh(stripeGeo, stripeMat);
-        satGroup.add(stripe);
+            const horn = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 5.0, 6), new THREE.MeshBasicMaterial({ color: 0x38bdf8 }));
+            horn.position.set(0, busH * 0.5 + 5.5, 0);
+            satGroup.add(horn);
+
+            // Optical Sensor Payload Barrel
+            const camGeo = new THREE.CylinderGeometry(2.5, 2.5, 7.0, 16);
+            const camMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9, roughness: 0.2 });
+            const cameraMesh = new THREE.Mesh(camGeo, camMat);
+            cameraMesh.position.set(0, -busH * 0.5 - 3.5, 2.0);
+            satGroup.add(cameraMesh);
+
+            // Thruster Cone
+            const nozGeo = new THREE.ConeGeometry(2.2, 4.0, 16, 1, true);
+            const nozMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.95, roughness: 0.25, side: THREE.DoubleSide });
+            const nozzle = new THREE.Mesh(nozGeo, nozMat);
+            nozzle.position.set(0, -busH * 0.5 - 2.0, -2.0);
+            satGroup.add(nozzle);
+
+            // Identification Accent Ring
+            const ringMesh = new THREE.Mesh(new THREE.BoxGeometry(busW * 1.02, 2.0, busD * 1.02), new THREE.MeshBasicMaterial({ color: accentCol }));
+            satGroup.add(ringMesh);
+
+        } else {
+            // ── CLASS 3: Heavy GEO / Space Station / Habitat (> 1500 kg) ──
+            const modGeo = new THREE.CylinderGeometry(9.0, 9.0, 36.0, 24);
+            const modMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.85, roughness: 0.25 });
+            const moduleMesh = new THREE.Mesh(modGeo, modMat);
+            moduleMesh.rotation.z = Math.PI / 2;
+            satGroup.add(moduleMesh);
+
+            // Central Structural Cross Truss
+            const trussGeo = new THREE.BoxGeometry(4.0, 65.0, 4.0);
+            const trussMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.8, roughness: 0.4 });
+            const truss = new THREE.Mesh(trussGeo, trussMat);
+            satGroup.add(truss);
+
+            // Quad Articulated Giant Solar Wings
+            const gWingGeo = new THREE.BoxGeometry(32.0, 0.5, 12.0);
+            const gWingMat = new THREE.MeshStandardMaterial({ color: 0x1e3a8a, metalness: 0.75, roughness: 0.2, emissive: 0x172554, emissiveIntensity: 0.12, side: THREE.DoubleSide });
+            [-1, 1].forEach(sideY => {
+                [-1, 1].forEach(sideX => {
+                    const gw = new THREE.Mesh(gWingGeo, gWingMat);
+                    gw.position.set(sideX * 36.0, sideY * 24.0, 0);
+                    satGroup.add(gw);
+                });
+            });
+
+            // Cupola Observation Dome
+            const domeGeo = new THREE.SphereGeometry(4.5, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.5);
+            const domeMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.9, roughness: 0.1, transparent: true, opacity: 0.85 });
+            const dome = new THREE.Mesh(domeGeo, domeMat);
+            dome.position.set(0, 0, 9.5);
+            dome.rotation.x = Math.PI / 2;
+            satGroup.add(dome);
+
+            // Dual Comms Dishes
+            const dishMat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.5, roughness: 0.3, side: THREE.DoubleSide });
+            [-1, 1].forEach(side => {
+                const dish = new THREE.Mesh(new THREE.SphereGeometry(6.0, 16, 8, 0, Math.PI * 2, 0, Math.PI * 0.45), dishMat);
+                dish.position.set(side * 22.0, 0, -10.0);
+                dish.rotation.x = -Math.PI * 0.4;
+                satGroup.add(dish);
+            });
+        }
 
         satGroup.visible = false;
         return satGroup;
@@ -2934,9 +3211,11 @@
             const container = document.getElementById('vcam-canvas-container') || canvas.parentElement;
             const w = (container && container.clientWidth > 20) ? container.clientWidth : 340;
             const h = (container && container.clientHeight > 20) ? container.clientHeight : 180;
-            vcamRenderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, preserveDrawingBuffer: true });
+            vcamRenderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, preserveDrawingBuffer: true, powerPreference: 'high-performance' });
+            vcamRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+            if (THREE.sRGBEncoding) vcamRenderer.outputEncoding = THREE.sRGBEncoding;
             vcamRenderer.setSize(w, h, false);
-            vcamCamera = new THREE.PerspectiveCamera(vcamFOV, w / h, 0.01, 2000000000);
+            vcamCamera = new THREE.PerspectiveCamera(vcamFOV, w / h, 1.0, 10000000.0);
             setupVcamResizeObserver();
             initVcamResizers();
         } catch (e) {
@@ -3639,6 +3918,130 @@
         }
     };
 
+    // ── CURATED PRESET ASTRODYNAMICS SCENARIOS CONTROLLER ────────────────────
+    let cachedScenarioPresets = null;
+
+    window.openPresetScenariosModal = function() {
+        const modal = document.getElementById('presets-scenarios-modal');
+        if (modal) modal.style.display = 'flex';
+        const list = document.getElementById('presets-scenario-list');
+        if (!list) return;
+        list.innerHTML = '<div style="text-align:center; padding:20px; color:#64748b;">Loading mission presets...</div>';
+
+        fetch('/api/scenarios/presets')
+            .then(r => r.json())
+            .then(data => {
+                cachedScenarioPresets = data.presets || [];
+                list.innerHTML = '';
+                cachedScenarioPresets.forEach(preset => {
+                    const card = document.createElement('div');
+                    card.style.cssText = 'background:#1e293b; border:1px solid #334155; border-radius:6px; padding:12px; display:flex; justify-content:space-between; align-items:center; gap:12px;';
+                    
+                    const left = document.createElement('div');
+                    left.style.flex = '1';
+                    
+                    const titleRow = document.createElement('div');
+                    titleRow.style.cssText = 'display:flex; align-items:center; gap:8px; margin-bottom:4px;';
+                    titleRow.innerHTML = `<strong style="color:#f8fafc; font-size:13px;">${preset.name}</strong>` +
+                        `<span style="background:#0284c7; color:white; font-size:10px; padding:1px 6px; border-radius:3px; font-weight:600;">${preset.satellites.length} Satellites</span>`;
+                    
+                    const desc = document.createElement('div');
+                    desc.style.cssText = 'font-size:11px; color:#94a3b8; line-height:1.4;';
+                    desc.innerText = preset.description;
+
+                    left.appendChild(titleRow);
+                    left.appendChild(desc);
+
+                    const btn = document.createElement('button');
+                    btn.style.cssText = 'background:#2563eb; color:white; border:none; padding:8px 14px; border-radius:4px; font-size:11px; font-weight:600; cursor:pointer; white-space:nowrap; transition:background 0.15s;';
+                    btn.innerText = '⚡ Load Mission';
+                    btn.onmouseenter = () => { btn.style.background = '#1d4ed8'; };
+                    btn.onmouseleave = () => { btn.style.background = '#2563eb'; };
+                    btn.onclick = () => window.loadPresetScenario(preset.id);
+
+                    card.appendChild(left);
+                    card.appendChild(btn);
+                    list.appendChild(card);
+                });
+            })
+            .catch(err => {
+                list.innerHTML = `<div style="color:#ef4444; padding:15px;">Failed to load presets: ${err.message}</div>`;
+            });
+    };
+
+    window.closePresetScenariosModal = function() {
+        const modal = document.getElementById('presets-scenarios-modal');
+        if (modal) modal.style.display = 'none';
+    };
+
+    window.loadPresetScenario = async function(presetId) {
+        if (!cachedScenarioPresets) {
+            try {
+                const r = await fetch('/api/scenarios/presets');
+                const d = await r.json();
+                cachedScenarioPresets = d.presets || [];
+            } catch (e) {
+                alert('Failed to fetch presets: ' + e.message);
+                return;
+            }
+        }
+        const preset = cachedScenarioPresets.find(p => p.id === presetId);
+        if (!preset) {
+            alert('Scenario preset not found');
+            return;
+        }
+
+        closePresetScenariosModal();
+        if (inSplashMode) enterMissionMode(false);
+        clearSatellites();
+        simTime = 0.0;
+        showCollisionBanner(`🚀 Loading Scenario: <strong>${preset.name}</strong>...`, 4000);
+
+        for (let i = 0; i < preset.satellites.length; i++) {
+            const satSpec = preset.satellites[i];
+            const payload = {
+                name: satSpec.name,
+                parent_body: satSpec.parent_body || 'Earth',
+                propagation_mode: satSpec.propagation_mode || 'rk45',
+                hardware_device_id: satSpec.device_id || 'esp32-node-1',
+                mass: satSpec.mass || 50.0,
+                drag_area: satSpec.drag_area || 0.1,
+                cd: satSpec.cd || 2.2,
+                altitude_km: satSpec.altitude_km,
+                eccentricity: satSpec.eccentricity || 0.0,
+                inclination_deg: satSpec.inclination_deg || 0.0,
+                raan_deg: satSpec.raan_deg || 0.0,
+                arg_pe_deg: satSpec.arg_pe_deg || 0.0,
+                true_anomaly_deg: satSpec.true_anomaly_deg || 0.0,
+                color: satSpec.color || '#38bdf8',
+                icon: satSpec.icon || 'satellite',
+                t_start: 0.0
+            };
+            try {
+                const res = await fetch('/simulate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (res.ok && data) {
+                    addSatelliteToScene(data);
+                } else {
+                    console.error('Error loading preset sat:', data);
+                }
+            } catch (err) {
+                console.error('Preset sat load error:', err);
+            }
+        }
+
+        if (activeSatellites.length > 0) {
+            focusSatellite(0);
+            focusView('Earth');
+            simSettings.playbackSpeed = 1.0;
+            updatePlayPauseButton();
+        }
+    };
+
     // ── Interactive Earth City Click & Focus Controller ──────────────────────
     let selectedCityPOI = null;
 
@@ -4130,6 +4533,12 @@
             }
             Object.values(sat.forceArrows).forEach(a => scene.remove(a));
         });
+        if (earthImpactGroup) {
+            while (earthImpactGroup.children.length > 0) {
+                earthImpactGroup.remove(earthImpactGroup.children[0]);
+            }
+            activeImpactMarkers.length = 0;
+        }
         activeSatellites = [];
         selectedSatIndex = -1;
         simTime = 0.0;
@@ -4239,17 +4648,32 @@
     }
 
     // ── Focus Satellite & Camera Centering ──────────────────────────────────
-    window.focusSatellite = function(idx) {
+    let lastFocusSatIdx = -1;
+    let lastFocusTime = 0;
+
+    window.focusSatellite = function(idx, forceZoomClose = false) {
         if (idx < 0 || idx >= activeSatellites.length) return;
         const sat = activeSatellites[idx];
+        const now = performance.now();
+        const isDoubleFocus = forceZoomClose || (selectedSatIndex === idx && (now - lastFocusTime < 2500));
+        lastFocusTime = now;
+        lastFocusSatIdx = idx;
+
         selectedSatIndex = idx;
         simSettings.cameraTarget = sat.name;
         cameraFocusMode = sat.name;
         document.getElementById('show-forces').checked = sat.showForces;
         if (controls) {
-            controls.minDistance = 0.001; // Allow 1-meter close-up zoom!
+            controls.minDistance = 0.001;
             controls.target.copy(sat.mesh.position);
-            camera.position.set(sat.mesh.position.x + 1200, sat.mesh.position.y + 600, sat.mesh.position.z + 1200);
+            if (isDoubleFocus) {
+                // Zoom in close to inspect the authentic 3D satellite model (55 km distance)
+                camera.position.set(sat.mesh.position.x + 40, sat.mesh.position.y + 22, sat.mesh.position.z + 40);
+                if (sat.detailedModel) sat.detailedModel.visible = true;
+                if (sat.sprite) sat.sprite.visible = false;
+            } else {
+                camera.position.set(sat.mesh.position.x + 1200, sat.mesh.position.y + 600, sat.mesh.position.z + 1200);
+            }
         }
         updateCameraDropdown();
         renderSidebar();
@@ -4258,6 +4682,10 @@
             const t = Math.min(simTime, b.t[b.t.length - 1]);
             updateTelemetry(sat, interpAt(b, t));
         }
+    };
+
+    window.zoomToSatelliteModel = function(idx) {
+        focusSatellite(idx, true);
     };
 
     // ── Sidebar UI ───────────────────────────────────────────────────────────
@@ -4269,6 +4697,10 @@
             if (idx === selectedSatIndex) li.classList.add('active');
             if (sat.reentry) li.classList.add('deorbited');
             li.style.borderLeftColor = sat.colorHex || ('#' + sat.color.toString(16).padStart(6,'0'));
+            li.ondblclick = (e) => {
+                e.stopPropagation();
+                window.zoomToSatelliteModel(idx);
+            };
 
             const bodyIcon = sat.parentBody === 'Moon' ? '🌕' : '🌍';
             const avatarIcon = sat.iconGlyph || '🛰️';
@@ -5917,8 +6349,16 @@
             // Subsurface collision / atmospheric impact protection: prevent penetrating inside Earth/Moon
             const localR = localPos.length();
             if (localR < bodyRadiusKm) {
-                sat.reentry = true;
-                if (sat.deorbitEpoch === null) sat.deorbitEpoch = t;
+                if (!sat.reentry) {
+                    sat.reentry = true;
+                    if (sat.deorbitEpoch === null) sat.deorbitEpoch = t;
+                    sat.lifetimeSeconds = sat.deorbitEpoch;
+                    sat.deorbitTime = formatTime(sat.lifetimeSeconds);
+                    const iLat = (buf.lat_deg && typeof idx === 'object' && buf.lat_deg[idx.lo]) || 0;
+                    const iLon = (buf.lon_deg && typeof idx === 'object' && buf.lon_deg[idx.lo]) || 0;
+                    spawnEarthImpactCrater(sat, { lat: iLat, lon: iLon, epoch: t, dispersion_major_km: 110, dispersion_minor_km: 30 });
+                    renderSidebar();
+                }
                 sat.mesh.visible = false;
                 if (sat.line) sat.line.visible = false;
                 Object.values(sat.forceArrows).forEach(a => { a.visible = false; });
@@ -6015,12 +6455,30 @@
             sw.opacity -= wallDt * 0.9;
             sw.mesh.scale.set(sw.scale, sw.scale, sw.scale);
             sw.mesh.material.opacity = Math.max(0, sw.opacity);
+            if (sw.coreMesh) {
+                const cScale = Math.max(0.1, 1.0 - (1.0 - sw.opacity) * 1.5);
+                sw.coreMesh.scale.set(cScale, cScale, cScale);
+                sw.coreMesh.material.opacity = Math.max(0, sw.opacity);
+            }
             if (sw.opacity <= 0) {
                 scene.remove(sw.mesh);
                 sw.mesh.geometry.dispose();
                 sw.mesh.material.dispose();
+                if (sw.coreMesh) {
+                    scene.remove(sw.coreMesh);
+                    sw.coreMesh.geometry.dispose();
+                    sw.coreMesh.material.dispose();
+                }
                 activeShockwaves.splice(s, 1);
             }
+        }
+
+        // 4c2. Animate Active Earth Impact Craters
+        for (let i = 0; i < activeImpactMarkers.length; i++) {
+            const m = activeImpactMarkers[i];
+            m.phase += wallDt * 3.0;
+            const pulse = 1.0 + Math.sin(m.phase) * 0.15;
+            m.rimMesh.scale.set(pulse, pulse, 1.0);
         }
 
         // 4d. Update 3D Earth City markers & labels LOD based on camera distance
@@ -6293,6 +6751,33 @@
             if (sunDir.lengthSq() > 0.01) {
                 rayleighMieAtmosphere.material.uniforms.uSunDir.value.copy(sunDir);
             }
+        }
+
+        // Animate drifting weather clouds
+        if (typeof weatherCloudsMesh !== 'undefined' && weatherCloudsMesh) {
+            weatherCloudsMesh.rotation.y += 0.00015;
+        }
+
+        // Flowing geomagnetic dipole field lines
+        if (typeof geomagneticFieldGroup !== 'undefined' && geomagneticFieldGroup && geomagneticFieldGroup.visible) {
+            const timeOffset = (performance.now() * 0.08) % 180;
+            magLineDashes.forEach(mat => {
+                mat.dashOffset = -timeOffset;
+            });
+        }
+
+        // Hide city labels and beacons behind the Earth horizon
+        if (typeof earthCityObjects !== 'undefined' && Array.isArray(earthCityObjects) && earthCityObjects.length > 0) {
+            const camPos = camera.position;
+            const rSq = R_EARTH_KM * R_EARTH_KM;
+            earthCityObjects.forEach(city => {
+                if (city.obj) {
+                    const worldPos = new THREE.Vector3();
+                    city.obj.getWorldPosition(worldPos);
+                    const isVisible = worldPos.dot(camPos) > (rSq * 0.96);
+                    city.obj.visible = isVisible && earthCitiesVisible;
+                }
+            });
         }
 
         if (renderer) renderer.render(scene, camera);
@@ -6660,6 +7145,33 @@
     renderer.domElement.addEventListener('pointerdown', onPointerDown);
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', onPointerUp);
+
+    renderer.domElement.addEventListener('dblclick', function(e) {
+        const rect = renderer.domElement.getBoundingClientRect();
+        const dblMouse = new THREE.Vector2(
+            ((e.clientX - rect.left) / rect.width) * 2 - 1,
+            -((e.clientY - rect.top) / rect.height) * 2 + 1
+        );
+        const ray = new THREE.Raycaster();
+        ray.setFromCamera(dblMouse, camera);
+        let hitIdx = -1, minD = Infinity;
+        activeSatellites.forEach((sat, sIdx) => {
+            if (!sat.mesh || !sat.mesh.visible) return;
+            const targets = [sat.mesh];
+            if (sat.sprite) targets.push(sat.sprite);
+            if (sat.detailedModel) targets.push(sat.detailedModel);
+            const hits = ray.intersectObjects(targets, true);
+            if (hits.length > 0 && hits[0].distance < minD) {
+                minD = hits[0].distance;
+                hitIdx = sIdx;
+            }
+        });
+        if (hitIdx >= 0) {
+            focusSatellite(hitIdx);
+        } else if (selectedSatIndex >= 0) {
+            focusSatellite(selectedSatIndex, true);
+        }
+    });
 
     // ── LIVE LEO SATELLITE TRACKING ──────────────────────────────────────────
     let liveSatelliteCatalog = [];

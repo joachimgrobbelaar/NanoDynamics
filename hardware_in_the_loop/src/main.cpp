@@ -388,7 +388,6 @@ tflite::MicroInterpreter* interpreter = nullptr;
 TfLiteTensor* input = nullptr;
 TfLiteTensor* output = nullptr;
 
-constexpr int kTensorArenaSize = 32 * 1024;
 uint8_t tensor_arena[kTensorArenaSize];
 static volatile bool reply_over_serial = false;
 static volatile bool enable_symplectic_proj = true;

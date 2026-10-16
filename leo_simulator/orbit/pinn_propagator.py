@@ -275,19 +275,34 @@ class PINNPropagator:
                 r_nn = unscaled[0:3]
                 v_nn = unscaled[3:6]
 
-                r_kin = curr_r + 0.5 * (curr_v + v_nn) * step_dt
-                r_next = 0.5 * r_nn + 0.5 * r_kin
-                r_next_mag = float(np.linalg.norm(r_next))
-
                 if symplectic_enabled:
-                    v_sq_target = 2.0 * (E_target + self.mu / r_next_mag)
-                    if v_sq_target > 0.0:
-                        v_nn_norm = float(np.linalg.norm(v_nn))
-                        v_next = v_nn * (np.sqrt(v_sq_target) / v_nn_norm) if v_nn_norm > 0 else v_nn
-                    else:
-                        v_next = v_nn
+                    r_hat = r_nn / pos_scale
+                    v_hat = v_nn / vel_scale
+                    E_target_hat = E_target / (vel_scale ** 2)
+                    mu_hat = self.mu / (pos_scale * (vel_scale ** 2))
+
+                    for _ in range(3):
+                        r_hm = float(np.linalg.norm(r_hat))
+                        v_hm = float(np.linalg.norm(v_hat))
+                        if r_hm < 1e-6:
+                            break
+                        E_cur_hat = 0.5 * (v_hm ** 2) - mu_hat / r_hm
+                        err = E_cur_hat - E_target_hat
+                        grad_r = (mu_hat / (r_hm ** 3)) * r_hat
+                        grad_v = v_hat
+                        norm_sq = float(np.dot(grad_r, grad_r) + np.dot(grad_v, grad_v))
+                        if norm_sq > 1e-12:
+                            lam = err / norm_sq
+                            r_hat -= lam * grad_r
+                            v_hat -= lam * grad_v
+
+                    r_next = (r_hat * pos_scale).astype(np.float64)
+                    v_next = (v_hat * vel_scale).astype(np.float64)
+                    r_next_mag = float(np.linalg.norm(r_next))
                 else:
+                    r_next = r_nn
                     v_next = v_nn
+                    r_next_mag = float(np.linalg.norm(r_next))
 
                 E_after = (float(np.linalg.norm(v_next)) ** 2) / 2.0 - self.mu / r_next_mag
                 e_drift = abs(E_after - E_target) / max(abs(E_target), 1.0)
@@ -492,16 +507,34 @@ class PINNPropagator:
                 r_nn = unscaled[0:3]
                 v_nn = unscaled[3:6]
 
-                r_kin = curr_r + 0.5 * (curr_v + v_nn) * step_dt
-                r_next = 0.5 * r_nn + 0.5 * r_kin
-                r_next_mag = float(np.linalg.norm(r_next))
+                if symplectic_enabled:
+                    r_hat = r_nn / pos_scale
+                    v_hat = v_nn / vel_scale
+                    E_target_hat = E_target / (vel_scale ** 2)
+                    mu_hat = self.mu / (pos_scale * (vel_scale ** 2))
 
-                v_sq_target = 2.0 * (E_target + self.mu / r_next_mag)
-                if v_sq_target > 0.0:
-                    v_nn_norm = float(np.linalg.norm(v_nn))
-                    v_next = v_nn * (np.sqrt(v_sq_target) / v_nn_norm) if v_nn_norm > 0 else v_nn
+                    for _ in range(3):
+                        r_hm = float(np.linalg.norm(r_hat))
+                        v_hm = float(np.linalg.norm(v_hat))
+                        if r_hm < 1e-6:
+                            break
+                        E_cur_hat = 0.5 * (v_hm ** 2) - mu_hat / r_hm
+                        err = E_cur_hat - E_target_hat
+                        grad_r = (mu_hat / (r_hm ** 3)) * r_hat
+                        grad_v = v_hat
+                        norm_sq = float(np.dot(grad_r, grad_r) + np.dot(grad_v, grad_v))
+                        if norm_sq > 1e-12:
+                            lam = err / norm_sq
+                            r_hat -= lam * grad_r
+                            v_hat -= lam * grad_v
+
+                    r_next = (r_hat * pos_scale).astype(np.float64)
+                    v_next = (v_hat * vel_scale).astype(np.float64)
+                    r_next_mag = float(np.linalg.norm(r_next))
                 else:
+                    r_next = r_nn
                     v_next = v_nn
+                    r_next_mag = float(np.linalg.norm(r_next))
 
                 curr_t += step_dt
                 curr_r = r_next

@@ -167,7 +167,7 @@ class ESP32HardwareAgent:
                     self.ser.reset_input_buffer()
                     self.ser.write(cmd.encode("utf-8"))
                     self.ser.flush()
-                    deadline = t0 + 0.25
+                    deadline = t0 + 0.65
                     while time.perf_counter() < deadline:
                         line = self.ser.readline().decode("utf-8", errors="ignore").strip()
                         if line.startswith("RESULT:"):
