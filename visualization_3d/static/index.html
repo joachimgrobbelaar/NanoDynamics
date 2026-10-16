@@ -269,6 +269,34 @@
             display: none !important;
         }
 
+        /* Non-blocking Toast Notifications */
+        #sx-toast-container {
+            position: fixed; top: 48px; right: 20px; z-index: 99999;
+            display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+        }
+        .sx-toast {
+            background: rgba(15, 23, 42, 0.95);
+            color: #f8fafc;
+            border-left: 4px solid #38bdf8;
+            padding: 10px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            box-shadow: 0 4px 18px rgba(0,0,0,0.55);
+            backdrop-filter: blur(8px);
+            pointer-events: auto;
+            animation: sxToastSlideIn 0.22s ease-out;
+            max-width: 380px;
+            line-height: 1.4;
+        }
+        .sx-toast.sx-toast-error { border-left-color: #ef4444; }
+        .sx-toast.sx-toast-success { border-left-color: #10b981; }
+        .sx-toast.sx-toast-warning { border-left-color: #f59e0b; }
+        @keyframes sxToastSlideIn {
+            from { transform: translateX(35px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
         /* Translucent Glassmorphic Splash Screen with Live 3D Background */
         #splash-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -406,7 +434,8 @@
                 <div class="win-dropdown">
                     <div class="win-dropdown-item" onclick="returnToSplash()"><span class="item-icon">🚀</span><span>Launchpad (Splash)</span></div>
                     <div class="win-dropdown-item" onclick="newProject()"><span class="item-icon">📄</span><span>New Simulation Session</span><span class="item-shortcut">Ctrl+N</span></div>
-                    <div class="win-dropdown-item" onclick="loadSim()"><span class="item-icon">📂</span><span>Load Simulation Session</span></div>
+                    <div class="win-dropdown-item" onclick="promptSaveSim()"><span class="item-icon">💾</span><span>Save Simulation Session...</span><span class="item-shortcut">Ctrl+S</span></div>
+                    <div class="win-dropdown-item" onclick="promptLoadSim()"><span class="item-icon">📂</span><span>Load Simulation Session...</span></div>
                     <div class="win-dropdown-item" onclick="openPresetScenariosModal()"><span class="item-icon">⚡</span><span>Preset Scenarios (Collision Avoidance, Deorbit)...</span></div>
                     <div class="win-dropdown-sep"></div>
                     <div class="win-dropdown-item" onclick="exportData()"><span class="item-icon">📥</span><span>Export Flight Telemetry CSV</span></div>
@@ -506,7 +535,7 @@
     <div id="collision-banner"></div>
 
     <!-- Onboard Virtual Camera Live Viewport (Picture-in-Picture) -->
-    <div id="virtual-cam-hud" style="display:none; flex-direction:column; position:fixed; bottom:20px; right:20px; width:340px; height:240px; min-width:280px; min-height:200px; max-width:90vw; max-height:85vh; overflow:hidden; background:#090D14ee; border:1px solid rgba(56,189,248,0.35); border-radius:6px; z-index:9000; box-shadow:0 10px 25px rgba(0,0,0,0.8); backdrop-filter:blur(16px);">
+    <div id="virtual-cam-hud" style="display:none; flex-direction:column; position:fixed; bottom:38px; right:16px; width:340px; height:240px; min-width:280px; min-height:200px; max-width:90vw; max-height:85vh; overflow:hidden; background:#090D14ee; border:1px solid rgba(56,189,248,0.35); border-radius:6px; z-index:9000; box-shadow:0 10px 25px rgba(0,0,0,0.8); backdrop-filter:blur(16px);">
         <!-- Top-Right and Top-Left Drag-to-Resize Handles -->
         <div id="vcam-resize-handle-tr" class="vcam-resize-handle" style="top:2px; right:2px; cursor:nesw-resize;" title="Drag top-right corner to enlarge camera view">◹</div>
         <div id="vcam-resize-handle-tl" class="vcam-resize-handle" style="top:2px; left:2px; cursor:nwse-resize;" title="Drag top-left corner to enlarge camera view">◸</div>
@@ -665,7 +694,7 @@
             <!-- Canvas Line Plot for On-Chip Processing Speed -->
             <div style="margin-bottom:8px;">
                 <div style="display:flex; justify-content:space-between; font-size:10px; color:#94a3b8; margin-bottom:2px;">
-                    <span>On-Chip Inference ($t_{\text{proc}}$):</span>
+                    <span>On-Chip Inference (t<sub>proc</sub>):</span>
                     <span id="hw-plot-proc-stat" style="color:#4ade80;">—</span>
                 </div>
                 <canvas id="hw-proc-canvas" width="220" height="45" style="background:#020617; border:1px solid #1e293b; border-radius:4px; width:100%; height:45px; display:block;"></canvas>
@@ -674,7 +703,7 @@
             <!-- Canvas Line Plot for Data / Network Latency -->
             <div>
                 <div style="display:flex; justify-content:space-between; font-size:10px; color:#94a3b8; margin-bottom:2px;">
-                    <span>Data Transit Latency ($t_{\text{lat}}$):</span>
+                    <span>Data Transit Latency (t<sub>lat</sub>):</span>
                     <span id="hw-plot-lat-stat" style="color:#facc15;">—</span>
                 </div>
                 <canvas id="hw-lat-canvas" width="220" height="45" style="background:#020617; border:1px solid #1e293b; border-radius:4px; width:100%; height:45px; display:block;"></canvas>
@@ -806,6 +835,7 @@
             <span style="color:#94a3b8;">Alt:</span><span id="fs-alt" style="color:#4ade80; text-align:right;">—</span>
             <span style="color:#94a3b8;">Vel:</span><span id="fs-vel" style="color:#facc15; text-align:right;">—</span>
             <span style="color:#94a3b8;">Inc:</span><span id="fs-inc" style="color:#c084fc; text-align:right;">—</span>
+            <span style="color:#94a3b8;">Sun:</span><span id="fs-sun" style="color:#facc15; text-align:right;">☀️ 100%</span>
         </div>
     </div>
 
@@ -822,6 +852,10 @@
             <div>Lat: <span id="city-hud-lat" style="color:#4ade80;">35.6762°</span></div>
             <div>Lon: <span id="city-hud-lon" style="color:#facc15;">139.6503°</span></div>
             <div style="grid-column:span 2; font-size:10px; color:#cbd5e1;" id="city-hud-sat-contact">🛰️ Nearest Satellite: Scanning...</div>
+            <div style="grid-column:span 2; font-size:10px; color:#38bdf8; display:flex; justify-content:space-between; border-top:1px dashed #334155; padding-top:4px;" id="city-hud-pass-stats">
+                <span>📡 Pass: <strong id="city-hud-aos-val" style="color:#4ade80;">Scanning orbit...</strong></span>
+                <span>Doppler (2.4G): <strong id="city-hud-doppler-val" style="color:#facc15;">—</strong></span>
+            </div>
         </div>
         <!-- Real-Life Map & Satellite Aerial Imagery Card -->
         <div id="city-hud-map-container" style="position:relative; width:100%; height:155px; border-radius:6px; overflow:hidden; margin-bottom:10px; border:1px solid #334155; background:#020617;">
@@ -949,12 +983,26 @@
                 <label style="color:#e2e8f0; font-weight:bold; font-size: 14px; cursor: pointer;"><input type="checkbox" id="m-cluster-enable" onchange="toggleClusterUI()"> 🌌 Generate Cluster / Constellation</label>
             </div>
             <div id="cluster-options" style="display:none; background:#0f172a; padding:12px; border-radius:6px; margin-top:8px; border:1px solid #3b82f6;">
-                <div class="form-group"><label style="color:#93c5fd;">Satellites (N):</label><input type="number" id="m-cluster-n" value="5" min="2" max="100"></div>
-                <div class="form-group"><label style="color:#93c5fd;">Δ Phase (°):</label><input type="number" id="m-cluster-dphase" value="10.0" step="1.0"></div>
-                <div class="form-group"><label style="color:#93c5fd;">Δ RAAN (°):</label><input type="number" id="m-cluster-draan" value="0.0" step="1.0"></div>
-                <div class="form-group"><label style="color:#93c5fd;">Δ Alt (km):</label><input type="number" id="m-cluster-dalt" value="0.0" step="1.0"></div>
-                <div class="form-group"><label style="color:#93c5fd;">Δ Inc (°):</label><input type="number" id="m-cluster-dinc" value="0.0" step="1.0"></div>
-                <div style="font-size:11px; color:#64748b; margin-top:6px;">Generates N satellites spaced out sequentially by these parameters to form Walker stars, strings-of-pearls, or custom local offsets.</div>
+                <div class="form-group" style="margin-bottom:8px;">
+                    <label style="color:#93c5fd; font-weight:600;">Constellation Pattern:</label>
+                    <select id="m-cluster-pattern" onchange="toggleClusterPatternFields()" style="background:#1e293b; color:white; border:1px solid #475569; padding:4px 8px; border-radius:4px; font-size:11px; width:100%;">
+                        <option value="string" selected>String-of-Pearls / Linear Offset Train</option>
+                        <option value="walker">Walker-Delta Shell Architecture (T/P/F)</option>
+                    </select>
+                </div>
+                <div id="cluster-standard-fields">
+                    <div class="form-group"><label style="color:#93c5fd;">Satellites (N):</label><input type="number" id="m-cluster-n" value="5" min="2" max="100"></div>
+                    <div class="form-group"><label style="color:#93c5fd;">Δ Phase (°):</label><input type="number" id="m-cluster-dphase" value="10.0" step="1.0"></div>
+                    <div class="form-group"><label style="color:#93c5fd;">Δ RAAN (°):</label><input type="number" id="m-cluster-draan" value="0.0" step="1.0"></div>
+                    <div class="form-group"><label style="color:#93c5fd;">Δ Alt (km):</label><input type="number" id="m-cluster-dalt" value="0.0" step="1.0"></div>
+                    <div class="form-group"><label style="color:#93c5fd;">Δ Inc (°):</label><input type="number" id="m-cluster-dinc" value="0.0" step="1.0"></div>
+                </div>
+                <div id="cluster-walker-fields" style="display:none;">
+                    <div class="form-group"><label style="color:#38bdf8;">Total Satellites (T):</label><input type="number" id="m-walker-t" value="12" min="2" max="72"></div>
+                    <div class="form-group"><label style="color:#38bdf8;">Orbital Planes (P):</label><input type="number" id="m-walker-p" value="3" min="1" max="24"></div>
+                    <div class="form-group"><label style="color:#38bdf8;">Relative Phasing (F):</label><input type="number" id="m-walker-f" value="1" min="0" max="24"></div>
+                </div>
+                <div style="font-size:11px; color:#64748b; margin-top:6px;">Generates constellation geometry: Walker Delta shells (T/P/F) or strings of pearls across orbital planes.</div>
             </div>
 
             <div id="modal-buttons" class="modal-buttons">
@@ -1408,6 +1456,59 @@
     <script src="/static/js/mission_guide.js"></script>
 
     <script>
+    // ── Non-blocking Toast Notification System ────────────────────────────────
+    window.showToast = function(message, type = 'info') {
+        let container = document.getElementById('sx-toast-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'sx-toast-container';
+            document.body.appendChild(container);
+        }
+        const toast = document.createElement('div');
+        toast.className = `sx-toast sx-toast-${type}`;
+        const icons = { info: 'ℹ️ ', error: '❌ ', success: '✅ ', warning: '⚠️ ' };
+        toast.innerHTML = (icons[type] || '') + message;
+        container.appendChild(toast);
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transition = 'opacity 0.3s ease';
+            setTimeout(() => toast.remove(), 300);
+        }, 4000);
+    };
+    // Non-blocking alert replacement to protect WebGL animation loop
+    window.alert = function(msg) {
+        window.showToast(msg, 'info');
+    };
+
+    // ── Global Keyboard Shortcuts ─────────────────────────────────────────────
+    window.addEventListener('keydown', (e) => {
+        const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
+        if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+        
+        if (e.code === 'Space') {
+            e.preventDefault();
+            if (typeof togglePlayPause === 'function') togglePlayPause();
+        } else if ((e.ctrlKey || e.metaKey) && (e.key === 'n' || e.key === 'N')) {
+            e.preventDefault();
+            if (typeof newProject === 'function') newProject();
+        } else if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+            e.preventDefault();
+            if (typeof promptSaveSim === 'function') promptSaveSim();
+        } else if (e.key === 'd' || e.key === 'D') {
+            e.preventDefault();
+            if (typeof openModal === 'function') openModal();
+        } else if (e.key === 'p' || e.key === 'P') {
+            e.preventDefault();
+            if (typeof openOrbitPresetsModal === 'function') openOrbitPresetsModal();
+        } else if (e.key === 'c' || e.key === 'C') {
+            e.preventDefault();
+            if (typeof toggleVirtualCameraFeed === 'function') toggleVirtualCameraFeed();
+        } else if (e.key === 'b' || e.key === 'B') {
+            e.preventDefault();
+            if (typeof openBurnPanelForSelectedSat === 'function') openBurnPanelForSelectedSat();
+        }
+    });
+
     const M_TO_KM = 1 / 1000;
     
     // Real Physical Scale Constants (in km)
@@ -2071,7 +2172,7 @@
 
     // ── Dynamic Weather & Cloud Layer ──
     const weatherCloudsGroup = new THREE.Group();
-    const cloudTex = tl.load('https://unpkg.com/three-globe/example/img/earth-clouds.png');
+    const cloudTex = tl.load('/static/textures/earth_clouds_1024.png');
     cloudTex.anisotropy = 16;
     const weatherCloudsMesh = new THREE.Mesh(
         new THREE.SphereGeometry(R_EARTH_KM + 6.0, 96, 96),
@@ -4154,6 +4255,26 @@
             }
         }
 
+        const aosVal = document.getElementById('city-hud-aos-val');
+        const dopVal = document.getElementById('city-hud-doppler-val');
+        if (minDistKm < 1500.0) {
+            const hKm = 500.0;
+            const theta = minDistKm / R_EARTH_KM;
+            const elevRad = Math.atan2((R_EARTH_KM + hKm) * Math.cos(theta) - R_EARTH_KM, (R_EARTH_KM + hKm) * Math.sin(theta));
+            const elevDeg = Math.max(0, elevRad * 180.0 / Math.PI);
+            const vLosKmS = 7.5 * Math.sin(theta);
+            const dopplerKHz = - (vLosKmS / 300000.0) * 2400000.0;
+            if (aosVal) aosVal.innerHTML = `<span style="color:#4ade80;">Active Pass (El: ${elevDeg.toFixed(1)}°)</span>`;
+            if (dopVal) dopVal.innerText = `${dopplerKHz >= 0 ? '+' : ''}${dopplerKHz.toFixed(1)} kHz`;
+        } else if (nearestSatName !== 'None') {
+            const etaSec = Math.round((minDistKm - 1200.0) / 7.5);
+            if (aosVal) aosVal.innerHTML = `<span style="color:#facc15;">AOS in ~${Math.floor(etaSec/60)}m ${etaSec%60}s</span>`;
+            if (dopVal) dopVal.innerText = `±48.0 kHz max`;
+        } else {
+            if (aosVal) aosVal.innerText = 'No Passes Active';
+            if (dopVal) dopVal.innerText = '—';
+        }
+
         if (hud) {
             hud.style.display = 'block';
             updateCityMapImage();
@@ -4226,7 +4347,17 @@
         if (r < 1.0) return { lat: 0, lon: 0, alt_km: 0 };
 
         const omega = sat.parentBody === 'Earth' ? 7.292115e-5 : 2.6617e-6;
-        const theta = omega * t;
+        let deltaOmegaJ2 = 0.0;
+        if (sat.parentBody === 'Earth' && sat.params) {
+            const inc = (sat.params.inclination_deg || 51.6) * Math.PI / 180.0;
+            const a_m = ((sat.params.altitude_km || 400.0) + R_EARTH_KM) * 1000.0;
+            const ecc = sat.params.eccentricity || 0.001;
+            const p_m = a_m * (1.0 - ecc * ecc);
+            const n_rad = Math.sqrt(3.986004418e14 / Math.pow(a_m, 3));
+            const dOmegaDt = -1.5 * 1.08263e-3 * Math.pow(6378137.0 / p_m, 2) * n_rad * Math.cos(inc);
+            deltaOmegaJ2 = dOmegaDt * t;
+        }
+        const theta = omega * t - deltaOmegaJ2;
         const cosT = Math.cos(theta), sinT = Math.sin(theta);
         const x_ecef = x * cosT + y * sinT;
         const y_ecef = -x * sinT + y * cosT;
@@ -5077,23 +5208,77 @@
             const baseRaan = parseFloat(document.getElementById('m-raan').value);
             const baseInc = parseFloat(document.getElementById('m-inc').value);
 
+            const body = document.getElementById('m-body').value;
+            const minAlt = body === 'Earth' ? 100.0 : 5.0;
+            const maxAlt = body === 'Earth' ? 400000.0 : 100000.0;
+            if (isNaN(baseAlt) || baseAlt < minAlt || baseAlt > maxAlt) {
+                showToast(`Altitude for ${body} must be between ${minAlt} and ${maxAlt} km`, 'error');
+                btn.textContent = 'Launch Spacecraft';
+                btn.disabled = false;
+                return;
+            }
+            const ecc = parseFloat(document.getElementById('m-ecc').value);
+            if (isNaN(ecc) || ecc < 0 || ecc >= 1.0) {
+                showToast('Orbital eccentricity must be in closed-open interval [0.0, 1.0)', 'error');
+                btn.textContent = 'Launch Spacecraft';
+                btn.disabled = false;
+                return;
+            }
+
             const engineMode = document.getElementById('m-engine') ? document.getElementById('m-engine').value : 'rk45';
             const hwNodeId = document.getElementById('m-hw-node') ? document.getElementById('m-hw-node').value : 'esp32-node-1';
 
-            for (let i = 0; i < nSats; i++) {
+            const clusterPattern = document.getElementById('m-cluster-pattern') ? document.getElementById('m-cluster-pattern').value : 'string';
+            let satConfigs = [];
+            if (isCluster && clusterPattern === 'walker') {
+                const T = parseInt(document.getElementById('m-walker-t').value) || 12;
+                const P = parseInt(document.getElementById('m-walker-p').value) || 3;
+                const F = parseInt(document.getElementById('m-walker-f').value) || 1;
+                const S = Math.max(1, Math.floor(T / P));
+                let count = 0;
+                for (let p = 0; p < P; p++) {
+                    const planeRaan = (baseRaan + p * (360.0 / P)) % 360.0;
+                    for (let s = 0; s < S && count < T; s++) {
+                        count++;
+                        const phase = (s * (360.0 / S) + p * (F * 360.0 / T)) % 360.0;
+                        satConfigs.push({
+                            name: `${baseName}-P${p+1}S${s+1}`,
+                            alt: baseAlt,
+                            ecc: ecc,
+                            inc: baseInc,
+                            raan: planeRaan,
+                            nu: phase
+                        });
+                    }
+                }
+            } else {
+                for (let i = 0; i < nSats; i++) {
+                    satConfigs.push({
+                        name: isCluster ? `${baseName}-${i+1}` : baseName,
+                        alt: baseAlt + (i * dAlt),
+                        ecc: ecc,
+                        inc: baseInc + (i * dInc),
+                        raan: baseRaan + (i * dRaan),
+                        nu: (i * dPhase) % 360
+                    });
+                }
+            }
+
+            for (let i = 0; i < satConfigs.length; i++) {
+                const cfg = satConfigs[i];
                 const payload = {
-                    name: isCluster ? `${baseName}-${i+1}` : baseName,
+                    name: cfg.name,
                     parent_body: document.getElementById('m-body').value,
                     propagation_mode: engineMode,
                     hardware_device_id: hwNodeId,
                     mass: parseFloat(document.getElementById('m-mass').value),
                     drag_area: parseFloat(document.getElementById('m-area').value),
                     cd: parseFloat(document.getElementById('m-cd').value),
-                    altitude_km: baseAlt + (i * dAlt),
-                    eccentricity: parseFloat(document.getElementById('m-ecc').value),
-                    inclination_deg: baseInc + (i * dInc),
-                    raan_deg: baseRaan + (i * dRaan),
-                    true_anomaly_deg: (i * dPhase) % 360,
+                    altitude_km: cfg.alt,
+                    eccentricity: cfg.ecc,
+                    inclination_deg: cfg.inc,
+                    raan_deg: cfg.raan,
+                    true_anomaly_deg: cfg.nu,
                     atmosphere_type: document.getElementById('m-atm-type').value,
                     density_scale: parseFloat(document.getElementById('m-density-scale').value) || 1.0,
                     include_j2: document.getElementById('m-j2').checked,
@@ -5110,17 +5295,17 @@
                 const data = await res.json();
                 if (!res.ok) {
                     const errMsg = typeof data.detail === 'string' ? data.detail : (Array.isArray(data.detail) ? data.detail.map(d => d.msg || JSON.stringify(d)).join(', ') : JSON.stringify(data));
-                    alert(`Simulation failed for sat ${i+1}: ` + errMsg);
+                    showToast(`Simulation failed for sat ${i+1}: ` + errMsg, 'error');
                     break;
                 }
                 if (inSplashMode) enterMissionMode(false);
                 addSatelliteToScene(data);
-                if (i === nSats - 1) {
+                if (i === satConfigs.length - 1) {
                     focusSatellite(activeSatellites.length - 1);
                 }
             }
         } catch (e) {
-            alert('Simulation failed: ' + e.message);
+            showToast('Simulation failed: ' + e.message, 'error');
         } finally {
             btn.textContent = 'Launch';
             btn.disabled = false;
@@ -5300,9 +5485,36 @@
     }
 
     // ── Save / Load ──────────────────────────────────────────────────────────
+    window.promptSaveSim = async function() {
+        const defaultName = `mission_${new Date().toISOString().slice(0,10)}_${Date.now().toString().slice(-4)}`;
+        const name = prompt('Enter simulation name to save:', defaultName);
+        if (!name || !name.trim()) return;
+        const input = document.getElementById('save-name');
+        if (input) input.value = name.trim();
+        await saveSim();
+    };
+
+    window.promptLoadSim = async function() {
+        try {
+            const res = await fetch('/list_saves');
+            const data = await res.json();
+            const saves = (data && Array.isArray(data.files)) ? data.files : [];
+            if (saves.length === 0) {
+                showToast('No saved simulation sessions found in saved_sims/.', 'info');
+                return;
+            }
+            const selected = prompt(`Select simulation session to load:\nAvailable: ${saves.join(', ')}`, saves[0]);
+            if (!selected || !selected.trim()) return;
+            await loadSim(selected.trim());
+        } catch (e) {
+            showToast('Failed to load simulation: ' + e.message, 'error');
+        }
+    };
+
     async function saveSim() {
-        const name = document.getElementById('save-name').value;
-        if (!name) return alert('Please enter a simulation name');
+        const nameInput = document.getElementById('save-name');
+        const name = (nameInput && nameInput.value) ? nameInput.value.trim() : '';
+        if (!name) return showToast('Please enter a simulation session name', 'warning');
         const payload = {
             filename: name,
             satellites: activeSatellites.map(s => ({
@@ -5312,21 +5524,39 @@
                 trajectory: s.buf
             }))
         };
-        await fetch('/save', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
-        alert('Simulation saved successfully!');
-        populateSaves();
+        try {
+            const res = await fetch('/save', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+            if (res.ok) {
+                showToast(`Simulation "${name}" saved successfully!`, 'success');
+                populateSaves();
+            } else {
+                showToast(`Failed saving simulation: ${res.statusText}`, 'error');
+            }
+        } catch (e) {
+            showToast(`Save error: ${e.message}`, 'error');
+        }
     }
 
-    async function loadSim() {
-        const name = document.getElementById('load-dropdown').value;
+    async function loadSim(explicitName) {
+        const name = explicitName || (document.getElementById('load-dropdown') ? document.getElementById('load-dropdown').value : '');
         if (!name) return;
-        const res = await fetch(`/load/${name}`);
-        const data = await res.json();
-        if (inSplashMode) enterMissionMode(false);
-        clearSatellites();
-        const satList = Array.isArray(data) ? data : (data.satellites || []);
-        satList.forEach(s => addSatelliteToScene(s));
-        document.getElementById('save-name').value = name;
+        try {
+            const res = await fetch(`/load/${name}`);
+            if (!res.ok) {
+                showToast(`Failed to load "${name}": ${res.statusText}`, 'error');
+                return;
+            }
+            const data = await res.json();
+            if (inSplashMode) enterMissionMode(false);
+            clearSatellites();
+            const satList = Array.isArray(data) ? data : (data.satellites || []);
+            satList.forEach(s => addSatelliteToScene(s));
+            const nameInput = document.getElementById('save-name');
+            if (nameInput) nameInput.value = name;
+            showToast(`Simulation "${name}" loaded with ${satList.length} satellite(s)`, 'success');
+        } catch (e) {
+            showToast(`Load error: ${e.message}`, 'error');
+        }
     }
 
     async function populateSaves() {
@@ -5359,7 +5589,15 @@
     window.toggleClusterUI = function() {
         const checked = document.getElementById('m-cluster-enable').checked;
         document.getElementById('cluster-options').style.display = checked ? 'block' : 'none';
-    }
+    };
+
+    window.toggleClusterPatternFields = function() {
+        const pattern = document.getElementById('m-cluster-pattern') ? document.getElementById('m-cluster-pattern').value : 'string';
+        const std = document.getElementById('cluster-standard-fields');
+        const walker = document.getElementById('cluster-walker-fields');
+        if (std) std.style.display = pattern === 'walker' ? 'none' : 'block';
+        if (walker) walker.style.display = pattern === 'walker' ? 'block' : 'none';
+    };
 
     function closeModal() {
         document.getElementById('modal-overlay').style.display = 'none';
@@ -6001,8 +6239,8 @@
 
     window.splashOpenLoadModal = function() {
         transitionWithLoading(() => {
-            loadSim();
-        }, "Retrieving Saved Telemetry & Ephemeris State...");
+            openPresetScenariosModal();
+        }, "Loading Mission Scenarios...");
     };
 
     window.splashOpenLiveTracking = function() {
@@ -6322,8 +6560,17 @@
 
         if (buffer.length < 2) return;
 
-        const maxVal = Math.max(...buffer, 1.0) * 1.25;
-        const minVal = Math.min(0, Math.min(...buffer));
+        // Apply EWMA smoothing filter (alpha = 0.35) to eliminate graph jitter
+        const smoothed = [];
+        let prev = buffer[0];
+        smoothed.push(prev);
+        for (let i = 1; i < buffer.length; i++) {
+            prev = 0.35 * buffer[i] + 0.65 * prev;
+            smoothed.push(prev);
+        }
+
+        const maxVal = Math.max(...smoothed, 1.0) * 1.25;
+        const minVal = Math.min(0, Math.min(...smoothed));
 
         // Draw glowing line
         ctx.strokeStyle = strokeColor;
@@ -6332,9 +6579,9 @@
         ctx.shadowBlur = 4;
         ctx.beginPath();
 
-        const stepX = w / (buffer.length - 1);
-        for (let i = 0; i < buffer.length; i++) {
-            const normY = (buffer[i] - minVal) / (maxVal - minVal);
+        const stepX = w / (smoothed.length - 1);
+        for (let i = 0; i < smoothed.length; i++) {
+            const normY = (smoothed[i] - minVal) / (maxVal - minVal);
             const x = i * stepX;
             const y = h - (normY * (h - 8) + 4);
             if (i === 0) ctx.moveTo(x, y);
@@ -6344,7 +6591,7 @@
         ctx.shadowBlur = 0;
 
         // Draw last point indicator
-        const lastVal = buffer[buffer.length - 1];
+        const lastVal = smoothed[smoothed.length - 1];
         const lastNormY = (lastVal - minVal) / (maxVal - minVal);
         const lastX = w - 1;
         const lastY = h - (lastNormY * (h - 8) + 4);
@@ -6474,6 +6721,16 @@
             const worldPos = bodyWorldPos.clone().add(localPos);
 
             sat.mesh.position.copy(worldPos);
+
+            // Eclipse & Solar Umbra Shadow Detection
+            const sunDir = earthWorldPos.clone().negate().normalize();
+            const projSun = localPos.dot(sunDir);
+            if (projSun < 0) {
+                const perpDist = localPos.clone().sub(sunDir.clone().multiplyScalar(projSun)).length();
+                sat.inEclipse = (perpDist < bodyRadiusKm);
+            } else {
+                sat.inEclipse = false;
+            }
 
             // Orient 3D satellite mesh along orbital velocity vector (prograde / nadir)
             if (buf.vx && buf.vx.length > 0) {
@@ -6807,6 +7064,11 @@
                             if (fsInc) {
                                 const incVal = (sat.params && sat.params.inclination_deg !== undefined) ? sat.params.inclination_deg.toFixed(1) + '°' : '—';
                                 fsInc.innerText = incVal;
+                            }
+                            const fsSun = document.getElementById('fs-sun');
+                            if (fsSun) {
+                                fsSun.innerText = sat.inEclipse ? '🌑 Eclipse (0%)' : '☀️ Sun (100%)';
+                                fsSun.style.color = sat.inEclipse ? '#f87171' : '#facc15';
                             }
                         }
 
@@ -7345,16 +7607,20 @@
         }
     };
 
+    let liveFilterDebounceTimer = null;
     window.filterLiveCatalog = function() {
-        const q = document.getElementById('live-search-input').value.toLowerCase().trim();
-        if (!q) {
-            renderLiveCatalogTable(liveSatelliteCatalog);
-            return;
-        }
-        const filtered = liveSatelliteCatalog.filter(s => 
-            s.name.toLowerCase().includes(q) || String(s.norad_id).includes(q)
-        );
-        renderLiveCatalogTable(filtered);
+        if (liveFilterDebounceTimer) clearTimeout(liveFilterDebounceTimer);
+        liveFilterDebounceTimer = setTimeout(() => {
+            const q = document.getElementById('live-search-input').value.toLowerCase().trim();
+            if (!q) {
+                renderLiveCatalogTable(liveSatelliteCatalog);
+                return;
+            }
+            const filtered = liveSatelliteCatalog.filter(s => 
+                s.name.toLowerCase().includes(q) || String(s.norad_id).includes(q)
+            );
+            renderLiveCatalogTable(filtered);
+        }, 300);
     };
 
     window.refreshLiveCatalogOnline = function() {
@@ -7425,7 +7691,7 @@
             if (!res.ok) {
                 const err = await res.json();
                 const errMsg = typeof err.detail === 'string' ? err.detail : (Array.isArray(err.detail) ? err.detail.map(d => d.msg || JSON.stringify(d)).join(', ') : 'Simulation error');
-                alert(`Error tracking satellite: ${errMsg}`);
+                showToast(`Error tracking satellite: ${errMsg}`, 'error');
                 if (btnElem) { btnElem.disabled = false; btnElem.innerText = origBtnText; }
                 return;
             }
@@ -7443,8 +7709,105 @@
             focusView('Earth');
             closeLiveTrackingModal();
         } catch (e) {
-            alert(`Network error tracking satellite: ${e.message}`);
+            showToast(`Network error tracking satellite: ${e.message}`, 'error');
             if (btnElem) { btnElem.disabled = false; btnElem.innerText = origBtnText; }
+        }
+    };
+
+    // ── Drag-and-Drop TLE / Ephemeris / Saved Session Ingest ───────────────────
+    window.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+    });
+    window.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const files = e.dataTransfer ? e.dataTransfer.files : null;
+        if (!files || files.length === 0) return;
+        const file = files[0];
+        if (file.name.endsWith('.tle') || file.name.endsWith('.txt')) {
+            showToast(`Parsing TLE ephemeris: ${file.name}...`, 'info');
+            const text = await file.text();
+            parseAndDeployTLE(text, file.name);
+        } else if (file.name.endsWith('.json')) {
+            showToast(`Loading simulation session: ${file.name}...`, 'info');
+            const text = await file.text();
+            try {
+                const data = JSON.parse(text);
+                const satList = Array.isArray(data) ? data : (data.satellites || []);
+                if (inSplashMode) enterMissionMode(false);
+                satList.forEach(s => addSatelliteToScene(s));
+                showToast(`Loaded ${satList.length} satellite(s) from ${file.name}`, 'success');
+            } catch (err) {
+                showToast('Invalid JSON simulation file: ' + err.message, 'error');
+            }
+        }
+    });
+
+    window.parseAndDeployTLE = function(text, filename) {
+        const lines = text.trim().split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+        let satName = filename ? filename.replace(/\.[^/.]+$/, '') : 'TLE-Spacecraft';
+        let line1 = null, line2 = null;
+        for (let i = 0; i < lines.length; i++) {
+            if (lines[i].startsWith('1 ') && i + 1 < lines.length && lines[i+1].startsWith('2 ')) {
+                if (i > 0 && !lines[i-1].startsWith('1 ') && !lines[i-1].startsWith('2 ')) {
+                    satName = lines[i-1];
+                }
+                line1 = lines[i];
+                line2 = lines[i+1];
+                break;
+            }
+        }
+        if (!line1 || !line2) {
+            showToast('Could not find standard Two-Line Element (TLE) lines in file', 'error');
+            return;
+        }
+        try {
+            const inc = parseFloat(line2.substring(8, 16));
+            const raan = parseFloat(line2.substring(17, 25));
+            const ecc = parseFloat('0.' + line2.substring(26, 33).trim());
+            const argP = parseFloat(line2.substring(34, 42));
+            const meanAnom = parseFloat(line2.substring(43, 51));
+            const meanMotion = parseFloat(line2.substring(52, 63)); // revs/day
+            const mu = 3.986004418e14;
+            const nRadS = meanMotion * (2 * Math.PI) / 86400.0;
+            const aMeters = Math.cbrt(mu / (nRadS * nRadS));
+            const altKm = (aMeters - 6378137.0) / 1000.0;
+
+            const payload = {
+                name: satName,
+                parent_body: 'Earth',
+                propagation_mode: 'rk45',
+                mass: 12.0,
+                drag_area: 0.05,
+                cd: 2.2,
+                altitude_km: Math.max(120.0, altKm),
+                eccentricity: Math.min(0.95, Math.max(0.0001, ecc)),
+                inclination_deg: inc,
+                raan_deg: raan,
+                arg_periapsis_deg: argP,
+                true_anomaly_deg: meanAnom,
+                t_start: simTime,
+                color: '#38bdf8',
+                icon: 'satellite'
+            };
+
+            fetch('/simulate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (inSplashMode) enterMissionMode(false);
+                addSatelliteToScene(data);
+                showToast(`TLE "${satName}" deployed (${altKm.toFixed(0)} km, ${inc.toFixed(1)}° inc)`, 'success');
+            })
+            .catch(err => {
+                showToast('Failed to deploy TLE: ' + err.message, 'error');
+            });
+        } catch (e) {
+            showToast('TLE Parsing Error: ' + e.message, 'error');
         }
     };
 
