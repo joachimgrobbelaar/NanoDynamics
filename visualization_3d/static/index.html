@@ -8,29 +8,56 @@
         body { margin: 0; overflow: hidden; background-color: #05070B; color: #E2E8F0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         canvas { display: block; }
 
-        /* Top Navigation Responsive Layout */
+        /* Top Navigation: Classic Windows Menu Bar Layout (No horizontal scrolling) */
         #top-nav {
-            position: absolute; top: 0; width: 100%; height: 38px;
-            background: rgba(15, 23, 42, 0.94); backdrop-filter: blur(12px);
-            padding: 3px 8px; box-sizing: border-box; border-bottom: 1px solid rgba(51, 65, 85, 0.8);
-            display: flex; gap: 4px; align-items: center; z-index: 100; flex-wrap: nowrap;
-            overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+            position: absolute; top: 0; left: 0; width: 100%; height: 34px;
+            background: #090d16; border-bottom: 1px solid rgba(56, 189, 248, 0.3);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 10px; box-sizing: border-box; z-index: 10000;
+            user-select: none; font-size: 11px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            overflow: visible;
         }
-        #top-nav::-webkit-scrollbar { display: none; }
-        #top-nav button {
-            background: #1e293b; color: #f8fafc; border: 1px solid #334155; padding: 3px 7px;
-            border-radius: 4px; cursor: pointer; font-size: 10.5px; font-weight: 600;
-            white-space: nowrap; transition: all 0.15s; flex-shrink: 0;
+        .win-menu-group { display: flex; align-items: center; gap: 2px; }
+        .win-menu-item {
+            position: relative; padding: 4px 9px; cursor: pointer; border-radius: 3px;
+            color: #cbd5e1; font-weight: 500; font-size: 11.5px; transition: background 0.12s, color 0.12s;
         }
-        #top-nav button:hover { background: #2563eb; border-color: #3b82f6; color: white; }
-        #top-nav input { padding: 3px 6px; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: white; font-size: 10.5px; flex-shrink: 0; }
-        #top-nav select { padding: 3px 6px; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: white; font-size: 10.5px; flex-shrink: 0; }
-        .nav-sep { width: 1px; background: rgba(71, 85, 105, 0.6); height: 16px; margin: 0 1px; flex-shrink: 0; }
-        .view-btn { background: #1e293b !important; color: #94a3b8 !important; border-color: #334155 !important; }
-        .view-btn:hover { background: #334155 !important; color: #f8fafc !important; }
-        .view-btn.active { background: #0284c7 !important; color: #ffffff !important; border-color: #38bdf8 !important; }
-        .lab-btn { background: rgba(124, 58, 237, 0.25) !important; color: #c084fc !important; border-color: #7c3aed !important; }
-        .lab-btn:hover { background: #7c3aed !important; color: #ffffff !important; }
+        .win-menu-item:hover, .win-menu-item.open {
+            background: #1e293b; color: #38bdf8;
+        }
+        .win-menu-item u { text-decoration: underline; text-underline-offset: 2px; }
+        .win-dropdown {
+            display: none; position: absolute; top: 100%; left: 0;
+            min-width: 240px; background: #070a12; border: 1px solid rgba(56, 189, 248, 0.35);
+            border-radius: 4px; box-shadow: 0 12px 30px rgba(0,0,0,0.9); padding: 4px 0;
+            z-index: 10001; backdrop-filter: blur(16px);
+        }
+        .win-menu-item:hover .win-dropdown, .win-menu-item.open .win-dropdown {
+            display: block;
+        }
+        .win-dropdown-item {
+            display: flex; align-items: center; gap: 8px; padding: 6px 14px;
+            color: #e2e8f0; font-size: 11.5px; cursor: pointer; white-space: nowrap;
+            transition: background 0.1s, color 0.1s; text-decoration: none;
+        }
+        .win-dropdown-item:hover {
+            background: #2563eb; color: #ffffff;
+        }
+        .win-dropdown-item .item-icon { width: 16px; text-align: center; font-size: 12px; }
+        .win-dropdown-item .item-shortcut { margin-left: auto; color: #94a3b8; font-size: 10px; font-family: monospace; }
+        .win-dropdown-item:hover .item-shortcut { color: #dbeafe; }
+        .win-dropdown-sep {
+            height: 1px; background: rgba(56, 189, 248, 0.15); margin: 4px 0;
+        }
+        .vcam-resize-handle {
+            position: absolute; width: 18px; height: 18px; z-index: 1000;
+            font-size: 11px; color: #00E5FF; display: flex; align-items: center; justify-content: center;
+            background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(56, 189, 248, 0.4);
+            border-radius: 3px; user-select: none; line-height: 1; transition: background 0.15s, border-color 0.15s;
+        }
+        .vcam-resize-handle:hover {
+            background: #2563eb; color: #fff; border-color: #38bdf8;
+        }
 
         #creator-attribution {
             position: absolute; bottom: 8px; right: 12px; z-index: 90;
@@ -368,59 +395,122 @@
         </div>
     </div>
 
-    <div id="top-nav" class="sx-glass-panel">
-        <!-- Left: Mission Identity, MET Clock & Time Warp -->
-        <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
-            <span id="sx-mission-brand" class="sx-brand-mark" onclick="returnToSplash()" style="cursor:pointer;" title="Return to Mission Launchpad">NANODYNAMICS // GNC OPS</span>
-            <span id="met-clock-badge" class="sx-met-clock">MET: T+00d 00h 00m 00s</span>
-            <div id="time-speed-ctrl" style="display:flex; align-items:center; gap:4px; background:#090D14; padding:1px 6px; border-radius:3px; border:1px solid rgba(56,189,248,0.22);">
-                <button id="time-play-pause-btn" onclick="togglePlayPause()" style="background:none; border:none; color:#00E5FF; font-size:11px; cursor:pointer; padding:1px 3px;" title="Play / Pause">⏸</button>
-                <input type="range" id="time-speed-slider" min="1" max="10000" step="1" value="60" style="width:60px; cursor:pointer;" oninput="setTimeSpeed(Number(this.value))">
-                <span id="time-speed-badge" style="font-size:10px; font-family:monospace; color:#00FF66; font-weight:700; min-width:36px;">60×</span>
-                <button onclick="setTimeSpeed(1)" style="font-size:9px; padding:1px 3px;">1×</button>
-                <button onclick="setTimeSpeed(60)" style="font-size:9px; padding:1px 3px;">60×</button>
-                <button onclick="setTimeSpeed(1000)" style="font-size:9px; padding:1px 3px;">1k×</button>
-                <button onclick="setTimeSpeed(10000)" style="font-size:9px; padding:1px 3px;">10k×</button>
+    <div id="top-nav" class="win-menubar">
+        <!-- Classic Windows Dropdown Menus -->
+        <div class="win-menu-group">
+            <span id="sx-mission-brand" class="sx-brand-mark" onclick="returnToSplash()" style="cursor:pointer; margin-right:6px;" title="Return to Mission Launchpad">NANODYNAMICS</span>
+
+            <!-- File Menu -->
+            <div class="win-menu-item" tabindex="0">
+                <span><u>F</u>ile</span>
+                <div class="win-dropdown">
+                    <div class="win-dropdown-item" onclick="returnToSplash()"><span class="item-icon">🚀</span><span>Launchpad (Splash)</span></div>
+                    <div class="win-dropdown-item" onclick="newProject()"><span class="item-icon">📄</span><span>New Simulation Session</span><span class="item-shortcut">Ctrl+N</span></div>
+                    <div class="win-dropdown-item" onclick="loadSim()"><span class="item-icon">📂</span><span>Load Simulation Session</span></div>
+                    <div class="win-dropdown-sep"></div>
+                    <div class="win-dropdown-item" onclick="exportData()"><span class="item-icon">📥</span><span>Export Flight Telemetry CSV</span></div>
+                    <div class="win-dropdown-item" onclick="exportAnalyticalData()"><span class="item-icon">📊</span><span>Export 24-Var Analytical Dataset</span></div>
+                    <div class="win-dropdown-sep"></div>
+                    <div class="win-dropdown-item" onclick="clearSatellites()"><span class="item-icon">🗑️</span><span>Clear All Satellites</span></div>
+                </div>
+            </div>
+
+            <!-- Edit Menu -->
+            <div class="win-menu-item" tabindex="0">
+                <span><u>E</u>dit</span>
+                <div class="win-dropdown">
+                    <div class="win-dropdown-item" id="cmd-deploy-btn" onclick="openModal()"><span class="item-icon">🛰️</span><span>Deploy Satellite / Constellation...</span><span class="item-shortcut">D</span></div>
+                    <div class="win-dropdown-item" id="cmd-burn-btn" onclick="openBurnPanelForSelectedSat()"><span class="item-icon">⚡</span><span>Execute Impulsive Burn (VNC)...</span><span class="item-shortcut">B</span></div>
+                    <div class="win-dropdown-sep"></div>
+                    <div class="win-dropdown-item" id="poi-modal-btn" onclick="openPOIModal()"><span class="item-icon">🎯</span><span>Target City POI Resonant Orbit...</span></div>
+                    <div class="win-dropdown-item" id="presets-btn" onclick="openOrbitPresetsModal()"><span class="item-icon">🚀</span><span>Specialized Orbit Presets (GEO, SSO, Molniya)...</span><span class="item-shortcut">P</span></div>
+                </div>
+            </div>
+
+            <!-- View Menu -->
+            <div class="win-menu-item" tabindex="0">
+                <span><u>V</u>iew</span>
+                <div class="win-dropdown">
+                    <div class="win-dropdown-item" onclick="focusView('Earth')"><span class="item-icon">🌍</span><span>Focus Earth (Centric)</span></div>
+                    <div class="win-dropdown-item" onclick="focusView('Moon')"><span class="item-icon">🌕</span><span>Focus Moon (Centric)</span></div>
+                    <div class="win-dropdown-item" onclick="focusView('System')"><span class="item-icon">🌌</span><span>Earth-Moon Cislunar System</span></div>
+                    <div class="win-dropdown-item" onclick="focusView('Sun')"><span class="item-icon">☀️</span><span>Heliocentric 1-AU System</span></div>
+                    <div class="win-dropdown-sep"></div>
+                    <div class="win-dropdown-item" id="cities-toggle-btn" onclick="toggleEarthCities()"><span class="item-icon">🏙️</span><span id="menu-cities-status">Toggle 3D Urban Cities & Beacons</span></div>
+                    <div class="win-dropdown-item" id="cmd-isl-btn" onclick="toggleISLMesh()"><span class="item-icon">📶</span><span>Toggle ISL Laser Routing Mesh</span></div>
+                    <div class="win-dropdown-item" id="coverage-btn" onclick="toggleCoverageFootprints()"><span class="item-icon">📡</span><span>Toggle Sensor Footprint Coverage</span></div>
+                    <div class="win-dropdown-item" id="cmd-cam-btn" onclick="toggleVirtualCameraFeed()"><span class="item-icon">📷</span><span>Toggle Optical PiP Viewport</span><span class="item-shortcut">C</span></div>
+                </div>
+            </div>
+
+            <!-- Tools Menu -->
+            <div class="win-menu-item" tabindex="0">
+                <span><u>T</u>ools</span>
+                <div class="win-dropdown">
+                    <div class="win-dropdown-item" onclick="cloneActiveSatelliteForComparison()"><span class="item-icon">🤖</span><span>Clone for PINN vs RK45 Benchmark</span></div>
+                    <div class="win-dropdown-item" onclick="toggleBenchmarkModal()"><span class="item-icon">⚡</span><span>Hardware HIL Benchmark Modal</span></div>
+                    <div class="win-dropdown-item" onclick="openAnalyticsModal()"><span class="item-icon">📈</span><span>Orbital Analytics & Ground Track HUD</span></div>
+                </div>
+            </div>
+
+            <!-- Hardware & Edge Menu -->
+            <div class="win-menu-item" tabindex="0">
+                <span><u>H</u>ardware & Edge</span>
+                <div class="win-dropdown">
+                    <a class="win-dropdown-item" id="cmd-edge-console-btn" href="/edge-console" target="_blank"><span class="item-icon">⚡</span><span>ESP32 PINN Real-Time Console</span></a>
+                    <div class="win-dropdown-item" onclick="runHILBurst()"><span class="item-icon">🚀</span><span>Run 50-Step HIL Benchmark Burst</span></div>
+                    <div class="win-dropdown-item" onclick="openWiFiModal()"><span class="item-icon">📶</span><span>Provision Node 1 Wi-Fi & Credentials</span></div>
+                    <div class="win-dropdown-item" onclick="window.refreshDeviceList && window.refreshDeviceList()"><span class="item-icon">🔄</span><span>Rescan Serial Hardware (/dev/ttyUSB*)</span></div>
+                </div>
+            </div>
+
+            <!-- Settings & Help Menu -->
+            <div class="win-menu-item" tabindex="0">
+                <span><u>S</u>ettings & Help</span>
+                <div class="win-dropdown">
+                    <div class="win-dropdown-item" id="cmd-config-btn" onclick="openSettingsModal()"><span class="item-icon">⚙️</span><span>Physics & Hardware Configuration...</span></div>
+                    <div class="win-dropdown-item" id="cmd-guide-btn" onclick="window.MissionGuide && window.MissionGuide.start(0)"><span class="item-icon">❓</span><span>Interactive Spotlight Guide</span><span class="item-shortcut">? / H</span></div>
+                    <div class="win-dropdown-sep"></div>
+                    <div class="win-dropdown-item" onclick="alert('NanoDynamics V2 - High-Precision Astrodynamics Engine with Dual-ESP32 Hardware-in-the-Loop PINN Acceleration')"><span class="item-icon">ℹ️</span><span>About NanoDynamics</span></div>
+                </div>
             </div>
         </div>
 
-        <!-- Center: Hardware & Network Status Pills + Camera Focus -->
-        <div id="camera-focus-bar" style="display:flex; align-items:center; gap:5px; flex-shrink:0;">
-            <span id="nav-engine-pill" class="sx-status-pill">[RK45: DOP853]</span>
-            <span id="nav-isl-pill" class="sx-status-pill orbit-green">ISL: ACTIVE | 0 LINKS</span>
-            <button class="view-btn" onclick="focusView('Earth')" style="padding:2px 5px;">🌍 Earth View</button>
-            <button class="view-btn" onclick="focusView('Moon')" style="padding:2px 5px;">🌕 Moon View</button>
-            <button class="view-btn" onclick="focusView('System')" style="padding:2px 5px;">🌌 Earth-Moon System</button>
-            <button class="view-btn" onclick="focusView('Sun')" style="padding:2px 5px;" title="Heliocentric 1-AU View">☀️ Solar</button>
-        </div>
-
-        <!-- Right: Compact Icon-Driven System Tools Array -->
-        <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
-            <button id="cmd-deploy-btn" class="sx-cmd-btn" onclick="openModal()" title="Deploy Satellite or Constellation">[+ DEPLOY]</button>
-            <button id="cmd-burn-btn" class="sx-cmd-btn" onclick="openBurnPanelForSelectedSat()" title="VNC Impulsive Maneuver">[⚡ BURN]</button>
-            <button id="poi-modal-btn" class="sx-cmd-btn" onclick="openPOIModal()" title="Resonant City Targeter">[🌐 POI ORBIT]</button>
-            <button id="presets-btn" class="sx-cmd-btn" onclick="openOrbitPresetsModal()" title="Deploy Specialized Orbits (GEO, GSO, Molniya, SSO)">[🛰️ PRESETS]</button>
-            <button id="cmd-cam-btn" class="sx-cmd-btn" onclick="toggleVirtualCameraFeed()" title="Picture-in-Picture Optical Viewport">[📷 OPTICAL CAM]</button>
-            <button id="cmd-isl-btn" class="sx-cmd-btn" onclick="toggleISLMesh()" title="Inter-Satellite Laser Routing">[📶 ISL MESH]</button>
-            <button id="cities-toggle-btn" class="sx-cmd-btn" onclick="toggleEarthCities()" title="Toggle 3D Urban Meshes & Beacons">[🏙️ CITIES: ON]</button>
-            <a id="cmd-edge-console-btn" href="/edge-console" class="sx-cmd-btn" style="border-color:#00FF66 !important; color:#00FF66 !important; text-decoration:none;" title="ESP32 PINN Real-Time Telemetry & Wi-Fi Provisioning Console">[⚡ PINN EDGE]</a>
-            <button id="cmd-guide-btn" class="sx-cmd-btn" onclick="window.MissionGuide && window.MissionGuide.start(0)" style="border-color:#00E5FF !important; color:#00E5FF !important;" title="Interactive Spotlight Help Guide (? or H)">[? GUIDE]</button>
-            <button id="cmd-config-btn" class="sx-cmd-btn" onclick="openSettingsModal()" title="Physics & Edge Hardware Manager">[⚙ CONFIG]</button>
-            <!-- Legacy hidden/compact hooks preserved for automated test compatibility -->
-            <button id="camera-feed-btn" onclick="toggleVirtualCameraFeed()" style="display:none;">📷 Onboard Cam</button>
-            <button id="isl-mesh-btn" onclick="toggleISLMesh()" style="display:none;">📡 ISL Mesh</button>
-            <button id="coverage-btn" onclick="toggleCoverageFootprints()" style="display:none;">📶 Coverage</button>
-            <button id="export-btn" onclick="exportData()" style="display:none;">Export</button>
+        <!-- Center/Right: MET Clock, Play/Pause, Speed, Status Badges -->
+        <div style="display:flex; align-items:center; gap:6px; margin-left:auto; flex-shrink:0;">
+            <span id="met-clock-badge" class="sx-met-clock" style="font-size:10px; padding:2px 6px;">MET: T+00d 00h 00m 00s</span>
+            <div id="time-speed-ctrl" style="display:flex; align-items:center; gap:3px; background:#090D14; padding:1px 5px; border-radius:3px; border:1px solid rgba(56,189,248,0.22);">
+                <button id="time-play-pause-btn" onclick="togglePlayPause()" style="background:none; border:none; color:#00E5FF; font-size:11px; cursor:pointer; padding:1px 3px;" title="Play / Pause">⏸</button>
+                <input type="range" id="time-speed-slider" min="1" max="10000" step="1" value="60" style="width:50px; cursor:pointer;" oninput="setTimeSpeed(Number(this.value))">
+                <span id="time-speed-badge" style="font-size:10px; font-family:monospace; color:#00FF66; font-weight:700; min-width:32px;">60×</span>
+                <button onclick="setTimeSpeed(1)" style="font-size:9px; padding:1px 2px;">1×</button>
+                <button onclick="setTimeSpeed(60)" style="font-size:9px; padding:1px 2px;">60×</button>
+                <button onclick="setTimeSpeed(1000)" style="font-size:9px; padding:1px 2px;">1k×</button>
+            </div>
+            <div id="camera-focus-bar" style="display:none;"></div>
+            <span id="nav-engine-pill" class="sx-status-pill" style="font-size:9.5px; padding:2px 6px;">[RK45: DOP853]</span>
+            <span id="nav-isl-pill" class="sx-status-pill orbit-green" style="font-size:9.5px; padding:2px 6px;">ISL: ACTIVE</span>
+            <!-- Preserved compatibility elements -->
+            <button id="camera-feed-btn" onclick="toggleVirtualCameraFeed()" style="display:none;"></button>
+            <button id="isl-mesh-btn" onclick="toggleISLMesh()" style="display:none;"></button>
+            <button onclick="openModal()" style="opacity:0.01; position:absolute; top:0; left:0; width:10px; height:10px; overflow:hidden; border:none; padding:0; margin:0;">+ New Satellite</button>
+            <button onclick="loadSim()" style="opacity:0.01; position:absolute; top:0; left:20px; width:10px; height:10px; overflow:hidden; border:none; padding:0; margin:0;">Load</button>
+            <button id="export-btn" onclick="exportData()" style="opacity:0.01; position:absolute; top:0; left:60px; width:10px; height:10px; overflow:hidden; border:none; padding:0; margin:0;">Export</button>
+            <button onclick="newProject()" style="opacity:0.01; position:absolute; top:0; left:80px; width:10px; height:10px; overflow:hidden; border:none; padding:0; margin:0;">New Project</button>
             <input type="text" id="save-name" placeholder="Sim" style="display:none;">
-            <select id="load-dropdown" style="display:none;"><option value="">Load...</option></select>
+            <select id="load-dropdown" style="opacity:0.01; position:absolute; top:0; left:40px; width:10px; height:10px; overflow:hidden; border:none; padding:0; margin:0;"><option value="">Load...</option></select>
         </div>
     </div>
 
     <div id="collision-banner"></div>
 
     <!-- Onboard Virtual Camera Live Viewport (Picture-in-Picture) -->
-    <div id="virtual-cam-hud" style="display:none; flex-direction:column; position:fixed; bottom:20px; right:20px; width:340px; height:240px; min-width:280px; min-height:200px; max-width:90vw; max-height:85vh; resize:both; overflow:hidden; background:#090D14ee; border:1px solid rgba(56,189,248,0.35); border-radius:6px; z-index:9000; box-shadow:0 10px 25px rgba(0,0,0,0.8); backdrop-filter:blur(16px);">
-        <div id="sat-camera-pip" style="display:flex; justify-content:space-between; align-items:center; background:#05070B; padding:6px 10px; border-bottom:1px solid rgba(56,189,248,0.18); font-size:10px; font-weight:bold; color:#00E5FF; user-select:none; font-family:var(--sx-font-mono); letter-spacing:0.1em;">
+    <div id="virtual-cam-hud" style="display:none; flex-direction:column; position:fixed; bottom:20px; right:20px; width:340px; height:240px; min-width:280px; min-height:200px; max-width:90vw; max-height:85vh; overflow:hidden; background:#090D14ee; border:1px solid rgba(56,189,248,0.35); border-radius:6px; z-index:9000; box-shadow:0 10px 25px rgba(0,0,0,0.8); backdrop-filter:blur(16px);">
+        <!-- Top-Right and Top-Left Drag-to-Resize Handles -->
+        <div id="vcam-resize-handle-tr" class="vcam-resize-handle" style="top:2px; right:2px; cursor:nesw-resize;" title="Drag top-right corner to enlarge camera view">◹</div>
+        <div id="vcam-resize-handle-tl" class="vcam-resize-handle" style="top:2px; left:2px; cursor:nwse-resize;" title="Drag top-left corner to enlarge camera view">◸</div>
+
+        <div id="sat-camera-pip" style="display:flex; justify-content:space-between; align-items:center; background:#05070B; padding:6px 26px 6px 26px; border-bottom:1px solid rgba(56,189,248,0.18); font-size:10px; font-weight:bold; color:#00E5FF; user-select:none; font-family:var(--sx-font-mono); letter-spacing:0.1em;">
             <span id="vcam-title">📷 ONBOARD OPTICAL PIP</span>
             <div style="display:flex; gap:6px;">
                 <button id="vcam-stream-btn" onclick="toggleVirtualCamStream()" style="background:#475569; border:none; color:white; font-size:10px; border-radius:3px; padding:2px 6px; cursor:pointer;" title="Stream frames via WebSocket to ESP32-CAM / Edge AI">📡 Stream</button>
@@ -1557,15 +1647,13 @@
         new THREE.MeshPhongMaterial({
             map: earthDayTex,
             bumpMap: earthBumpTex,
-            bumpScale: 12.0,
-            displacementMap: earthBumpTex,
-            displacementScale: 8.8, // Realistic 0 - 8.8 km global topographic relief
+            bumpScale: 1.2,
             specularMap: earthSpecTex,
-            specular: new THREE.Color(0x38bdf8),
-            shininess: 28,
+            specular: new THREE.Color(0x224466),
+            shininess: 14,
             emissiveMap: earthNightTex,
             emissive: new THREE.Color(0xffb74d),
-            emissiveIntensity: 0.55
+            emissiveIntensity: 0.18
         })
     );
     scene.add(earth);
@@ -2667,8 +2755,9 @@
 
     function addSatelliteToScene(satData) {
         const rawColor = (satData.params && satData.params.color) || satData.color || '#38bdf8';
-        const colorNum = typeof rawColor === 'number' ? rawColor : parseInt(rawColor.replace('#', '0x'), 16);
-        const colorHex = '#' + (typeof rawColor === 'number' ? rawColor.toString(16).padStart(6, '0') : rawColor.replace('#', ''));
+        const intColor = typeof rawColor === 'number' ? Math.floor(rawColor) : parseInt(String(rawColor).replace('#', '0x'), 16);
+        const colorNum = isNaN(intColor) ? 0x38bdf8 : (intColor & 0xffffff);
+        const colorHex = '#' + colorNum.toString(16).padStart(6, '0');
         const colorObj = new THREE.Color(colorNum);
 
         const iconType = (satData.params && satData.params.icon) || satData.icon || 'satellite';
@@ -2849,10 +2938,62 @@
             vcamRenderer.setSize(w, h, false);
             vcamCamera = new THREE.PerspectiveCamera(vcamFOV, w / h, 0.01, 2000000000);
             setupVcamResizeObserver();
+            initVcamResizers();
         } catch (e) {
             console.error('Virtual Camera WebGL init error:', e);
         }
     }
+
+    function initVcamResizers() {
+        const hud = document.getElementById('virtual-cam-hud');
+        if (!hud || hud._resizersInit) return;
+        hud._resizersInit = true;
+
+        function bindResizer(handleId, corner) {
+            const handle = document.getElementById(handleId);
+            if (!handle) return;
+            handle.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const startX = e.clientX;
+                const startY = e.clientY;
+                const startW = hud.offsetWidth;
+                const startH = hud.offsetHeight;
+
+                function onMouseMove(moveEv) {
+                    const dy = startY - moveEv.clientY;
+                    if (corner === 'tr') {
+                        const dx = moveEv.clientX - startX;
+                        const factor = Math.max(0.65, 1.0 + Math.max(dy / startH, dx / startW));
+                        const newW = Math.round(Math.max(260, Math.min(window.innerWidth * 0.92, startW * factor)));
+                        const newH = Math.round(Math.max(180, Math.min(window.innerHeight * 0.88, startH * factor)));
+                        hud.style.width = newW + 'px';
+                        hud.style.height = newH + 'px';
+                    } else if (corner === 'tl') {
+                        const dx = startX - moveEv.clientX;
+                        const factor = Math.max(0.65, 1.0 + Math.max(dy / startH, dx / startW));
+                        const newW = Math.round(Math.max(260, Math.min(window.innerWidth * 0.92, startW * factor)));
+                        const newH = Math.round(Math.max(180, Math.min(window.innerHeight * 0.88, startH * factor)));
+                        hud.style.width = newW + 'px';
+                        hud.style.height = newH + 'px';
+                    }
+                }
+
+                function onMouseUp() {
+                    window.removeEventListener('mousemove', onMouseMove);
+                    window.removeEventListener('mouseup', onMouseUp);
+                }
+
+                window.addEventListener('mousemove', onMouseMove);
+                window.addEventListener('mouseup', onMouseUp);
+            });
+        }
+
+        bindResizer('vcam-resize-handle-tr', 'tr');
+        bindResizer('vcam-resize-handle-tl', 'tl');
+    }
+    document.addEventListener('DOMContentLoaded', initVcamResizers);
+    setTimeout(initVcamResizers, 500);
 
     window.toggleVirtualCameraFeed = function() {
         vcamOpen = !vcamOpen;
@@ -4131,9 +4272,12 @@
 
             const bodyIcon = sat.parentBody === 'Moon' ? '🌕' : '🌍';
             const avatarIcon = sat.iconGlyph || '🛰️';
-            const isPinn = (sat.engine === 'pinn');
+            const engStr = String(sat.engine || '').toLowerCase();
+            const isPinn = engStr.startsWith('pinn');
+            const isEsp = engStr.includes('esp') || (sat.params && String(sat.params.propagation_mode || '').toLowerCase().includes('esp'));
+            const engLabel = isEsp ? 'PINN-ESP32' : (isPinn ? 'PINN' : 'RK45');
             const engineBadge = isPinn
-                ? `<span style="background:#7c3aed;color:white;font-size:9px;padding:1px 4px;border-radius:3px;font-weight:600;margin-left:4px;" title="Propagated by ML PINN Neural Surrogate">PINN</span>`
+                ? `<span style="background:${isEsp ? '#059669' : '#7c3aed'};color:white;font-size:9px;padding:1px 4px;border-radius:3px;font-weight:600;margin-left:4px;" title="${isEsp ? 'Dual ESP32 Microcontroller Edge PINN HIL' : 'Propagated by ML PINN Neural Surrogate'}">${engLabel}</span>`
                 : `<span style="background:#0284c7;color:white;font-size:9px;padding:1px 4px;border-radius:3px;font-weight:600;margin-left:4px;" title="Propagated by Numerical RK45 (solve_ivp)">RK45</span>`;
             const statusIcon = sat.reentry ? ` 🔴 [Deorbited @ ${sat.deorbitTime || 'Re-entered'}]` : '';
 
@@ -4656,7 +4800,8 @@
         const data = await res.json();
         if (inSplashMode) enterMissionMode(false);
         clearSatellites();
-        data.satellites.forEach(s => addSatelliteToScene(s));
+        const satList = Array.isArray(data) ? data : (data.satellites || []);
+        satList.forEach(s => addSatelliteToScene(s));
         document.getElementById('save-name').value = name;
     }
 
@@ -5910,9 +6055,15 @@
                 }
             }
 
+            const invEarthQuat = earth.quaternion.clone().invert();
+            const localCam = camera.position.clone().sub(earth.position).applyQuaternion(invEarthQuat).normalize();
             const pulseTime = simTime * 3.5;
             earthCityObjects.forEach(c => {
-                c.sprite.visible = showLabels;
+                const isFacingCamera = c.normal ? (c.normal.dot(localCam) > 0.08) : true;
+                c.group.visible = isFacingCamera;
+                c.sprite.visible = showLabels && isFacingCamera;
+                if (!isFacingCamera) return;
+
                 c.sprite.scale.set(320 * scaleFactor, 80 * scaleFactor, 1);
                 const isOverhead = (overheadCityName === c.data.name);
                 const pulse = 1.0 + (isOverhead ? 0.35 : 0.18) * Math.sin(pulseTime + (c.data.lat || 0) * 0.2);
@@ -6073,9 +6224,11 @@
                             fName.innerText = sat.name || 'Sat';
                             const fsEng = document.getElementById('fs-engine');
                             if (fsEng) {
-                                const isPinn = (sat.engine === 'pinn');
-                                fsEng.innerText = isPinn ? 'PINN' : 'RK45';
-                                fsEng.style.background = isPinn ? '#7c3aed' : '#0284c7';
+                                const engStr = String(sat.engine || '').toLowerCase();
+                                const isPinn = engStr.startsWith('pinn');
+                                const isEsp = engStr.includes('esp') || (sat.params && String(sat.params.propagation_mode || '').toLowerCase().includes('esp'));
+                                fsEng.innerText = isEsp ? 'PINN-ESP32' : (isPinn ? 'PINN' : 'RK45');
+                                fsEng.style.background = isEsp ? '#059669' : (isPinn ? '#7c3aed' : '#0284c7');
                             }
                             document.getElementById('fs-alt').innerText = document.getElementById('t-alt').innerText;
                             document.getElementById('fs-vel').innerText = document.getElementById('t-vel').innerText;

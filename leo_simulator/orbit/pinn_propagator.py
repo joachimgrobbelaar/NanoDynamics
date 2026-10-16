@@ -176,8 +176,9 @@ class PINNPropagator:
                 raise ValueError(f"State vector must have length 6, got {len(state0)}")
 
         dt_model = float(self.stats.get("dt", 60.0))
-        # Use model's native dt if dt_eval <= 0
-        step_dt = dt_eval if dt_eval > 0 else dt_model
+        # The transition surrogate is strictly trained on dt = dt_model (60.0s).
+        # Using mismatched dt_eval scales kinematic blends incorrectly and causes severe orbit drift.
+        step_dt = dt_model
 
         pos_scale = float(self.stats.get("pos_scale", 6378137.0))
         vel_scale = float(self.stats.get("vel_scale", 8000.0))
@@ -402,8 +403,7 @@ class PINNPropagator:
                 raise ValueError(f"State vector must have length 6, got {len(state0)}")
 
         dt_model = float(self.stats.get("dt", 60.0))
-        # Use model's native dt if dt_eval <= 0
-        step_dt = dt_eval if dt_eval > 0 else dt_model
+        step_dt = dt_model
 
         pos_scale = float(self.stats.get("pos_scale", 6378137.0))
         vel_scale = float(self.stats.get("vel_scale", 8000.0))

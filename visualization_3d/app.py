@@ -683,7 +683,7 @@ async def simulate_satellite(params: SatelliteParams):
         )
 
         chunk_duration = body["default_chunk_duration"]
-        dt_eval = body["dt_eval"]
+        dt_eval = 60.0 if is_pinn else body["dt_eval"]
 
         if is_pinn and hasattr(prop, 'propagate_async') and prop.network_ws is not None:
             res = await prop.propagate_async(orbit=orbit, duration_seconds=chunk_duration, t_start=params.t_start, dt_eval=dt_eval)
@@ -749,7 +749,7 @@ async def stream_chunk(req: StreamRequest):
                     prop.network_ws = active_hil_worker
         else:
             prop = _build_propagator(req.params)
-        dt_eval = req.dt_eval if req.dt_eval else body["dt_eval"]
+        dt_eval = 60.0 if is_pinn else (req.dt_eval if req.dt_eval else body["dt_eval"])
         res = await _propagate_chunk_async( prop, req.state, req.t_start, req.chunk_duration, dt_eval
         )
         chunk = _format_chunk(res, prop, body["radius_m"], include_forces=True)
