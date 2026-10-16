@@ -21,3 +21,4 @@ hardware_in_the_loop/.pio/
 firestore-debug.log
 *.log
 .agents/
+visualization_3d/static/cache_maps/

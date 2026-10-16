@@ -823,6 +823,20 @@
             <div>Lon: <span id="city-hud-lon" style="color:#facc15;">139.6503°</span></div>
             <div style="grid-column:span 2; font-size:10px; color:#cbd5e1;" id="city-hud-sat-contact">🛰️ Nearest Satellite: Scanning...</div>
         </div>
+        <!-- Real-Life Map & Satellite Aerial Imagery Card -->
+        <div id="city-hud-map-container" style="position:relative; width:100%; height:155px; border-radius:6px; overflow:hidden; margin-bottom:10px; border:1px solid #334155; background:#020617;">
+            <img id="city-hud-map-img" src="" alt="Real Satellite Aerial View" style="width:100%; height:100%; object-fit:cover; display:block;" />
+            <div style="position:absolute; top:6px; left:6px; display:flex; gap:4px; z-index:10;">
+                <button id="city-map-mode-sat" onclick="setCityMapMode('satellite')" style="background:rgba(15,23,42,0.88); color:#38bdf8; border:1px solid #0284c7; border-radius:4px; font-size:10px; padding:2px 7px; cursor:pointer; font-weight:700;">🛰️ Aerial Sat</button>
+                <button id="city-map-mode-street" onclick="setCityMapMode('street')" style="background:rgba(15,23,42,0.88); color:#94a3b8; border:1px solid #475569; border-radius:4px; font-size:10px; padding:2px 7px; cursor:pointer;">🗺️ Street Map</button>
+            </div>
+            <div style="position:absolute; top:6px; right:6px; display:flex; gap:4px; z-index:10;">
+                <button onclick="zoomCityMap(-0.05)" title="Zoom In" style="background:rgba(15,23,42,0.88); color:white; border:1px solid #475569; border-radius:4px; font-size:11px; width:22px; height:22px; cursor:pointer; display:flex; align-items:center; justify-content:center;">➕</button>
+                <button onclick="zoomCityMap(0.05)" title="Zoom Out" style="background:rgba(15,23,42,0.88); color:white; border:1px solid #475569; border-radius:4px; font-size:11px; width:22px; height:22px; cursor:pointer; display:flex; align-items:center; justify-content:center;">➖</button>
+            </div>
+            <div id="city-hud-map-loading" style="display:none; position:absolute; inset:0; background:rgba(15,23,42,0.7); display:flex; align-items:center; justify-content:center; font-size:11px; color:#38bdf8;">🛰️ Fetching High-Res Aerial Imagery...</div>
+            <div style="position:absolute; bottom:4px; right:6px; font-size:9px; color:rgba(255,255,255,0.7); background:rgba(0,0,0,0.6); padding:1px 5px; border-radius:3px;">Esri World Imagery / Real Cartography</div>
+        </div>
         <div style="display:flex; gap:8px;">
             <button id="city-hud-target-btn" onclick="openPOIForCurrentCity()" style="flex:1; background:#059669; color:white; border:none; padding:7px 10px; border-radius:6px; font-weight:600; font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">🚀 Target Flyover Orbit</button>
             <button id="city-hud-focus-btn" onclick="focusCurrentCity3D()" style="flex:1; background:#0284c7; color:white; border:none; padding:7px 10px; border-radius:6px; font-weight:600; font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">🎯 Focus in 3D</button>
@@ -1910,6 +1924,23 @@
                 dummy.updateMatrix();
                 urbanInstancedMesh.setMatrixAt(instIdx++, dummy.matrix);
             }
+
+            // 0. High-resolution real-world aerial satellite ground decal
+            const decalGeo = new THREE.CircleGeometry(75, 32);
+            const decalTex = new THREE.TextureLoader().load(`/api/map/satellite?lat=${city.lat}&lon=${city.lon}&zoom=0.25&size=256`);
+            decalTex.anisotropy = 4;
+            const decalMat = new THREE.MeshBasicMaterial({
+                map: decalTex,
+                side: THREE.DoubleSide,
+                depthWrite: false,
+                polygonOffset: true,
+                polygonOffsetFactor: -1,
+                polygonOffsetUnits: -1
+            });
+            const decalMesh = new THREE.Mesh(decalGeo, decalMat);
+            decalMesh.position.copy(surfacePos);
+            decalMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+            cityGroup.add(decalMesh);
 
             // 1. Surface glowing ground ring
             const ringGeo = new THREE.RingGeometry(25, 75, 32);
@@ -3754,7 +3785,7 @@
             const res = await fetch('/api/orbit/poi', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ lat, lon, altitude_km: alt, name })
+                body: JSON.stringify({ lat, lon, altitude_km: alt, name, epoch_seconds: simTime })
             });
             const data = await res.json();
             if (!res.ok) { alert('POI orbit computation failed: ' + data.detail); return; }
@@ -3791,7 +3822,7 @@
                 closePOIModal();
                 selectedSatIndex = activeSatellites.length - 1;
                 renderSidebar();
-                focusView('Earth');
+                handleFocusChange(name);
                 vcamOpen = true;
                 setVirtualCamMode('nadir');
                 const hud = document.getElementById('virtual-cam-hud');
@@ -4123,7 +4154,45 @@
             }
         }
 
-        if (hud) hud.style.display = 'block';
+        if (hud) {
+            hud.style.display = 'block';
+            updateCityMapImage();
+        }
+    };
+
+    let currentCityMapMode = 'satellite';
+    let currentCityMapZoom = 0.15;
+
+    window.setCityMapMode = function(mode) {
+        currentCityMapMode = mode;
+        const satBtn = document.getElementById('city-map-mode-sat');
+        const streetBtn = document.getElementById('city-map-mode-street');
+        if (mode === 'satellite') {
+            if (satBtn) { satBtn.style.color = '#38bdf8'; satBtn.style.borderColor = '#0284c7'; satBtn.style.fontWeight = '700'; }
+            if (streetBtn) { streetBtn.style.color = '#94a3b8'; streetBtn.style.borderColor = '#475569'; streetBtn.style.fontWeight = '400'; }
+        } else {
+            if (satBtn) { satBtn.style.color = '#94a3b8'; satBtn.style.borderColor = '#475569'; satBtn.style.fontWeight = '400'; }
+            if (streetBtn) { streetBtn.style.color = '#38bdf8'; streetBtn.style.borderColor = '#0284c7'; streetBtn.style.fontWeight = '700'; }
+        }
+        updateCityMapImage();
+    };
+
+    window.zoomCityMap = function(delta) {
+        currentCityMapZoom = Math.max(0.02, Math.min(1.2, currentCityMapZoom + delta));
+        updateCityMapImage();
+    };
+
+    window.updateCityMapImage = function() {
+        if (!selectedCityPOI || !selectedCityPOI.data) return;
+        const img = document.getElementById('city-hud-map-img');
+        const loading = document.getElementById('city-hud-map-loading');
+        if (!img) return;
+        const endpoint = currentCityMapMode === 'satellite' ? '/api/map/satellite' : '/api/map/street';
+        const url = `${endpoint}?lat=${selectedCityPOI.data.lat}&lon=${selectedCityPOI.data.lon}&zoom=${currentCityMapZoom.toFixed(3)}&size=400`;
+        if (loading) loading.style.display = 'flex';
+        img.onload = () => { if (loading) loading.style.display = 'none'; };
+        img.onerror = () => { if (loading) loading.style.display = 'none'; };
+        img.src = url;
     };
 
     window.openPOIForCurrentCity = function() {

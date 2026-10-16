@@ -5,6 +5,7 @@ import math
 import os
 import re
 import sys
+import urllib.request
 
 import numpy as np
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
@@ -518,6 +519,7 @@ class POIOrbitRequest(BaseModel):
     altitude_km: float = 550.0
     inclination_deg: float | None = None
     eccentricity: float = 0.001
+    epoch_seconds: float = 0.0
     name: str = "POI-Sat"
 
 
@@ -552,12 +554,67 @@ def api_design_poi_orbit(req: POIOrbitRequest):
         target_alt_km=req.altitude_km,
         inclination_deg=req.inclination_deg,
         eccentricity=req.eccentricity,
+        epoch_seconds=req.epoch_seconds,
     )
     return {
         "status": "success",
         "name": req.name,
         **res,
     }
+
+
+MAP_CACHE_DIR = os.path.join(BASE_DIR, "static", "cache_maps")
+os.makedirs(MAP_CACHE_DIR, exist_ok=True)
+
+
+@app.get("/api/map/satellite")
+def api_map_satellite(lat: float, lon: float, zoom: float = 0.15, size: int = 400):
+    """Return high-resolution real-world aerial satellite imagery tile for coordinates."""
+    min_lat, max_lat = max(-85.0, lat - zoom), min(85.0, lat + zoom)
+    min_lon, max_lon = max(-180.0, lon - zoom), min(180.0, lon + zoom)
+    cache_key = f"sat_{lat:.4f}_{lon:.4f}_{zoom:.3f}_{size}.jpg"
+    cache_path = os.path.join(MAP_CACHE_DIR, cache_key)
+    if os.path.exists(cache_path) and os.path.getsize(cache_path) > 0:
+        return FileResponse(cache_path, media_type="image/jpeg")
+
+    url = (
+        f"https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/export?"
+        f"bbox={min_lon},{min_lat},{max_lon},{max_lat}&bboxSR=4326&imageSR=4326&size={size},{size}&format=jpg&f=image"
+    )
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "LEOSimulator/2.0"})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = resp.read()
+        with open(cache_path, "wb") as f:
+            f.write(data)
+        return Response(content=data, media_type="image/jpeg")
+    except Exception as e:
+        return JSONResponse(status_code=502, content={"detail": f"Failed fetching satellite map: {e}"})
+
+
+@app.get("/api/map/street")
+def api_map_street(lat: float, lon: float, zoom: float = 0.15, size: int = 400):
+    """Return high-resolution real-world street/road map tile for coordinates."""
+    min_lat, max_lat = max(-85.0, lat - zoom), min(85.0, lat + zoom)
+    min_lon, max_lon = max(-180.0, lon - zoom), min(180.0, lon + zoom)
+    cache_key = f"street_{lat:.4f}_{lon:.4f}_{zoom:.3f}_{size}.jpg"
+    cache_path = os.path.join(MAP_CACHE_DIR, cache_key)
+    if os.path.exists(cache_path) and os.path.getsize(cache_path) > 0:
+        return FileResponse(cache_path, media_type="image/jpeg")
+
+    url = (
+        f"https://services.arcgisonline.com/arcgis/rest/services/World_Street_Map/MapServer/export?"
+        f"bbox={min_lon},{min_lat},{max_lon},{max_lat}&bboxSR=4326&imageSR=4326&size={size},{size}&format=jpg&f=image"
+    )
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "LEOSimulator/2.0"})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = resp.read()
+        with open(cache_path, "wb") as f:
+            f.write(data)
+        return Response(content=data, media_type="image/jpeg")
+    except Exception as e:
+        return JSONResponse(status_code=502, content={"detail": f"Failed fetching street map: {e}"})
 
 
 @app.get("/api/orbit/presets")

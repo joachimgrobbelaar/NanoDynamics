@@ -93,8 +93,9 @@ def design_orbit_for_poi(
     ascending: bool = True,
     inclination_deg: Optional[float] = None,
     eccentricity: float = 0.001,
+    epoch_seconds: float = 0.0,
 ) -> Dict[str, Any]:
-    """Compute orbital elements (a, e, i, RAAN, arg_pe, nu) that flies over (lat, lon) at t=0.
+    """Compute orbital elements (a, e, i, RAAN, arg_pe, nu) that flies over (lat, lon) at epoch_seconds.
 
     Args:
         lat_deg: Target latitude in degrees [-90, +90].
@@ -103,6 +104,7 @@ def design_orbit_for_poi(
         ascending: If True, satellite passes over target on northbound track; else southbound.
         inclination_deg: Optional forced inclination. Must be >= |lat_deg|.
         eccentricity: Orbital eccentricity (default near-circular 0.001).
+        epoch_seconds: Simulation epoch in seconds when flyover occurs.
 
     Returns:
         Dictionary containing Keplerian elements and initial Cartesian state (r, v).
@@ -132,14 +134,18 @@ def design_orbit_for_poi(
         u_flyover = math.pi - u_base
 
     # Longitude difference delta_lambda from RAAN:
-    # tan(lambda - RAAN) = cos(inc) * tan(u)
+    # tan(alpha - RAAN) = cos(inc) * tan(u)
     cos_u = math.cos(u_flyover)
     sin_delta = math.sin(u_flyover) * math.cos(inc)
     cos_delta = cos_u
     delta_lam = math.atan2(sin_delta, cos_delta)
 
+    # In ECI, at epoch_seconds, Greenwich meridian has rotated by theta
+    theta_g = (OMEGA_EARTH * epoch_seconds) % (2.0 * math.pi)
+    alpha_city = (lam + theta_g) % (2.0 * math.pi)
+
     # RAAN in [0, 2*pi)
-    raan = (lam - delta_lam) % (2.0 * math.pi)
+    raan = (alpha_city - delta_lam) % (2.0 * math.pi)
 
     # For circular/near-circular orbit, choose arg_perigee = 0 -> nu = u
     arg_pe = 0.0

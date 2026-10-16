@@ -550,3 +550,30 @@ class TestGeodeticCoordinatesAndBurnEndpoints:
         assert "lon_deg" in data["trajectory"]
         assert len(data["trajectory"]["t"]) > 0
 
+    def test_poi_orbit_design_with_epoch(self):
+        payload = {
+            "lat": 35.6762,
+            "lon": 139.6503,
+            "altitude_km": 500.0,
+            "epoch_seconds": 720.0,
+            "name": "Tokyo-Flyover",
+        }
+        res = client.post("/api/orbit/poi", json=payload)
+        assert res.status_code == 200
+        data = res.json()
+        assert data["status"] == "success"
+        assert "elements" in data
+        assert "initial_state" in data
+
+    def test_map_satellite_and_street(self):
+        res_sat = client.get("/api/map/satellite?lat=35.6762&lon=139.6503&zoom=0.15&size=100")
+        assert res_sat.status_code == 200
+        assert res_sat.headers["content-type"] == "image/jpeg"
+        assert len(res_sat.content) > 100
+
+        res_str = client.get("/api/map/street?lat=35.6762&lon=139.6503&zoom=0.15&size=100")
+        assert res_str.status_code == 200
+        assert res_str.headers["content-type"] == "image/jpeg"
+        assert len(res_str.content) > 100
+
+
