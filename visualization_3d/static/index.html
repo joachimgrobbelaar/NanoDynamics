@@ -1654,11 +1654,11 @@
 
     const tl = new THREE.TextureLoader();
 
-    // ── Multi-Tier PBR Earth Photosphere, VIIRS Night Lights & Rayleigh/Mie Limb Scattering ──
-    const earthDayTex = tl.load('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg');
-    const earthBumpTex = tl.load('https://unpkg.com/three-globe/example/img/earth-topology.png');
-    const earthSpecTex = tl.load('https://unpkg.com/three-globe/example/img/earth-water.png');
-    const earthNightTex = tl.load('https://unpkg.com/three-globe/example/img/earth-night.jpg');
+    // ── Ultra High-Definition NASA Blue Marble 5400x2700 & VIIRS Night Lights ──
+    const earthDayTex = tl.load('/static/textures/earth_nasa_5400.jpg');
+    const earthBumpTex = tl.load('/static/textures/earth_normal_2048.jpg');
+    const earthSpecTex = tl.load('/static/textures/earth_specular_2048.jpg');
+    const earthNightTex = tl.load('/static/textures/earth_night_lights.jpg');
 
     [earthDayTex, earthBumpTex, earthSpecTex, earthNightTex].forEach(tex => {
         if (tex) {
@@ -1670,17 +1670,17 @@
     });
 
     const earth = new THREE.Mesh(
-        new THREE.SphereGeometry(R_EARTH_KM, 96, 96),
-        new THREE.MeshPhongMaterial({
+        new THREE.SphereGeometry(R_EARTH_KM, 128, 128),
+        new THREE.MeshStandardMaterial({
             map: earthDayTex,
-            bumpMap: earthBumpTex,
-            bumpScale: 1.2,
-            specularMap: earthSpecTex,
-            specular: new THREE.Color(0x224466),
-            shininess: 14,
+            normalMap: earthBumpTex,
+            normalScale: new THREE.Vector2(0.9, 0.9),
+            roughnessMap: earthSpecTex,
+            roughness: 0.72,
+            metalness: 0.1,
             emissiveMap: earthNightTex,
-            emissive: new THREE.Color(0xffb74d),
-            emissiveIntensity: 0.18
+            emissive: new THREE.Color(0xffb020),
+            emissiveIntensity: 0.22
         })
     );
     scene.add(earth);
@@ -2673,9 +2673,11 @@
         }
 
         const period = sat.period_s || 5400;
-        // Window of 1 full orbit trailing + 1 full orbit forward
+        // Window of trailing orbit + forward predicted trajectory down to crash site
         const tTail = Math.max(b.t[0], currentSimTime - period);
-        const tHead = Math.min(b.t[b.t.length - 1], currentSimTime + period);
+        const tHead = sat.reentry
+            ? Math.min(b.t[b.t.length - 1], Math.max(currentSimTime + period, sat.deorbitEpoch || b.t[b.t.length - 1]))
+            : Math.min(b.t[b.t.length - 1], currentSimTime + period * 2);
 
         let startIdx = 0;
         while (startIdx < b.t.length && b.t[startIdx] < tTail) startIdx++;
@@ -2735,7 +2737,14 @@
                 // Forward predicted arc
                 const span = Math.max(1.0, tHead - currentSimTime);
                 const frac = Math.max(0.0, Math.min(1.0, 1.0 - (t - currentSimTime) / span));
-                brightness = 0.25 + 0.45 * frac;
+                brightness = 0.35 + 0.55 * frac;
+                if (sat.reentry && sat.deorbitEpoch && t >= sat.deorbitEpoch - 3600) {
+                    colAttr.array[pIdx * 3] = 1.0;
+                    colAttr.array[pIdx * 3 + 1] = 0.35 * brightness;
+                    colAttr.array[pIdx * 3 + 2] = 0.1;
+                    pIdx++;
+                    continue;
+                }
             }
 
             colAttr.array[pIdx * 3] = Math.min(1.0, baseColor.r * brightness * boost);
@@ -4695,7 +4704,8 @@
         activeSatellites.forEach((sat, idx) => {
             const li = document.createElement('li');
             if (idx === selectedSatIndex) li.classList.add('active');
-            if (sat.reentry) li.classList.add('deorbited');
+            const isActuallyDeorbited = sat.reentry && sat.deorbitEpoch !== null && simTime >= sat.deorbitEpoch;
+            if (isActuallyDeorbited) li.classList.add('deorbited');
             li.style.borderLeftColor = sat.colorHex || ('#' + sat.color.toString(16).padStart(6,'0'));
             li.ondblclick = (e) => {
                 e.stopPropagation();
@@ -4711,7 +4721,15 @@
             const engineBadge = isPinn
                 ? `<span style="background:${isEsp ? '#059669' : '#7c3aed'};color:white;font-size:9px;padding:1px 4px;border-radius:3px;font-weight:600;margin-left:4px;" title="${isEsp ? 'Dual ESP32 Microcontroller Edge PINN HIL' : 'Propagated by ML PINN Neural Surrogate'}">${engLabel}</span>`
                 : `<span style="background:#0284c7;color:white;font-size:9px;padding:1px 4px;border-radius:3px;font-weight:600;margin-left:4px;" title="Propagated by Numerical RK45 (solve_ivp)">RK45</span>`;
-            const statusIcon = sat.reentry ? ` 🔴 [Deorbited @ ${sat.deorbitTime || 'Re-entered'}]` : '';
+
+            let statusIcon = '';
+            if (isActuallyDeorbited) {
+                statusIcon = ` <span style="color:#ef4444;font-size:9px;font-weight:700;">🔴 [Deorbited @ ${sat.deorbitTime || 'Re-entered'}]</span>`;
+            } else if (sat.reentry && sat.deorbitEpoch !== null) {
+                const rem = Math.max(0, sat.deorbitEpoch - simTime);
+                const crashStr = sat.impact ? `${sat.impact.lat.toFixed(1)}°, ${sat.impact.lon.toFixed(1)}°` : (sat.events && sat.events.impact ? `${sat.events.impact.lat_deg.toFixed(1)}°, ${sat.events.impact.lon_deg.toFixed(1)}°` : 'Computing');
+                statusIcon = ` <span style="background:#78350f;color:#fde047;border:1px solid #d97706;padding:1px 5px;border-radius:3px;font-size:9px;font-weight:700;margin-left:4px;" title="Predicted Crash Site: ${crashStr}">⚠️ Deorbit T-${formatTime(rem)} | Crash: ${crashStr}</span>`;
+            }
 
             li.innerHTML = `
                 <div class="sat-info-badge">
@@ -4854,8 +4872,12 @@
         document.getElementById('t-vel').innerText  = `${v.toFixed(3)} km/s`;
         document.getElementById('t-period').innerText = `${(sat.period_s/60).toFixed(1)} min`;
         
-        if (sat.reentry) {
-            document.getElementById('t-life').innerHTML = `<span class="val-warn">🔴 Deorbited (${sat.deorbitTime || 'Re-entered'})</span>`;
+        const isDeorbitedNow = sat.reentry && sat.deorbitEpoch !== null && simTime >= sat.deorbitEpoch;
+        if (isDeorbitedNow) {
+            document.getElementById('t-life').innerHTML = `<span class="val-warn" style="color:#ef4444;">🔴 Deorbited (${sat.deorbitTime || 'Impacted'})</span>`;
+        } else if (sat.reentry && sat.deorbitEpoch !== null) {
+            const remTime = Math.max(0, sat.deorbitEpoch - simTime);
+            document.getElementById('t-life').innerHTML = `<span class="val-warn" style="color:#f59e0b;">⚠️ Predicted De-orbit: in ${formatTime(remTime)}</span>`;
         } else {
             document.getElementById('t-life').innerHTML = `<span class="val-highlight">Active (Safe Orbit)</span>`;
         }
@@ -4950,18 +4972,19 @@
 
         if (ev.reentry || sat.reentry) {
             cReentry.style.display = 'block';
-            const rLat = ev.reentry ? `${ev.reentry.lat_deg.toFixed(2)}°, ${ev.reentry.lon_deg.toFixed(2)}°` : 'Lat/Lon Estimated';
-            const rT = ev.reentry ? formatTime(ev.reentry.time_s) : (sat.deorbitTime || 'Re-entered');
+            const rLat = ev.reentry ? `${ev.reentry.lat_deg.toFixed(2)}°, ${ev.reentry.lon_deg.toFixed(2)}°` : 'Computing...';
+            const rT = ev.reentry ? formatTime(ev.reentry.time_s) : (sat.deorbitTime || (sat.deorbitEpoch ? formatTime(sat.deorbitEpoch) : 'Predicted'));
             document.getElementById('coord-reentry-val').innerText = `${rLat} @ ${rT}`;
         } else {
             cReentry.style.display = 'none';
         }
 
-        if (ev.impact || (sat.reentry && sat.lifetimeSeconds)) {
+        if (ev.impact || sat.impact || (sat.reentry && (sat.lifetimeSeconds || sat.deorbitEpoch))) {
             cImpact.style.display = 'block';
-            const iLat = ev.impact ? `${ev.impact.lat_deg.toFixed(2)}°, ${ev.impact.lon_deg.toFixed(2)}°` : `${geo.lat.toFixed(2)}°, ${geo.lon.toFixed(2)}°`;
-            const iT = ev.impact ? formatTime(ev.impact.time_s) : (sat.deorbitTime || 'Impacted');
-            document.getElementById('coord-impact-val').innerText = `${iLat} @ ${iT}`;
+            const impObj = sat.impact || (ev.impact ? { lat: ev.impact.lat_deg, lon: ev.impact.lon_deg, epoch: ev.impact.time_s } : null);
+            const iLat = impObj ? `${impObj.lat.toFixed(2)}°, ${impObj.lon.toFixed(2)}°` : `${geo.lat.toFixed(2)}°, ${geo.lon.toFixed(2)}°`;
+            const iT = isDeorbitedNow ? (sat.deorbitTime || 'Impacted') : `ETA ${formatTime(Math.max(0, (sat.deorbitEpoch || 0) - simTime))}`;
+            document.getElementById('coord-impact-val').innerText = `${iLat} (${iT})`;
         } else {
             cImpact.style.display = 'none';
         }
@@ -6336,6 +6359,9 @@
                 sat.mesh.visible = false;
                 if (sat.line) sat.line.visible = false;
                 Object.values(sat.forceArrows).forEach(a => { a.visible = false; });
+                if (sat.impactPos) {
+                    sat.mesh.position.copy(bodyWorldPos.clone().add(sat.impactPos));
+                }
                 return;
             }
 
@@ -6348,8 +6374,15 @@
 
             // Subsurface collision / atmospheric impact protection: prevent penetrating inside Earth/Moon
             const localR = localPos.length();
-            if (localR < bodyRadiusKm) {
-                if (!sat.reentry) {
+            if (localR <= bodyRadiusKm) {
+                const surfaceDir = localPos.clone().normalize();
+                const surfacePos = surfaceDir.multiplyScalar(bodyRadiusKm + 1.0);
+                const impactWorldPos = bodyWorldPos.clone().add(surfacePos);
+                sat.mesh.position.copy(impactWorldPos);
+                sat.impactPos = surfacePos.clone();
+
+                if (!sat.impactTriggered) {
+                    sat.impactTriggered = true;
                     sat.reentry = true;
                     if (sat.deorbitEpoch === null) sat.deorbitEpoch = t;
                     sat.lifetimeSeconds = sat.deorbitEpoch;
@@ -6357,6 +6390,8 @@
                     const iLat = (buf.lat_deg && typeof idx === 'object' && buf.lat_deg[idx.lo]) || 0;
                     const iLon = (buf.lon_deg && typeof idx === 'object' && buf.lon_deg[idx.lo]) || 0;
                     spawnEarthImpactCrater(sat, { lat: iLat, lon: iLon, epoch: t, dispersion_major_km: 110, dispersion_minor_km: 30 });
+                    spawnCollisionShockwave(impactWorldPos);
+                    showCollisionBanner(`💥 <strong>MISSION CONCLUDED: ${sat.name} IMPACTED EARTH</strong><br><span style="font-size:11px; font-weight:normal;">Crash Site: ${iLat.toFixed(2)}°, ${iLon.toFixed(2)}° | Impact MET: ${sat.deorbitTime}</span>`, 10000);
                     renderSidebar();
                 }
                 sat.mesh.visible = false;
@@ -6386,19 +6421,28 @@
                 }
             }
 
-            // Smooth LOD: show authentic 3D satellite mesh when zoomed in close (< 350 km)
+            // Smooth LOD: show authentic 3D satellite mesh when zoomed in close, hide 2D billboard completely
             const distToCam = camera.position.distanceTo(sat.mesh.position);
-            if (distToCam < 350.0) {
+            if (distToCam < 250.0) {
+                // Closer than 250 km: icon must disappear completely!
+                if (sat.sprite) {
+                    sat.sprite.visible = false;
+                    sat.sprite.material.opacity = 0.0;
+                }
                 if (sat.detailedModel) {
                     sat.detailedModel.visible = true;
                     sat.detailedModel.rotation.y += 0.005 * Math.min(wallDt, 0.05);
                 }
+            } else if (distToCam < 900.0) {
+                // Transition zone: icon smoothly fades out, 3D model visible
+                if (sat.detailedModel) sat.detailedModel.visible = true;
                 if (sat.sprite) {
-                    const spriteAlpha = Math.max(0.0, Math.min(1.0, (distToCam - 40.0) / 310.0));
+                    const spriteAlpha = Math.max(0.0, Math.min(1.0, (distToCam - 250.0) / 450.0));
                     sat.sprite.material.opacity = spriteAlpha;
                     sat.sprite.visible = spriteAlpha > 0.01;
                 }
             } else {
+                // Distant view: show icon glyph
                 if (sat.detailedModel) sat.detailedModel.visible = false;
                 if (sat.sprite) {
                     sat.sprite.material.opacity = 1.0;
@@ -7128,12 +7172,38 @@
             return;
         }
 
-        // 3. City Click Detection
+        // 3. Click Detection (Satellite or City)
         if (!draggingHandle && !(dragOrbitMode && dragOrbitStartPos)) {
             const dx = event.clientX - uxPointerDownPos.x;
             const dy = event.clientY - uxPointerDownPos.y;
             const dt = performance.now() - uxPointerDownTime;
             if (Math.hypot(dx, dy) < 8 && dt < 450) {
+                // Check if user clicked an active satellite in 3D
+                const rect = renderer.domElement.getBoundingClientRect();
+                const clickM = new THREE.Vector2(
+                    ((event.clientX - rect.left) / rect.width) * 2 - 1,
+                    -((event.clientY - rect.top) / rect.height) * 2 + 1
+                );
+                const clickRay = new THREE.Raycaster();
+                clickRay.setFromCamera(clickM, camera);
+                let hitSatIdx = -1, minSatD = Infinity;
+                activeSatellites.forEach((sat, sIdx) => {
+                    if (!sat.mesh || !sat.mesh.visible) return;
+                    const targets = [sat.mesh];
+                    if (sat.sprite) targets.push(sat.sprite);
+                    if (sat.detailedModel) targets.push(sat.detailedModel);
+                    const hits = clickRay.intersectObjects(targets, true);
+                    if (hits.length > 0 && hits[0].distance < minSatD) {
+                        minSatD = hits[0].distance;
+                        hitSatIdx = sIdx;
+                    }
+                });
+
+                if (hitSatIdx >= 0) {
+                    focusSatellite(hitSatIdx);
+                    return;
+                }
+
                 const clickedCity = checkCityClick(event);
                 if (clickedCity) {
                     selectEarthCity(clickedCity);
@@ -7167,9 +7237,9 @@
             }
         });
         if (hitIdx >= 0) {
-            focusSatellite(hitIdx);
+            zoomToSatelliteModel(hitIdx);
         } else if (selectedSatIndex >= 0) {
-            focusSatellite(selectedSatIndex, true);
+            zoomToSatelliteModel(selectedSatIndex);
         }
     });
 
