@@ -1,0 +1,48 @@
+# Dual-ESP32 Hardware-in-the-Loop (HIL) & Avionics Bus Configuration
+architecture: "Dual-ESP32 Symplectic PINN Edge Mesh"
+packet_protocol:
+  struct_name: "OrbitStatePacket"
+  payload_bytes: 42
+  packed_format_le: "<H10f"
+  ccsds_apid: "0x01A4"
+
+nodes:
+  node1_gateway:
+    board: "esp32dev"
+    chip: "ESP32-D0WDQ6 (ESP32-DevKitC V4)"
+    usb_serial_port: "/dev/ttyUSB0"
+    baudrate: 115200
+    mac_address: "7C:9E:BD:44:52:E4"
+    softap_ssid: "NANODYNAMICS-ESP32-GW"
+    softap_ip: "192.168.4.1"
+    websocket_endpoint: "ws://192.168.1.38:8000/ws/edge"
+    freertos_tasks:
+      core_0: "WiFi_WebSocket_OTA_NVS_Portal (8192B stack, priority 2)"
+      core_1: "ESP_NOW_Raw_MAC_Transceiver (4096B stack, priority 3)"
+    pins:
+      status_led_gpio: 2
+      uart_tx_gpio: 1
+      uart_rx_gpio: 3
+      spi_mosi_gpio: 23
+      spi_miso_gpio: 19
+      spi_sclk_gpio: 18
+      spi_cs_gpio: 5
+
+  node2_inference:
+    board: "esp32dev"
+    chip: "ESP32-D0WDQ6 (ESP32 DevKit V1)"
+    usb_serial_port: "/dev/ttyUSB1"
+    baudrate: 115200
+    wifi_tcp_stack: "disabled_raw_80211_only"
+    espnow_channel: 1
+    tflite_micro:
+      quantization: "INT8_full_integer"
+      tensor_arena_bytes: 32768
+      header_file: "firmware/node2_inference/transition_model_data.h"
+    freertos_tasks:
+      core_0: "Symplectic_Hamiltonian_Projector (4096B stack, priority 2)"
+      core_1: "TFLM_INT8_PINN_Inference (8192B stack, priority 3)"
+    pins:
+      status_led_gpio: 2
+      i2c_sda_gpio: 21
+      i2c_scl_gpio: 22

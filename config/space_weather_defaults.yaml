@@ -1,0 +1,31 @@
+# Empirical Solar Flux (F10.7) & Geomagnetic (Kp/Ap) Conditioning Defaults
+# Used as the conditioning vector p_k = [B_coeff, F10.7, F10.7A, Kp] for PINN inference
+default_conditioning:
+  f107_sfu: 155.0
+  f107a_81d_sfu: 148.5
+  kp_index: 3.0
+  ap_index: 15.0
+  solar_pressure_n_m2: 4.56e-6
+
+solar_activity_regimes:
+  solar_minimum:
+    f107_sfu: 70.0
+    f107a_81d_sfu: 72.0
+    kp_index: 1.0
+    ap_index: 4.0
+    scale_height_km: 42.5
+    rho0_200km_kg_m3: 2.15e-10
+  nominal_moderate:
+    f107_sfu: 150.0
+    f107a_81d_sfu: 145.0
+    kp_index: 3.0
+    ap_index: 15.0
+    scale_height_km: 58.2
+    rho0_200km_kg_m3: 3.85e-10
+  severe_geomagnetic_storm:
+    f107_sfu: 245.0
+    f107a_81d_sfu: 210.0
+    kp_index: 8.3
+    ap_index: 236.0
+    scale_height_km: 79.4
+    rho0_200km_kg_m3: 8.90e-10

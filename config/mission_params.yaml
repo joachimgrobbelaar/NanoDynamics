@@ -1,0 +1,47 @@
+# Nanodynamics-v3 Mission & Orbital Regime Configuration (TRL 1 -> TRL 9)
+mission:
+  name: "Nanodynamics-v3 Multi-Regime Constellation"
+  epoch_utc: "2026-10-16T00:00:00Z"
+  canonical_units:
+    r_scale_m: 6378137.0          # WGS84 Equatorial Radius R_E [m]
+    mu_earth_m3_s2: 3.986004418e14
+    v_scale_m_s: 7905.3661498     # sqrt(mu_E / R_E) [m/s]
+    t_scale_s: 806.8110649        # sqrt(R_E^3 / mu_E) [s]
+
+regimes:
+  vlleo_goce:
+    description: "ESA GOCE Very-Low-Earth-Orbit Gravity Gradiometry"
+    altitude_km: 255.0
+    inclination_deg: 96.7
+    eccentricity: 0.001
+    b_coeff_m2_kg: 0.0028
+    dt_step_s: 10.0
+
+  leo_swarm_a:
+    description: "ESA Swarm-A Ionospheric & Geomagnetic Explorer"
+    altitude_km: 462.0
+    inclination_deg: 87.35
+    eccentricity: 0.0012
+    b_coeff_m2_kg: 0.0045
+    dt_step_s: 10.0
+
+  sso_sentinel_1a:
+    description: "ESA Copernicus Sentinel-1A Sun-Synchronous SAR"
+    altitude_km: 693.0
+    inclination_deg: 98.18
+    eccentricity: 0.00013
+    b_coeff_m2_kg: 0.0062
+    dt_step_s: 30.0
+
+  cislunar_nrho_gateway:
+    description: "CR3BP Earth-Moon L2 9:2 Synodic Near-Rectilinear Halo Orbit"
+    mass_ratio_mu: 0.012150585609624
+    earth_moon_distance_km: 384400.0
+    l1_gateway_x_nd: 0.83691513
+    l2_gateway_x_nd: 1.15568217
+    target_jacobi_c: 3.048
+
+fdir:
+  max_hamiltonian_drift_rel: 1.0e-5
+  fallback_integrator: "symplectic_verlet"
+  enable_manifold_projection: true

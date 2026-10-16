@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Earth_Explorer_File>
+  <Earth_Explorer_Header>
+    <Fixed_Header>
+      <File_Name>S1A_OPER_AUX_POEORB_OPOD_20261016T000000_V20261016T000000_20261016T001000</File_Name>
+      <File_Description>Precise Orbit Ephemerides (POE) Orbit File</File_Description>
+      <Mission>Sentinel-1A</Mission>
+      <File_Class>OPER</File_Class>
+      <File_Type>AUX_POEORB</File_Type>
+    </Fixed_Header>
+    <Variable_Header>
+      <Ref_Frame>EARTH_FIXED</Ref_Frame>
+      <Time_Reference>UTC</Time_Reference>
+    </Variable_Header>
+  </Earth_Explorer_Header>
+  <Data_Block type="xml">
+    <List_of_OSVs count="6">
+      <OSV>
+        <TAI>TAI=2026-10-16T00:00:37.000000</TAI>
+        <UTC>UTC=2026-10-16T00:00:00.000000</UTC>
+        <UT1>UT1=2026-10-16T00:00:00.012410</UT1>
+        <Absolute_Orbit>56142</Absolute_Orbit>
+        <X unit="m">7071137.000</X>
+        <Y unit="m">0.000</Y>
+        <Z unit="m">0.000</Z>
+        <VX unit="m/s">0.000000</VX>
+        <VY unit="m/s">-1072.814200</VY>
+        <VZ unit="m/s">7435.192400</VZ>
+        <Quality>NOMINAL</Quality>
+      </OSV>
+      <OSV>
+        <TAI>TAI=2026-10-16T00:01:37.000000</TAI>
+        <UTC>UTC=2026-10-16T00:01:00.000000</UTC>
+        <UT1>UT1=2026-10-16T00:01:00.012410</UT1>
+        <Absolute_Orbit>56142</Absolute_Orbit>
+        <X unit="m">7056894.120</X>
+        <Y unit="m">-64347.210</Y>
+        <Z unit="m">445961.840</Z>
+        <VX unit="m/s">-474.618200</VX>
+        <VY unit="m/s">-1070.652100</VY>
+        <VZ unit="m/s">7420.214800</VZ>
+        <Quality>NOMINAL</Quality>
+      </OSV>
+      <OSV>
+        <TAI>TAI=2026-10-16T00:02:37.000000</TAI>
+        <UTC>UTC=2026-10-16T00:02:00.000000</UTC>
+        <UT1>UT1=2026-10-16T00:02:00.012410</UT1>
+        <Absolute_Orbit>56142</Absolute_Orbit>
+        <X unit="m">7014223.480</X>
+        <Y unit="m">-128435.180</Y>
+        <Z unit="m">890127.420</Z>
+        <VX unit="m/s">-947.324100</VX>
+        <VY unit="m/s">-1064.178400</VY>
+        <VZ unit="m/s">7375.341200</VZ>
+        <Quality>NOMINAL</Quality>
+      </OSV>
+      <OSV>
+        <TAI>TAI=2026-10-16T00:03:37.000000</TAI>
+        <UTC>UTC=2026-10-16T00:03:00.000000</UTC>
+        <UT1>UT1=2026-10-16T00:03:00.012410</UT1>
+        <Absolute_Orbit>56142</Absolute_Orbit>
+        <X unit="m">6943301.190</X>
+        <Y unit="m">-192006.410</Y>
+        <Z unit="m">1330708.150</Z>
+        <VX unit="m/s">-1416.218900</VX>
+        <VY unit="m/s">-1053.431200</VY>
+        <VZ unit="m/s">7300.781900</VZ>
+        <Quality>NOMINAL</Quality>
+      </OSV>
+      <OSV>
+        <TAI>TAI=2026-10-16T00:04:37.000000</TAI>
+        <UTC>UTC=2026-10-16T00:04:00.000000</UTC>
+        <UT1>UT1=2026-10-16T00:04:00.012410</UT1>
+        <Absolute_Orbit>56142</Absolute_Orbit>
+        <X unit="m">6844419.820</X>
+        <Y unit="m">-254805.290</Y>
+        <Z unit="m">1765928.610</Z>
+        <VX unit="m/s">-1879.409100</VX>
+        <VY unit="m/s">-1038.472100</VY>
+        <VZ unit="m/s">7196.841200</VZ>
+        <Quality>NOMINAL</Quality>
+      </OSV>
+      <OSV>
+        <TAI>TAI=2026-10-16T00:05:37.000000</TAI>
+        <UTC>UTC=2026-10-16T00:05:00.000000</UTC>
+        <UT1>UT1=2026-10-16T00:05:00.012410</UT1>
+        <Absolute_Orbit>56142</Absolute_Orbit>
+        <X unit="m">6718012.450</X>
+        <Y unit="m">-316580.120</Y>
+        <Z unit="m">2194034.880</Z>
+        <VX unit="m/s">-2335.021400</VX>
+        <VY unit="m/s">-1019.381200</VY>
+        <VZ unit="m/s">7063.941800</VZ>
+        <Quality>NOMINAL</Quality>
+      </OSV>
+    </List_of_OSVs>
+  </Data_Block>
+</Earth_Explorer_File>
