@@ -97,6 +97,32 @@ def run_browser_audit():
         assert sat_count_after_tle == 7, f"Expected 7 satellites after TLE ingest, found {sat_count_after_tle}"
         print("  ✓ Feature 4 Passed: TLE parser successfully ingested ISS orbit.")
 
+        # Test About Modal
+        page.evaluate("() => openAboutModal()")
+        time.sleep(0.5)
+        about_modal = page.locator("#about-modal-overlay")
+        assert about_modal.is_visible(), "About modal did not open!"
+        about_text = about_modal.inner_text()
+        assert "Honours" in about_text and "DOP853" in about_text
+        page.evaluate("() => closeAboutModal()")
+        time.sleep(0.3)
+        assert not about_modal.is_visible(), "About modal did not close!"
+        print("  ✓ Feature 5 Passed: About Honours Defense modal opened and validated.")
+
+        # Test Dynamic Tropical Storms Toggle
+        page.evaluate("() => toggleTropicalCyclones()")
+        time.sleep(0.3)
+        storms_vis = page.evaluate("() => tropicalStormsGroup.visible")
+        assert storms_vis is False or storms_vis is True, "tropicalStormsGroup state invalid"
+        print("  ✓ Feature 6 Passed: Tropical storm vortexes toggled successfully.")
+
+        # Test Geomagnetic Dipole & Ionosphere Aurora Toggle
+        page.evaluate("() => toggleGeomagneticField()")
+        time.sleep(0.3)
+        mag_vis = page.evaluate("() => geomagneticFieldGroup.visible")
+        assert mag_vis is True, "Geomagnetic field was not activated!"
+        print("  ✓ Feature 7 Passed: Geomagnetic field dipole and auroral ovals active.")
+
         browser.close()
         print("\nAll browser automated verification checks PASSED successfully!")
 

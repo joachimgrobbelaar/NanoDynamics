@@ -215,6 +215,8 @@ class SatelliteParams(BaseModel):
     include_j2: bool = Field(True, description="Include J2 oblateness perturbation")
     include_drag: bool = Field(True, description="Include atmospheric drag")
     include_moon: bool = Field(False, description="Include lunar third-body gravity")
+    include_srp: bool = Field(False, description="Include Solar Radiation Pressure (SRP) perturbation with ray-tracing")
+    cr: float = Field(1.3, ge=1.0, le=2.0, description="Radiation pressure reflectivity coefficient")
     # Visual representation
     color: str = Field("#38bdf8", description="Hex color for trajectory and indicator")
     icon: str = Field("satellite", description="Avatar icon type: satellite, rocket, astronaut, alien, ufo, sphere")
@@ -335,6 +337,8 @@ def _build_propagator(params: SatelliteParams) -> OrbitPropagator:
         include_drag=use_drag,
         include_earth_rotation=use_drag,
         include_moon=(params.parent_body == "Earth" and params.include_moon),
+        include_srp=params.include_srp,
+        cr=params.cr,
         mu=body["mu"],
         r_earth=body["radius_m"],
         j2=body["j2"],
@@ -350,7 +354,7 @@ def _build_propagator(params: SatelliteParams) -> OrbitPropagator:
 
 def _compute_forces(prop: OrbitPropagator, t_arr, r_arr, v_arr):
     """Compute force vectors along a trajectory. Returns dict of lists."""
-    forces = {"central": [], "j2": [], "drag": [], "moon": [], "total": []}
+    forces = {"central": [], "j2": [], "drag": [], "moon": [], "srp": [], "total": []}
     for i in range(len(t_arr)):
         acc = prop.dynamics.compute_accelerations(r_arr[i], v_arr[i], t=float(t_arr[i]))
         for k in forces:
@@ -1551,6 +1555,107 @@ def get_scenario_presets():
                         "drag_area": 18.0,
                         "cd": 2.2,
                         "color": "#eab308",
+                    }
+                ],
+            },
+            {
+                "id": "starlink_mega_shell",
+                "name": "Starlink Mega-Constellation Shell (24 Sats, 3 Planes)",
+                "description": "Walker Delta 24/3/1 constellation shell at 550 km altitude, 53° inclination, with inter-satellite optical laser routing mesh.",
+                "satellites": [
+                    {
+                        "name": f"STARLINK-P{plane+1}-S{s+1}",
+                        "parent_body": "Earth",
+                        "propagation_mode": "rk45",
+                        "altitude_km": 550.0,
+                        "eccentricity": 0.0003,
+                        "inclination_deg": 53.0,
+                        "raan_deg": float(plane * 120.0),
+                        "arg_pe_deg": 0.0,
+                        "true_anomaly_deg": float((s * 45.0 + plane * 15.0) % 360.0),
+                        "mass": 280.0,
+                        "drag_area": 2.4,
+                        "cd": 2.2,
+                        "color": ["#38bdf8", "#00ffcc", "#818cf8"][plane],
+                    }
+                    for plane in range(3)
+                    for s in range(8)
+                ]
+            },
+            {
+                "id": "kessler_catastrophic_collision",
+                "name": "Catastrophic LEO Kessler Collision Disaster (14.2 km/s)",
+                "description": "Counter-rotating orbits resulting in direct high-speed hypervelocity conjunction (Cosmos-Iridium scenario) triggering debris dispersal.",
+                "satellites": [
+                    {
+                        "name": "COSMOS-2251-DERELICT",
+                        "parent_body": "Earth",
+                        "propagation_mode": "rk45",
+                        "altitude_km": 776.0,
+                        "eccentricity": 0.0012,
+                        "inclination_deg": 74.0,
+                        "raan_deg": 10.0,
+                        "arg_pe_deg": 0.0,
+                        "true_anomaly_deg": 45.0,
+                        "mass": 900.0,
+                        "drag_area": 4.5,
+                        "cd": 2.2,
+                        "color": "#ef4444",
+                    },
+                    {
+                        "name": "IRIDIUM-33-COMMERCIAL",
+                        "parent_body": "Earth",
+                        "propagation_mode": "rk45",
+                        "altitude_km": 776.05,
+                        "eccentricity": 0.0012,
+                        "inclination_deg": 86.4,
+                        "raan_deg": 188.0,
+                        "arg_pe_deg": 0.0,
+                        "true_anomaly_deg": 45.02,
+                        "mass": 560.0,
+                        "drag_area": 3.8,
+                        "cd": 2.2,
+                        "color": "#f59e0b",
+                    }
+                ]
+            },
+            {
+                "id": "pinn_autonomous_evasion_burn",
+                "name": "PINN Real-Time Autonomous Boot Burn Avoidance",
+                "description": "Onboard PINN detects conjunction in <2ms and fires an emergency +15 m/s impulsive boot burn raising periapsis to avert disaster.",
+                "satellites": [
+                    {
+                        "name": "TARGET-DEBRIS-PIECE",
+                        "parent_body": "Earth",
+                        "propagation_mode": "rk45",
+                        "altitude_km": 500.0,
+                        "eccentricity": 0.0005,
+                        "inclination_deg": 51.6,
+                        "raan_deg": 0.0,
+                        "arg_pe_deg": 0.0,
+                        "true_anomaly_deg": 0.0,
+                        "mass": 150.0,
+                        "drag_area": 1.2,
+                        "cd": 2.2,
+                        "color": "#dc2626",
+                    },
+                    {
+                        "name": "NANODYNAMICS-PINN-GNC",
+                        "parent_body": "Earth",
+                        "propagation_mode": "pinn_local",
+                        "altitude_km": 500.02,
+                        "eccentricity": 0.0005,
+                        "inclination_deg": 51.62,
+                        "raan_deg": 0.05,
+                        "arg_pe_deg": 0.0,
+                        "true_anomaly_deg": 179.98,
+                        "mass": 25.0,
+                        "drag_area": 0.15,
+                        "cd": 2.2,
+                        "color": "#00ffcc",
+                        "autonomous_avoidance": True,
+                        "avoidance_range_km": 5.0,
+                        "avoidance_dv": 15.0,
                     }
                 ]
             }

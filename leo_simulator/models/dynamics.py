@@ -6,7 +6,7 @@ and atmospheric drag.
 
 import numpy as np
 
-from leo_simulator.constants import J2_EARTH, MU_EARTH, MU_MOON, MU_SUN, OMEGA_EARTH, R_EARTH, R_MOON
+from leo_simulator.constants import J2_EARTH, MU_EARTH, MU_MOON, MU_SUN, OMEGA_EARTH, R_EARTH, R_MOON, R_SUN_ORBIT
 from leo_simulator.models.drag import (
     BaseAtmosphere,
     ExponentialAtmosphere,
@@ -20,6 +20,8 @@ from leo_simulator.models.gravity import (
     sun_position,
     third_body_acceleration,
 )
+
+P_SUN_1AU: float = 4.56e-6  # Solar radiation pressure at 1 AU [N / m^2]
 
 
 class OrbitalDynamics:
@@ -42,6 +44,8 @@ class OrbitalDynamics:
         include_moon: bool = False,
         include_sun: bool = False,
         include_lunar_harmonics: bool = False,
+        include_srp: bool = False,
+        cr: float = 1.3,
         mu: float = MU_EARTH,
         r_earth: float = R_EARTH,
         j2: float = J2_EARTH,
@@ -77,6 +81,8 @@ class OrbitalDynamics:
         self.include_moon = include_moon
         self.include_sun = include_sun
         self.include_lunar_harmonics = include_lunar_harmonics
+        self.include_srp = include_srp
+        self.cr = float(cr)
         self.mu = float(mu)
         self.r_earth = float(r_earth)
         self.j2 = float(j2)
@@ -136,11 +142,37 @@ class OrbitalDynamics:
             else np.zeros(3, dtype=np.float64)
         )
 
+        r_s = sun_position(t)
         a_sun = (
-            third_body_acceleration(r_vec, sun_position(t), mu_moon=self.mu_sun)
+            third_body_acceleration(r_vec, r_s, mu_moon=self.mu_sun)
             if self.include_sun
             else np.zeros(3, dtype=np.float64)
         )
+
+        # ── Solar Radiation Pressure (SRP) with Ray-Tracing Cylindrical Shadow ──
+        if self.include_srp and self.mass > 0:
+            d_sun_vec = r_s - r_vec
+            dist_sun = float(np.linalg.norm(d_sun_vec))
+            u_sun = d_sun_vec / dist_sun
+
+            # Ray-sphere intersection against Earth
+            t_closest = -float(np.dot(r_vec, u_sun))
+            r_sat_mag_sq = float(np.dot(r_vec, r_vec))
+            d_perp_sq = r_sat_mag_sq - (t_closest * t_closest) if t_closest > 0 else r_sat_mag_sq
+
+            if t_closest > 0 and d_perp_sq < (self.r_earth * self.r_earth):
+                nu = 0.0  # Full Umbra (Earth shadow)
+            elif t_closest > 0 and d_perp_sq < ((self.r_earth + 100_000.0) ** 2):
+                nu = (np.sqrt(max(0.0, d_perp_sq)) - self.r_earth) / 100_000.0  # Penumbra
+            else:
+                nu = 1.0  # Direct solar flux
+
+            flux_scale = (R_SUN_ORBIT / dist_sun) ** 2
+            p_srp_mag = P_SUN_1AU * flux_scale * (self.cr * self.area / self.mass) * nu
+            # Radiation pressure pushes directly away from the Sun (-u_sun)
+            a_srp = -p_srp_mag * u_sun
+        else:
+            a_srp = np.zeros(3, dtype=np.float64)
 
         if self.include_lunar_harmonics:
             r_sel = (r_vec - r_m) if (self.include_moon and r_m is not None) else np.asarray(r_vec, dtype=np.float64)
@@ -148,7 +180,7 @@ class OrbitalDynamics:
         else:
             a_lunar_harm = np.zeros(3, dtype=np.float64)
 
-        a_total = a_central + a_j2 + a_drag + a_moon + a_sun + a_lunar_harm
+        a_total = a_central + a_j2 + a_drag + a_moon + a_sun + a_srp + a_lunar_harm
 
         return {
             "central": a_central,
@@ -156,6 +188,7 @@ class OrbitalDynamics:
             "drag": a_drag,
             "moon": a_moon,
             "sun": a_sun,
+            "srp": a_srp,
             "lunar_harmonics": a_lunar_harm,
             "total": a_total,
         }
