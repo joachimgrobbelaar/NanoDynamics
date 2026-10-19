@@ -66,7 +66,7 @@ from leo_simulator.orbit.finite_burn import (
 )
 
 
-app = FastAPI()
+app = FastAPI(docs_url="/api/docs", redoc_url="/api/redoc")
 
 from hardware_in_the_loop.esp32_manager import ESP32DeviceManager
 
@@ -193,6 +193,54 @@ BODIES = {
         "default_chunk_duration": 2592000.0,
         "dt_eval": 3600.0,
     },
+    "Mercury": {
+        "name": "Mercury",
+        "mu": 2.2032e13,
+        "radius_m": 2439700.0,
+        "j2": 6.0e-5,
+        "omega": 1.24001e-6,
+        "has_atmosphere": False,
+        "min_alt_km": 20.0,
+        "max_alt_km": 50000.0,
+        "default_alt_km": 250.0,
+        "default_ecc": 0.001,
+        "default_inc": 45.0,
+        "default_raan": 0.0,
+        "default_chunk_duration": 86400.0,
+        "dt_eval": 60.0,
+    },
+    "Venus": {
+        "name": "Venus",
+        "mu": 3.24859e14,
+        "radius_m": 6051800.0,
+        "j2": 4.458e-6,
+        "omega": -2.9924e-7,
+        "has_atmosphere": True,
+        "min_alt_km": 150.0,
+        "max_alt_km": 100000.0,
+        "default_alt_km": 400.0,
+        "default_ecc": 0.001,
+        "default_inc": 30.0,
+        "default_raan": 0.0,
+        "default_chunk_duration": 86400.0,
+        "dt_eval": 60.0,
+    },
+    "Mars": {
+        "name": "Mars",
+        "mu": 4.282837e13,
+        "radius_m": 3389500.0,
+        "j2": 1.96045e-3,
+        "omega": 7.0882e-5,
+        "has_atmosphere": True,
+        "min_alt_km": 80.0,
+        "max_alt_km": 100000.0,
+        "default_alt_km": 350.0,
+        "default_ecc": 0.001,
+        "default_inc": 25.0,
+        "default_raan": 0.0,
+        "default_chunk_duration": 86400.0,
+        "dt_eval": 60.0,
+    },
 }
 
 
@@ -230,7 +278,7 @@ class SatelliteParams(BaseModel):
         mode_lower = self.propagation_mode.lower()
         if mode_lower.startswith("pinn") and self.parent_body != "Earth":
             raise ValueError(
-                "propagation_mode: The PINN surrogate model currently only supports Earth orbits. Select 'rk45' for Moon simulations."
+                "propagation_mode: The PINN surrogate model currently only supports Earth orbits. Select 'rk45' for Moon, Mars, Venus, or Mercury simulations."
             )
         body = BODIES.get(self.parent_body, BODIES["Earth"])
         if not self.allow_decay:
@@ -354,11 +402,14 @@ def _build_propagator(params: SatelliteParams) -> OrbitPropagator:
 
 def _compute_forces(prop: OrbitPropagator, t_arr, r_arr, v_arr):
     """Compute force vectors along a trajectory. Returns dict of lists."""
-    forces = {"central": [], "j2": [], "drag": [], "moon": [], "srp": [], "total": []}
+    forces = {"central": [], "j2": [], "j3": [], "j4": [], "j22": [], "drag": [], "moon": [], "sun": [], "srp": [], "tides": [], "magnetic": [], "total": []}
     for i in range(len(t_arr)):
         acc = prop.dynamics.compute_accelerations(r_arr[i], v_arr[i], t=float(t_arr[i]))
         for k in forces:
-            forces[k].append(acc[k].tolist())
+            if k in acc:
+                forces[k].append(acc[k].tolist())
+            else:
+                forces[k].append([0.0, 0.0, 0.0])
     return forces
 
 
@@ -476,6 +527,30 @@ def read_root():
     )
 
 
+@app.get("/graphs")
+def read_graphs():
+    return FileResponse(
+        os.path.join(BASE_DIR, "static", "telemetry_graphs.html"),
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache", "Expires": "0"}
+    )
+
+
+@app.get("/vcam")
+def read_vcam():
+    return FileResponse(
+        os.path.join(BASE_DIR, "static", "vcam_popout.html"),
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache", "Expires": "0"}
+    )
+
+
+@app.get("/docs")
+def read_docs():
+    return FileResponse(
+        os.path.join(BASE_DIR, "static", "docs.html"),
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache", "Expires": "0"}
+    )
+
+
 
 @app.get("/api/devices")
 def api_get_devices():
@@ -564,6 +639,103 @@ def api_design_poi_orbit(req: POIOrbitRequest):
         "status": "success",
         "name": req.name,
         **res,
+    }
+
+
+class StationaryGEORequest(BaseModel):
+    lat: float = 0.0
+    lon: float
+    epoch_seconds: float = 0.0
+    name: str = "GEO-Stationary"
+
+
+@app.post("/api/orbit/stationary_geo")
+def api_stationary_geo(req: StationaryGEORequest):
+    """Compute exact geostationary orbit placing satellite permanently stationary over city meridian."""
+    r_geo_m = 42_164_140.0
+    alt_km = (r_geo_m - R_EARTH) / 1000.0
+    mu_earth = 3.986004418e14
+    v_circ = math.sqrt(mu_earth / r_geo_m)
+    period_s = 2.0 * math.pi * math.sqrt((r_geo_m**3) / mu_earth)
+
+    # Calculate longitude offset from Greenwich sidereal rotation
+    omega_earth = 7.292115e-5
+    theta_gmst_deg = math.degrees((omega_earth * req.epoch_seconds) % (2.0 * math.pi))
+    raan_deg = (req.lon + theta_gmst_deg) % 360.0
+    raan_rad = math.radians(raan_deg)
+
+    # Initial Cartesian state in ECI
+    rx = r_geo_m * math.cos(raan_rad)
+    ry = r_geo_m * math.sin(raan_rad)
+    rz = 0.0
+    vx = -v_circ * math.sin(raan_rad)
+    vy = v_circ * math.cos(raan_rad)
+    vz = 0.0
+
+    return {
+        "status": "success",
+        "name": req.name,
+        "orbital_elements": {
+            "semi_major_axis_km": r_geo_m / 1000.0,
+            "altitude_km": alt_km,
+            "eccentricity": 0.0,
+            "inclination_deg": 0.0,
+            "raan_deg": raan_deg,
+            "arg_perigee_deg": 0.0,
+            "true_anomaly_deg": 0.0,
+            "period_s": period_s,
+        },
+        "initial_state": {
+            "r": [rx, ry, rz],
+            "v": [vx, vy, vz],
+            "v_mag_kms": v_circ / 1000.0,
+        },
+        "target_city_lon": req.lon,
+    }
+
+
+class InsertionBurnRequest(BaseModel):
+    target_altitude_km: float = 550.0
+    target_inclination_deg: float = 51.6
+    parking_altitude_km: float = 180.0
+    launch_lat_deg: float = 28.5
+
+
+@app.post("/api/maneuvers/insertion_burn")
+def api_insertion_burn(req: InsertionBurnRequest):
+    """Calculate multi-impulse orbit insertion maneuvers (Parking -> Transfer -> Target Orbit)."""
+    mu = 3.986004418e14
+    r1 = R_EARTH + req.parking_altitude_km * 1000.0
+    r2 = R_EARTH + req.target_altitude_km * 1000.0
+    v1 = math.sqrt(mu / r1)
+    v2 = math.sqrt(mu / r2)
+
+    a_trans = (r1 + r2) / 2.0
+    v_t1 = math.sqrt(mu * (2.0 / r1 - 1.0 / a_trans))
+    v_t2 = math.sqrt(mu * (2.0 / r2 - 1.0 / a_trans))
+
+    dv1_injection = v_t1 - v1
+    dv2_circularize = v2 - v_t2
+    di_deg = abs(req.target_inclination_deg - req.launch_lat_deg)
+    dv_plane_change = 2.0 * v2 * math.sin(math.radians(di_deg) / 2.0) if di_deg > 0.1 else 0.0
+    total_dv = dv1_injection + dv2_circularize + dv_plane_change
+    transfer_duration_s = math.pi * math.sqrt((a_trans**3) / mu)
+
+    return {
+        "status": "success",
+        "parking_altitude_km": req.parking_altitude_km,
+        "target_altitude_km": req.target_altitude_km,
+        "dv1_injection_ms": round(dv1_injection, 2),
+        "dv2_circularization_ms": round(dv2_circularize, 2),
+        "dv_plane_change_ms": round(dv_plane_change, 2),
+        "total_dv_ms": round(total_dv, 2),
+        "transfer_duration_s": round(transfer_duration_s, 1),
+        "transfer_duration_min": round(transfer_duration_s / 60.0, 1),
+        "burn_nodes": [
+            {"node": 1, "name": "Trans-Target Injection", "dv_ms": round(dv1_injection, 2), "altitude_km": req.parking_altitude_km, "frame": "Prograde"},
+            {"node": 2, "name": "Orbit Circularization", "dv_ms": round(dv2_circularize, 2), "altitude_km": req.target_altitude_km, "frame": "Prograde"},
+            {"node": 3, "name": "Inclination Trim", "dv_ms": round(dv_plane_change, 2), "altitude_km": req.target_altitude_km, "frame": "Normal"}
+        ]
     }
 
 

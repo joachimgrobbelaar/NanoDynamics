@@ -7,15 +7,24 @@ Coordinates are defined in an Earth-Centered Inertial (ECI) Cartesian frame [x, 
 import numpy as np
 
 from leo_simulator.constants import (
+    B0_EARTH_SURFACE,
+    C22_EARTH,
     J2_EARTH,
+    J3_EARTH,
+    J4_EARTH,
+    K2_EARTH_TIDE,
     LP165P_HARMONICS_4X4,
+    MAG_POLE_LON_RAD,
+    MAG_POLE_TILT_RAD,
     MU_EARTH,
     MU_MOON,
     MU_SUN,
+    OMEGA_EARTH,
     R_EARTH,
     R_MOON,
     R_MOON_ORBIT,
     R_SUN_ORBIT,
+    S22_EARTH,
     T_MOON_ORBIT,
     T_SUN_ORBIT,
 )
@@ -475,4 +484,188 @@ def total_gravity_acceleration(
 
     a_j2 = j2_perturbation_acceleration(r_vec, mu=mu, r_earth=r_earth, j2=j2)
     return a_central + a_j2
+
+
+def j3_perturbation_acceleration(
+    r_vec: np.ndarray | list,
+    mu: float = MU_EARTH,
+    r_earth: float = R_EARTH,
+    j3: float = J3_EARTH,
+) -> np.ndarray:
+    """Compute perturbative acceleration due to Earth's J3 pear-shaped zonal harmonic.
+
+    Standard formulation:
+        factor = - (5/2) * J3 * mu * R_E^3 / r^7
+        a_x = factor * x * z * (3 - 7 * z^2 / r^2)
+        a_y = factor * y * z * (3 - 7 * z^2 / r^2)
+        a_z = factor * (6 * z^2 - 7 * z^4 / r^2 - (3/5) * r^2)
+    """
+    r = np.asarray(r_vec, dtype=np.float64)
+    r_norm = float(np.linalg.norm(r))
+    if r_norm <= 0.0:
+        return np.zeros(3, dtype=np.float64)
+
+    x, y, z = r[0], r[1], r[2]
+    r2 = r_norm * r_norm
+    z2 = z * z
+    z2_over_r2 = z2 / r2
+
+    factor = -2.5 * j3 * mu * (r_earth**3) / (r_norm**7)
+    ax = factor * x * z * (3.0 - 7.0 * z2_over_r2)
+    ay = factor * y * z * (3.0 - 7.0 * z2_over_r2)
+    az = factor * (6.0 * z2 - 7.0 * (z2 * z2_over_r2) - 0.6 * r2)
+    return np.array([ax, ay, az], dtype=np.float64)
+
+
+def j4_perturbation_acceleration(
+    r_vec: np.ndarray | list,
+    mu: float = MU_EARTH,
+    r_earth: float = R_EARTH,
+    j4: float = J4_EARTH,
+) -> np.ndarray:
+    """Compute perturbative acceleration due to Earth's J4 fourth zonal harmonic."""
+    r = np.asarray(r_vec, dtype=np.float64)
+    r_norm = float(np.linalg.norm(r))
+    if r_norm <= 0.0:
+        return np.zeros(3, dtype=np.float64)
+
+    x, y, z = r[0], r[1], r[2]
+    r2 = r_norm * r_norm
+    z2_over_r2 = (z * z) / r2
+
+    factor = (5.0 / 8.0) * j4 * mu * (r_earth**4) / (r_norm**7)
+    term_xy = 3.0 - 42.0 * z2_over_r2 + 63.0 * (z2_over_r2**2)
+    term_z = 15.0 - 70.0 * z2_over_r2 + 63.0 * (z2_over_r2**2)
+
+    ax = factor * x * term_xy
+    ay = factor * y * term_xy
+    az = factor * z * term_z
+    return np.array([ax, ay, az], dtype=np.float64)
+
+
+def tesseral_j22_acceleration(
+    r_vec: np.ndarray | list,
+    t: float = 0.0,
+    mu: float = MU_EARTH,
+    r_earth: float = R_EARTH,
+    c22: float = C22_EARTH,
+    s22: float = S22_EARTH,
+    omega_earth: float = OMEGA_EARTH,
+) -> np.ndarray:
+    """Compute perturbative acceleration from Earth's equatorial ellipticity (C22, S22).
+
+    Drives longitudinal drift of geostationary orbits toward stable points at 75.1 deg E and 105.3 deg W.
+    """
+    r = np.asarray(r_vec, dtype=np.float64)
+    r_norm = float(np.linalg.norm(r))
+    if r_norm <= 0.0:
+        return np.zeros(3, dtype=np.float64)
+
+    theta_gmst = (omega_earth * t) % (2.0 * np.pi)
+    cos_th, sin_th = np.cos(theta_gmst), np.sin(theta_gmst)
+
+    # Rotate ECI position to ECEF
+    x_ecef = cos_th * r[0] + sin_th * r[1]
+    y_ecef = -sin_th * r[0] + cos_th * r[1]
+    z_ecef = r[2]
+
+    # Partial derivatives of V_22 in ECEF
+    # V22 = (3 * mu * R_E^2 / r^5) * (C22 * (x^2 - y^2) + 2 * S22 * x * y)
+    factor = 3.0 * mu * (r_earth**2) / (r_norm**5)
+    quad = c22 * (x_ecef**2 - y_ecef**2) + 2.0 * s22 * x_ecef * y_ecef
+
+    dV_dx = factor * (2.0 * c22 * x_ecef + 2.0 * s22 * y_ecef) - (5.0 * x_ecef / (r_norm**2)) * factor * quad
+    dV_dy = factor * (-2.0 * c22 * y_ecef + 2.0 * s22 * x_ecef) - (5.0 * y_ecef / (r_norm**2)) * factor * quad
+    dV_dz = - (5.0 * z_ecef / (r_norm**2)) * factor * quad
+
+    # Rotate back to ECI
+    ax = cos_th * dV_dx - sin_th * dV_dy
+    ay = sin_th * dV_dx + cos_th * dV_dy
+    az = dV_dz
+    return np.array([ax, ay, az], dtype=np.float64)
+
+
+def solid_earth_tide_acceleration(
+    r_vec: np.ndarray | list,
+    r_moon: np.ndarray | None = None,
+    r_sun: np.ndarray | None = None,
+    mu_moon: float = MU_MOON,
+    mu_sun: float = MU_SUN,
+    r_earth: float = R_EARTH,
+    k2: float = K2_EARTH_TIDE,
+) -> np.ndarray:
+    """Compute solid Earth tidal potential perturbation on satellite due to Moon & Sun tidal bulges."""
+    r = np.asarray(r_vec, dtype=np.float64)
+    r_norm = float(np.linalg.norm(r))
+    if r_norm <= 0.0:
+        return np.zeros(3, dtype=np.float64)
+
+    a_tide = np.zeros(3, dtype=np.float64)
+    bodies = []
+    if r_moon is not None:
+        bodies.append((np.asarray(r_moon, dtype=np.float64), mu_moon))
+    if r_sun is not None:
+        bodies.append((np.asarray(r_sun, dtype=np.float64), mu_sun))
+
+    for r_b, mu_b in bodies:
+        d_b = float(np.linalg.norm(r_b))
+        if d_b <= 0.0:
+            continue
+        u_b = r_b / d_b
+        cos_psi = float(np.dot(r / r_norm, u_b))
+        factor = (k2 * mu_b * (r_earth**5)) / (2.0 * (d_b**3) * (r_norm**4))
+        # Gradient of P2(cos psi) term
+        grad_term = factor * (3.0 * (3.0 * cos_psi**2 - 1.0) * (r / r_norm) - 6.0 * cos_psi * u_b)
+        a_tide += grad_term
+
+    return a_tide
+
+
+def earth_magnetic_field_vector(
+    r_vec: np.ndarray | list,
+    t: float = 0.0,
+    r_earth: float = R_EARTH,
+    b0: float = B0_EARTH_SURFACE,
+    tilt_rad: float = MAG_POLE_TILT_RAD,
+    lon_pole_rad: float = MAG_POLE_LON_RAD,
+    omega_earth: float = OMEGA_EARTH,
+) -> np.ndarray:
+    """Compute geomagnetic dipole magnetic field vector B in Tesla at satellite position in ECI frame.
+
+    B(r) = (B0 * R_E^3 / r^3) * [3 * (m_hat . r_hat) * r_hat - m_hat]
+    """
+    r = np.asarray(r_vec, dtype=np.float64)
+    r_norm = float(np.linalg.norm(r))
+    if r_norm <= 0.0:
+        return np.zeros(3, dtype=np.float64)
+
+    # Current geographic longitude of magnetic dipole in ECI
+    pole_lon_eci = lon_pole_rad + (omega_earth * t)
+    # Unit vector pointing toward North Magnetic Pole in ECI
+    m_hat = np.array([
+        np.sin(tilt_rad) * np.cos(pole_lon_eci),
+        np.sin(tilt_rad) * np.sin(pole_lon_eci),
+        np.cos(tilt_rad),
+    ], dtype=np.float64)
+
+    r_hat = r / r_norm
+    dipole_scale = b0 * ((r_earth / r_norm) ** 3)
+    b_vec = dipole_scale * (3.0 * float(np.dot(m_hat, r_hat)) * r_hat - m_hat)
+    return b_vec
+
+
+def lorentz_magnetic_acceleration(
+    r_vec: np.ndarray | list,
+    v_vec: np.ndarray | list,
+    q_charge: float = 1e-4,  # Net residual satellite charge in Coulombs
+    mass: float = 4.0,       # Satellite mass in kg
+    t: float = 0.0,
+) -> np.ndarray:
+    """Compute Lorentz acceleration a = (q/m) * (v x B) from geomagnetic interaction."""
+    if mass <= 0.0:
+        return np.zeros(3, dtype=np.float64)
+    b_vec = earth_magnetic_field_vector(r_vec, t=t)
+    v = np.asarray(v_vec, dtype=np.float64)
+    f_lorentz = q_charge * np.cross(v, b_vec)
+    return f_lorentz / mass
 

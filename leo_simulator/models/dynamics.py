@@ -14,10 +14,16 @@ from leo_simulator.models.drag import (
 )
 from leo_simulator.models.gravity import (
     central_gravity_acceleration,
+    earth_magnetic_field_vector,
     j2_perturbation_acceleration,
+    j3_perturbation_acceleration,
+    j4_perturbation_acceleration,
+    lorentz_magnetic_acceleration,
     lunar_harmonics_acceleration,
     moon_position,
+    solid_earth_tide_acceleration,
     sun_position,
+    tesseral_j22_acceleration,
     third_body_acceleration,
 )
 
@@ -45,6 +51,15 @@ class OrbitalDynamics:
         include_sun: bool = False,
         include_lunar_harmonics: bool = False,
         include_srp: bool = False,
+        include_j3: bool = False,
+        include_j4: bool = False,
+        include_j22: bool = False,
+        include_earth_tides: bool = False,
+        include_magnetic: bool = False,
+        q_charge: float = 1e-4,
+        pitch_deg: float = 0.0,
+        yaw_deg: float = 0.0,
+        roll_deg: float = 0.0,
         cr: float = 1.3,
         mu: float = MU_EARTH,
         r_earth: float = R_EARTH,
@@ -76,6 +91,15 @@ class OrbitalDynamics:
         self.atmosphere = atmosphere if atmosphere is not None else ExponentialAtmosphere()
         self.include_central_gravity = include_central_gravity
         self.include_j2 = include_j2
+        self.include_j3 = include_j3
+        self.include_j4 = include_j4
+        self.include_j22 = include_j22
+        self.include_earth_tides = include_earth_tides
+        self.include_magnetic = include_magnetic
+        self.q_charge = float(q_charge)
+        self.pitch_deg = float(pitch_deg)
+        self.yaw_deg = float(yaw_deg)
+        self.roll_deg = float(roll_deg)
         self.include_drag = include_drag
         self.include_earth_rotation = include_earth_rotation
         self.include_moon = include_moon
@@ -119,12 +143,17 @@ class OrbitalDynamics:
             else np.zeros(3, dtype=np.float64)
         )
 
+        # Compute attitude-adjusted effective frontal drag area
+        alpha = np.radians(self.pitch_deg)
+        beta = np.radians(self.yaw_deg)
+        effective_area = max(0.001, self.area * (abs(np.cos(alpha) * np.cos(beta)) + 2.5 * abs(np.sin(alpha)) + 2.0 * abs(np.sin(beta))))
+
         a_drag = (
             aerodynamic_drag_acceleration(
                 r_vec,
                 v_vec,
                 cd=self.cd,
-                area=self.area,
+                area=effective_area,
                 mass=self.mass,
                 atmosphere_model=self.atmosphere,
                 r_earth=self.r_earth,
@@ -135,7 +164,7 @@ class OrbitalDynamics:
             else np.zeros(3, dtype=np.float64)
         )
 
-        r_m = moon_position(t) if (self.include_moon or self.include_lunar_harmonics) else None
+        r_m = moon_position(t) if (self.include_moon or self.include_lunar_harmonics or self.include_earth_tides) else None
         a_moon = (
             third_body_acceleration(r_vec, r_m, mu_moon=self.mu_moon)
             if self.include_moon and r_m is not None
@@ -168,7 +197,7 @@ class OrbitalDynamics:
                 nu = 1.0  # Direct solar flux
 
             flux_scale = (R_SUN_ORBIT / dist_sun) ** 2
-            p_srp_mag = P_SUN_1AU * flux_scale * (self.cr * self.area / self.mass) * nu
+            p_srp_mag = P_SUN_1AU * flux_scale * (self.cr * effective_area / self.mass) * nu
             # Radiation pressure pushes directly away from the Sun (-u_sun)
             a_srp = -p_srp_mag * u_sun
         else:
@@ -180,17 +209,30 @@ class OrbitalDynamics:
         else:
             a_lunar_harm = np.zeros(3, dtype=np.float64)
 
-        a_total = a_central + a_j2 + a_drag + a_moon + a_sun + a_srp + a_lunar_harm
+        # ── Higher Order Gravity & Tidal Perturbations ──
+        a_j3 = j3_perturbation_acceleration(r_vec, mu=self.mu, r_earth=self.r_earth) if self.include_j3 else np.zeros(3, dtype=np.float64)
+        a_j4 = j4_perturbation_acceleration(r_vec, mu=self.mu, r_earth=self.r_earth) if self.include_j4 else np.zeros(3, dtype=np.float64)
+        a_j22 = tesseral_j22_acceleration(r_vec, t=t, mu=self.mu, r_earth=self.r_earth) if self.include_j22 else np.zeros(3, dtype=np.float64)
+        a_tides = solid_earth_tide_acceleration(r_vec, r_moon=r_m, r_sun=r_s, mu_moon=self.mu_moon, mu_sun=self.mu_sun, r_earth=self.r_earth) if self.include_earth_tides else np.zeros(3, dtype=np.float64)
+        a_mag = lorentz_magnetic_acceleration(r_vec, v_vec, q_charge=self.q_charge, mass=self.mass, t=t) if self.include_magnetic else np.zeros(3, dtype=np.float64)
+
+        a_total = a_central + a_j2 + a_drag + a_moon + a_sun + a_srp + a_lunar_harm + a_j3 + a_j4 + a_j22 + a_tides + a_mag
 
         return {
             "central": a_central,
             "j2": a_j2,
+            "j3": a_j3,
+            "j4": a_j4,
+            "j22": a_j22,
             "drag": a_drag,
             "moon": a_moon,
             "sun": a_sun,
             "srp": a_srp,
+            "tides": a_tides,
+            "magnetic": a_mag,
             "lunar_harmonics": a_lunar_harm,
             "total": a_total,
+            "effective_area": float(effective_area),
         }
 
     def derivatives(self, t: float, state: np.ndarray) -> np.ndarray:

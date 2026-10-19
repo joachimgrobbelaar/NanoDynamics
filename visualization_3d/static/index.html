@@ -1,12 +1,13 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Earth-Moon Real-Scale Orbital Dynamics & Experimentation Simulator</title>
+    <title>Solar System & Earth-Moon Orbital Dynamics Simulator</title>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <link rel="stylesheet" href="/static/css/spacex_tokens.css">
     <style>
-        body { margin: 0; overflow: hidden; background-color: #05070B; color: #E2E8F0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-        canvas { display: block; }
+        html, body { width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden; background-color: #05070B; color: #E2E8F0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        canvas { display: block; width: 100% !important; height: 100% !important; }
 
         /* Top Navigation: Classic Windows Menu Bar Layout (No horizontal scrolling) */
         #top-nav {
@@ -397,16 +398,18 @@
     <div id="brand-intro-screen">
         <div class="brand-intro-content" style="text-align:center;">
             <svg class="brand-vector-logo" viewBox="0 0 760 140" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <!-- Glowing Orbital Hohmann Transfer Arc -->
-                <path d="M 40,92 C 160,-28 600,-28 720,92 C 620,158 140,158 40,92 Z" stroke="url(#logo-grad-orbit)" stroke-width="3.5" stroke-dasharray="1400" stroke-dashoffset="1400" style="animation: drawLogoOrbit 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;" />
-                <!-- Hypersonic Vector Delta Arrow -->
-                <polygon points="720,92 742,86 734,104" fill="#38BDF8" />
+                <!-- Dual Concentric Keplerian Orbital Halo Arcs (No Fish-Tail Cross) -->
+                <ellipse cx="380" cy="70" rx="355" ry="50" stroke="url(#logo-grad-orbit)" stroke-width="2.5" stroke-dasharray="14 10" opacity="0.4" />
+                <path d="M 45,74 C 180,16 580,16 715,74" stroke="url(#logo-grad-orbit)" stroke-width="4.0" stroke-linecap="round" />
+                <path d="M 110,94 C 240,126 520,126 650,94" stroke="url(#logo-grad-orbit)" stroke-width="2.2" stroke-linecap="round" opacity="0.65" />
+                <!-- Supersonic Aerospace Delta Chevron -->
+                <polygon points="715,74 690,64 696,80" fill="#00FFCC" />
                 <!-- Modern Aerospace Typography: NANODYNAMICS -->
-                <text x="380" y="85" text-anchor="middle" fill="#FFFFFF" style="font-size:46px; font-weight:900; letter-spacing:0.32em; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">NANODYNAMICS</text>
-                <text x="380" y="118" text-anchor="middle" fill="#38BDF8" style="font-size:11px; font-weight:700; letter-spacing:0.38em; font-family:'SF Mono', Monaco, monospace;">ORBITAL ASTRODYNAMICS &amp; TINYML PINN ENGINE • WITS HONOURS</text>
+                <text x="380" y="79" text-anchor="middle" fill="#FFFFFF" style="font-size:45px; font-weight:900; letter-spacing:0.34em; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">NANODYNAMICS</text>
+                <text x="380" y="110" text-anchor="middle" fill="#38BDF8" style="font-size:10.5px; font-weight:700; letter-spacing:0.38em; font-family:'SF Mono', Monaco, monospace;">ORBITAL ASTRODYNAMICS &amp; TINYML PINN ENGINE • WITS HONOURS</text>
                 <defs>
                     <linearGradient id="logo-grad-orbit" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stop-color="#0284C7" stop-opacity="0.2"/>
+                        <stop offset="0%" stop-color="#0284C7" stop-opacity="0.25"/>
                         <stop offset="50%" stop-color="#38BDF8" stop-opacity="1"/>
                         <stop offset="100%" stop-color="#00FFCC" stop-opacity="1"/>
                     </linearGradient>
@@ -526,12 +529,16 @@
                 <div class="win-dropdown">
                     <div class="win-dropdown-item" onclick="focusView('Earth')"><span class="item-icon">🌍</span><span>Focus Earth (Centric)</span></div>
                     <div class="win-dropdown-item" onclick="focusView('Moon')"><span class="item-icon">🌕</span><span>Focus Moon (Centric)</span></div>
+                    <div class="win-dropdown-item" onclick="focusView('Mars')"><span class="item-icon">🔴</span><span>Focus Mars (Centric)</span></div>
+                    <div class="win-dropdown-item" onclick="focusView('Venus')"><span class="item-icon">🟡</span><span>Focus Venus (Centric)</span></div>
+                    <div class="win-dropdown-item" onclick="focusView('Mercury')"><span class="item-icon">⚪</span><span>Focus Mercury (Centric)</span></div>
                     <div class="win-dropdown-item" onclick="focusView('System')"><span class="item-icon">🌌</span><span>Earth-Moon Cislunar System</span></div>
-                    <div class="win-dropdown-item" onclick="focusView('Sun')"><span class="item-icon">☀️</span><span>Heliocentric 1-AU System</span></div>
+                    <div class="win-dropdown-item" onclick="focusView('Sun')"><span class="item-icon">☀️</span><span>Full Solar System (Heliocentric)</span></div>
                     <div class="win-dropdown-sep"></div>
                     <div class="win-dropdown-item" id="cities-toggle-btn" onclick="toggleEarthCities()"><span class="item-icon">🏙️</span><span id="menu-cities-status">Toggle 3D Urban Cities & Beacons</span></div>
+                    <div class="win-dropdown-item" onclick="toggleGroundStations()"><span class="item-icon">📡</span><span id="menu-gs-status">Toggle Ground Stations & Downlink Beams</span></div>
                     <div class="win-dropdown-item" id="cmd-isl-btn" onclick="toggleISLMesh()"><span class="item-icon">📶</span><span>Toggle ISL Laser Routing Mesh</span></div>
-                    <div class="win-dropdown-item" id="coverage-btn" onclick="toggleCoverageFootprints()"><span class="item-icon">📡</span><span>Toggle Sensor Footprint Coverage</span></div>
+                    <div class="win-dropdown-item" id="coverage-btn" onclick="toggleCoverageFootprints()"><span class="item-icon">🛰️</span><span>Toggle Sensor Footprint Coverage</span></div>
                     <div class="win-dropdown-item" id="cmd-cam-btn" onclick="toggleVirtualCameraFeed()"><span class="item-icon">📷</span><span>Toggle Optical PiP Viewport</span><span class="item-shortcut">C</span></div>
                     <div class="win-dropdown-sep"></div>
                     <div class="win-dropdown-item" onclick="toggleGeomagneticField()"><span class="item-icon">🌐</span><span id="menu-mag-status">Toggle Earth Geomagnetic Dipole & Aurora</span></div>
@@ -566,9 +573,12 @@
                 <span><u>S</u>ettings & Help</span>
                 <div class="win-dropdown">
                     <div class="win-dropdown-item" id="cmd-config-btn" onclick="openSettingsModal()"><span class="item-icon">⚙️</span><span>Physics & Hardware Configuration...</span></div>
-                    <div class="win-dropdown-item" id="cmd-guide-btn" onclick="window.MissionGuide && window.MissionGuide.start(0)"><span class="item-icon">❓</span><span>Interactive Spotlight Guide</span><span class="item-shortcut">? / H</span></div>
+                    <div class="win-dropdown-item" id="cmd-guide-menu-btn" onclick="window.MissionGuide && window.MissionGuide.start(0)"><span class="item-icon">❓</span><span>Interactive Spotlight Guide</span><span class="item-shortcut">? / H</span></div>
+                    <a class="win-dropdown-item" href="/docs" target="_blank" style="text-decoration:none; color:inherit;"><span class="item-icon">📖</span><span>Detailed Astrodynamics & PINN Manual...</span><span class="item-shortcut">/docs</span></a>
+                    <a class="win-dropdown-item" href="/graphs" target="_blank" style="text-decoration:none; color:inherit;"><span class="item-icon">📊</span><span>Standalone Telemetry Graphs & LaTeX...</span><span class="item-shortcut">/graphs</span></a>
+                    <a class="win-dropdown-item" href="/vcam" target="_blank" style="text-decoration:none; color:inherit;"><span class="item-icon">📷</span><span>Pop-out Optical PiP & Mosaic...</span><span class="item-shortcut">/vcam</span></a>
                     <div class="win-dropdown-sep"></div>
-                    <div class="win-dropdown-item" onclick="openAboutModal()"><span class="item-icon">ℹ️</span><span>About NanoDynamics...</span></div>
+                    <div class="win-dropdown-item" onclick="openAboutModal()"><span class="item-icon">ℹ️</span><span>About NanoDynamics v3...</span></div>
                 </div>
             </div>
         </div>
@@ -578,15 +588,17 @@
             <span id="met-clock-badge" class="sx-met-clock" style="font-size:10px; padding:2px 6px;">MET: T+00d 00h 00m 00s</span>
             <div id="time-speed-ctrl" style="display:flex; align-items:center; gap:3px; background:#090D14; padding:1px 5px; border-radius:3px; border:1px solid rgba(56,189,248,0.22);">
                 <button id="time-play-pause-btn" onclick="togglePlayPause()" style="background:none; border:none; color:#00E5FF; font-size:11px; cursor:pointer; padding:1px 3px;" title="Play / Pause">⏸</button>
-                <input type="range" id="time-speed-slider" min="1" max="10000" step="1" value="60" style="width:50px; cursor:pointer;" oninput="setTimeSpeed(Number(this.value))">
-                <span id="time-speed-badge" style="font-size:10px; font-family:monospace; color:#00FF66; font-weight:700; min-width:32px;">60×</span>
-                <button onclick="setTimeSpeed(1)" style="font-size:9px; padding:1px 2px;">1×</button>
-                <button onclick="setTimeSpeed(60)" style="font-size:9px; padding:1px 2px;">60×</button>
-                <button onclick="setTimeSpeed(1000)" style="font-size:9px; padding:1px 2px;">1k×</button>
+                <input type="range" id="time-speed-slider" min="1" max="100" step="1" value="5" style="width:50px; cursor:pointer;" oninput="setTimeSpeed(Number(this.value))">
+                <span id="time-speed-badge" style="font-size:10px; font-family:monospace; color:#00FF66; font-weight:700; min-width:32px;">5×</span>
+                <button onclick="setTimeSpeed(1)" style="font-size:9px; padding:1px 3px;">1×</button>
+                <button onclick="setTimeSpeed(5)" style="font-size:9px; padding:1px 3px;">5×</button>
+                <button onclick="setTimeSpeed(10)" style="font-size:9px; padding:1px 3px;">10×</button>
+                <button onclick="setTimeSpeed(20)" style="font-size:9px; padding:1px 3px;">20×</button>
             </div>
             <div id="camera-focus-bar" style="display:none;"></div>
             <span id="nav-engine-pill" class="sx-status-pill" style="font-size:9.5px; padding:2px 6px;">[RK45: DOP853]</span>
             <span id="nav-isl-pill" class="sx-status-pill orbit-green" style="font-size:9.5px; padding:2px 6px;">ISL: ACTIVE</span>
+            <button id="cmd-guide-btn" onclick="window.MissionGuide && window.MissionGuide.start(0)" class="sx-btn" style="font-size:9.5px; padding:2px 7px; background:rgba(6,182,212,0.15); border:1px solid #00E5FF; color:#00E5FF; border-radius:3px; cursor:pointer;" title="Spotlight Tour">? GUIDE</button>
             <!-- Preserved compatibility elements -->
             <button id="camera-feed-btn" onclick="toggleVirtualCameraFeed()" style="display:none;"></button>
             <button id="isl-mesh-btn" onclick="toggleISLMesh()" style="display:none;"></button>
@@ -893,10 +905,19 @@
     </div>
     <div id="analytics-toggle-btn" onclick="toggleAnalyticsCollapse()" title="Toggle Real-Time Analytics Panel">📈</div>
 
-    <div id="floating-stat-box" style="display:none; position:absolute; pointer-events:none; z-index:110; background:rgba(15, 23, 42, 0.92); backdrop-filter:blur(8px); border:1px solid #38bdf8; border-radius:8px; padding:8px 12px; font-family:monospace; font-size:11px; color:#f8fafc; box-shadow:0 4px 16px rgba(0,0,0,0.6), 0 0 8px rgba(56,189,248,0.25); transform-origin:top left; transition:transform 0.05s linear; min-width:140px;">
-        <div style="font-weight:bold; color:#38bdf8; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+    <!-- Pinnable Satellite HUD Tag & Vector Leader Line -->
+    <svg id="stat-box-leader-svg" style="position:fixed; inset:0; width:100%; height:100%; pointer-events:none; z-index:109; display:none;">
+        <line id="stat-leader-line" x1="0" y1="0" x2="0" y2="0" stroke="#00E5FF" stroke-width="1.8" stroke-dasharray="4,4" opacity="0.85"/>
+        <circle id="stat-leader-dot" cx="0" cy="0" r="3.5" fill="#00E5FF"/>
+    </svg>
+
+    <div id="floating-stat-box" style="display:none; position:absolute; pointer-events:auto; z-index:110; background:rgba(15, 23, 42, 0.92); backdrop-filter:blur(8px); border:1px solid #38bdf8; border-radius:8px; padding:8px 12px; font-family:monospace; font-size:11px; color:#f8fafc; box-shadow:0 4px 16px rgba(0,0,0,0.6), 0 0 8px rgba(56,189,248,0.25); transform-origin:top left; transition:transform 0.05s linear; min-width:140px;">
+        <div style="font-weight:bold; color:#38bdf8; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
             <span id="fs-name" style="font-size:12px; letter-spacing:0.5px;">Sat</span>
-            <span id="fs-engine" style="font-size:9px; font-weight:bold; padding:2px 5px; border-radius:4px; background:#0284c7; color:white;">RK45</span>
+            <div style="display:flex; align-items:center; gap:4px;">
+                <span id="fs-engine" style="font-size:9px; font-weight:bold; padding:2px 5px; border-radius:4px; background:#0284c7; color:white;">RK45</span>
+                <button id="fs-pin-btn" onclick="togglePinStatBox()" style="background:#1e293b; border:1px solid rgba(56,189,248,0.4); color:#38bdf8; font-size:10px; border-radius:3px; padding:1px 4px; cursor:pointer;" title="Pin/Unpin to screen dock">📌</button>
+            </div>
         </div>
         <div style="display:grid; grid-template-columns:auto 1fr; gap:2px 8px; font-size:11px;">
             <span style="color:#94a3b8;">Alt:</span><span id="fs-alt" style="color:#4ade80; text-align:right;">—</span>
@@ -961,6 +982,9 @@
                 <select id="m-body" onchange="updateBodyConstraints()">
                     <option value="Earth" selected>🌍 Earth</option>
                     <option value="Moon">🌕 Moon</option>
+                    <option value="Mars">🔴 Mars</option>
+                    <option value="Venus">🟡 Venus</option>
+                    <option value="Mercury">⚪ Mercury</option>
                 </select>
             </div>
             <div class="form-group">
@@ -1757,12 +1781,65 @@
     const T_YEAR_S = 365.25 * 86400; // 31,557,600 s (1 Julian Year)
     const R_SUN_KM = 696340.0; // Real solar radius in km
 
+    const R_MERCURY_KM = 2439.7;
+    const R_MERCURY_ORBIT_KM = 57909050.0;
+    const T_MERCURY_ORBIT_S = 87.969 * 86400;
+    const MERCURY_INC_RAD = 7.005 * Math.PI / 180.0;
+
+    const R_VENUS_KM = 6051.8;
+    const R_VENUS_ORBIT_KM = 108208000.0;
+    const T_VENUS_ORBIT_S = 224.701 * 86400;
+    const VENUS_INC_RAD = 3.394 * Math.PI / 180.0;
+
+    const R_MARS_KM = 3389.5;
+    const R_MARS_ORBIT_KM = 227939200.0;
+    const T_MARS_ORBIT_S = 686.980 * 86400;
+    const MARS_INC_RAD = 1.850 * Math.PI / 180.0;
+
     function getEarthSunPosition(t) {
         const angle = (2 * Math.PI * t) / T_YEAR_S;
         const x = Math.cos(angle) * R_EARTH_ORBIT_AU_KM;
         const z = Math.sin(angle) * R_EARTH_ORBIT_AU_KM;
-        const y = 0.0;
+        return new THREE.Vector3(x, 0, z);
+    }
+
+    function getMercurySunPosition(t) {
+        const angle = (2 * Math.PI * t) / T_MERCURY_ORBIT_S + 0.45;
+        const x = Math.cos(angle) * R_MERCURY_ORBIT_KM;
+        const y = Math.sin(angle) * R_MERCURY_ORBIT_KM * Math.sin(MERCURY_INC_RAD);
+        const z = Math.sin(angle) * R_MERCURY_ORBIT_KM * Math.cos(MERCURY_INC_RAD);
         return new THREE.Vector3(x, y, z);
+    }
+
+    function getVenusSunPosition(t) {
+        const angle = (2 * Math.PI * t) / T_VENUS_ORBIT_S + 1.82;
+        const x = Math.cos(angle) * R_VENUS_ORBIT_KM;
+        const y = Math.sin(angle) * R_VENUS_ORBIT_KM * Math.sin(VENUS_INC_RAD);
+        const z = Math.sin(angle) * R_VENUS_ORBIT_KM * Math.cos(VENUS_INC_RAD);
+        return new THREE.Vector3(x, y, z);
+    }
+
+    function getMarsSunPosition(t) {
+        const angle = (2 * Math.PI * t) / T_MARS_ORBIT_S + 3.14;
+        const x = Math.cos(angle) * R_MARS_ORBIT_KM;
+        const y = Math.sin(angle) * R_MARS_ORBIT_KM * Math.sin(MARS_INC_RAD);
+        const z = Math.sin(angle) * R_MARS_ORBIT_KM * Math.cos(MARS_INC_RAD);
+        return new THREE.Vector3(x, y, z);
+    }
+
+    function createPlanetOrbitLine(radiusKm, incRad, colorHex, opacity = 0.35) {
+        const pts = [];
+        for (let a = 0; a <= Math.PI * 2; a += 0.005) {
+            pts.push(new THREE.Vector3(
+                Math.cos(a) * radiusKm,
+                Math.sin(a) * radiusKm * Math.sin(incRad),
+                Math.sin(a) * radiusKm * Math.cos(incRad)
+            ));
+        }
+        return new THREE.LineLoop(
+            new THREE.BufferGeometry().setFromPoints(pts),
+            new THREE.LineBasicMaterial({ color: colorHex, transparent: true, opacity })
+        );
     }
 
     // ── 1-AU Earth Orbital Ellipse Path around the Sun ──
@@ -1780,19 +1857,26 @@
     );
     scene.add(earthOrbitLine);
 
+    const mercuryOrbitLine = createPlanetOrbitLine(R_MERCURY_ORBIT_KM, MERCURY_INC_RAD, 0x94a3b8, 0.30);
+    const venusOrbitLine = createPlanetOrbitLine(R_VENUS_ORBIT_KM, VENUS_INC_RAD, 0xfacc15, 0.30);
+    const marsOrbitLine = createPlanetOrbitLine(R_MARS_ORBIT_KM, MARS_INC_RAD, 0xef4444, 0.35);
+    scene.add(mercuryOrbitLine);
+    scene.add(venusOrbitLine);
+    scene.add(marsOrbitLine);
+
     // ── Heliocentric Sun Directional Illumination ──
     const sunLight = new THREE.DirectionalLight(0xfffdf0, 1.85);
     sunLight.position.set(0, 0, 0);
     scene.add(sunLight);
     scene.add(sunLight.target);
 
-    // Boosted ambient & fill illumination for clear satellite & trajectory visibility
-    const ambientLight = new THREE.AmbientLight(0x64748b, 0.95);
+    // Ambient & fill illumination adjusted for deep black night side and realistic space contrast
+    const ambientLight = new THREE.AmbientLight(0x1e293b, 0.22);
     scene.add(ambientLight);
-    const hemiLight = new THREE.HemisphereLight(0x38bdf8, 0x1e293b, 0.55);
+    const hemiLight = new THREE.HemisphereLight(0x0284c7, 0x020617, 0.25);
     scene.add(hemiLight);
 
-    // ── Photorealistic Procedural Solar Photosphere, Chromosphere, & Multi-Layer Corona ──
+    // ── Photorealistic Procedural Solar Photosphere & Smooth Cinematic Corona ──
     let sunGroupRef = null;
     let sunCoreRef = null;
     let sunCoronaSpikes = null;
@@ -1800,53 +1884,37 @@
         const sunGroup = new THREE.Group();
         sunGroup.position.set(0, 0, 0);
 
-        // 1. Generate High-Res 2048x1024 Procedural Solar Photosphere Texture with Convection Granules & Limb Darkening
+        // 1. High-Res Solar Photosphere Canvas with smooth limb darkening & granules
         const sunTexCanvas = document.createElement('canvas');
-        sunTexCanvas.width = 2048; sunTexCanvas.height = 1024;
+        sunTexCanvas.width = 1024; sunTexCanvas.height = 512;
         const sCtx = sunTexCanvas.getContext('2d');
         
-        // Base solar plasma gradient (core white-hot yellow to deep incandescent orange)
-        const plasmaGrad = sCtx.createLinearGradient(0, 0, 0, 1024);
-        plasmaGrad.addColorStop(0.0, '#fffef0');
-        plasmaGrad.addColorStop(0.2, '#fef08a');
-        plasmaGrad.addColorStop(0.5, '#f59e0b');
-        plasmaGrad.addColorStop(0.8, '#ea580c');
-        plasmaGrad.addColorStop(1.0, '#9a3412');
+        // Solar limb darkening gradient
+        const plasmaGrad = sCtx.createLinearGradient(0, 0, 0, 512);
+        plasmaGrad.addColorStop(0.0, '#fffbf0');
+        plasmaGrad.addColorStop(0.3, '#fef08a');
+        plasmaGrad.addColorStop(0.7, '#f59e0b');
+        plasmaGrad.addColorStop(1.0, '#d97706');
         sCtx.fillStyle = plasmaGrad;
-        sCtx.fillRect(0, 0, 2048, 1024);
+        sCtx.fillRect(0, 0, 1024, 512);
 
-        // Convective granulation noise pattern & magnetic sunspots
-        const imgData = sCtx.getImageData(0, 0, 2048, 1024);
+        // Granulation texture
+        const imgData = sCtx.getImageData(0, 0, 1024, 512);
         const data = imgData.data;
-        for (let y = 0; y < 1024; y++) {
-            for (let x = 0; x < 2048; x++) {
-                const idx = (y * 2048 + x) * 4;
-                const n1 = Math.sin(x * 0.05) * Math.cos(y * 0.05);
-                const n2 = Math.sin(x * 0.12 + 1.4) * Math.sin(y * 0.12 + 0.9);
-                const n3 = Math.cos(x * 0.25) * Math.cos(y * 0.25);
-                const totalNoise = (n1 * 0.5 + n2 * 0.35 + n3 * 0.15) * 32;
-
-                // Sunspot active regions around mid-latitudes
-                let spotFactor = 1.0;
-                if ((y > 380 && y < 440) || (y > 580 && y < 640)) {
-                    const spotNoise = Math.sin(x * 0.02) * Math.cos(y * 0.04);
-                    if (spotNoise > 0.82) {
-                        spotFactor = Math.max(0.18, 1.0 - (spotNoise - 0.82) * 5.0);
-                    }
-                }
-                
-                data[idx] = Math.min(255, Math.max(0, (data[idx] + totalNoise) * spotFactor));
-                data[idx+1] = Math.min(255, Math.max(0, (data[idx+1] + totalNoise * 0.8) * spotFactor));
-                data[idx+2] = Math.min(255, Math.max(0, (data[idx+2] + totalNoise * 0.25) * spotFactor));
+        for (let y = 0; y < 512; y++) {
+            for (let x = 0; x < 1024; x++) {
+                const idx = (y * 1024 + x) * 4;
+                const n = (Math.sin(x * 0.08) * Math.cos(y * 0.08) + Math.sin(x * 0.18 + 1.0) * Math.sin(y * 0.18)) * 14.0;
+                data[idx] = Math.min(255, Math.max(0, data[idx] + n));
+                data[idx+1] = Math.min(255, Math.max(0, data[idx+1] + n * 0.8));
+                data[idx+2] = Math.min(255, Math.max(0, data[idx+2] + n * 0.3));
             }
         }
         sCtx.putImageData(imgData, 0, 0);
 
         const sunSurfaceTex = new THREE.CanvasTexture(sunTexCanvas);
         sunSurfaceTex.wrapS = THREE.RepeatWrapping;
-        sunSurfaceTex.wrapT = THREE.ClampToEdgeWrapping;
 
-        // Photosphere 3D Sphere at Real 696,340 km Radius
         const coreGeo = new THREE.SphereGeometry(R_SUN_KM, 64, 64);
         const coreMat = new THREE.MeshBasicMaterial({
             map: sunSurfaceTex,
@@ -1856,52 +1924,23 @@
         sunGroup.add(sunCore);
         sunCoreRef = sunCore;
 
-        // 2. High-Definition Inner Chromosphere Radiant Envelope
-        const innerGlowCanvas = document.createElement('canvas');
-        innerGlowCanvas.width = 512; innerGlowCanvas.height = 512;
-        const igCtx = innerGlowCanvas.getContext('2d');
-        const igGrad = igCtx.createRadialGradient(256, 256, 80, 256, 256, 256);
-        igGrad.addColorStop(0.0, 'rgba(255, 255, 255, 1.0)');
-        igGrad.addColorStop(0.3, 'rgba(254, 240, 138, 0.95)');
-        igGrad.addColorStop(0.6, 'rgba(245, 158, 11, 0.55)');
-        igGrad.addColorStop(0.85, 'rgba(234, 88, 12, 0.2)');
-        igGrad.addColorStop(1.0, 'rgba(154, 52, 18, 0.0)');
-        igCtx.fillStyle = igGrad;
-        igCtx.fillRect(0, 0, 512, 512);
-
-        const innerTex = new THREE.CanvasTexture(innerGlowCanvas);
-        const innerMat = new THREE.SpriteMaterial({ map: innerTex, transparent: true, blending: THREE.AdditiveBlending });
-        const innerGlowSprite = new THREE.Sprite(innerMat);
-        innerGlowSprite.scale.set(R_SUN_KM * 2.8, R_SUN_KM * 2.8, 1.0);
-        sunGroup.add(innerGlowSprite);
-
-        // 3. Volumetric Outer Corona Streamers & 8-Point Diffraction Spikes
+        // 2. Soft Gaussian Solar Corona Halo (smooth falloff, zero harsh spikes)
         const coronaCanvas = document.createElement('canvas');
         coronaCanvas.width = 512; coronaCanvas.height = 512;
         const cCtx = coronaCanvas.getContext('2d');
-        const cGrad = cCtx.createRadialGradient(256, 256, 20, 256, 256, 256);
-        cGrad.addColorStop(0.0, 'rgba(255, 250, 230, 0.95)');
-        cGrad.addColorStop(0.25, 'rgba(253, 224, 71, 0.45)');
-        cGrad.addColorStop(0.55, 'rgba(249, 115, 22, 0.18)');
-        cGrad.addColorStop(0.85, 'rgba(239, 68, 68, 0.05)');
+        const cGrad = cCtx.createRadialGradient(256, 256, 60, 256, 256, 256);
+        cGrad.addColorStop(0.0, 'rgba(255, 255, 250, 1.0)');
+        cGrad.addColorStop(0.18, 'rgba(254, 240, 138, 0.85)');
+        cGrad.addColorStop(0.42, 'rgba(245, 158, 11, 0.35)');
+        cGrad.addColorStop(0.72, 'rgba(234, 88, 12, 0.08)');
         cGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
         cCtx.fillStyle = cGrad;
         cCtx.fillRect(0, 0, 512, 512);
 
-        // 8 Optical Starburst Diffraction Spikes
-        cCtx.strokeStyle = 'rgba(255, 245, 200, 0.35)';
-        cCtx.lineWidth = 2.5;
-        for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
-            cCtx.beginPath();
-            cCtx.moveTo(256, 256);
-            cCtx.lineTo(256 + Math.cos(a) * 250, 256 + Math.sin(a) * 250);
-            cCtx.stroke();
-        }
-
         const coronaTex = new THREE.CanvasTexture(coronaCanvas);
         const coronaMat = new THREE.SpriteMaterial({ map: coronaTex, transparent: true, blending: THREE.AdditiveBlending });
         const corona = new THREE.Sprite(coronaMat);
-        corona.scale.set(R_SUN_KM * 6.5, R_SUN_KM * 6.5, 1.0);
+        corona.scale.set(R_SUN_KM * 4.2, R_SUN_KM * 4.2, 1.0);
         sunGroup.add(corona);
         sunCoronaSpikes = corona;
 
@@ -2006,20 +2045,56 @@
         roughness: 0.88,
         metalness: 0.05,
         emissiveMap: earthNightTex,
-        emissive: new THREE.Color(0xffb020),
-        emissiveIntensity: 0.22
+        emissive: new THREE.Color(0xffd166),
+        emissiveIntensity: 1.0
     });
+    let earthShaderRef = null;
     earthMat.onBeforeCompile = function(shader) {
+        earthShaderRef = shader;
+        shader.uniforms.uSunDirection = { value: new THREE.Vector3(-1.0, 0.0, 0.0) };
+        shader.vertexShader = shader.vertexShader.replace(
+            '#include <common>',
+            `
+            #include <common>
+            varying vec3 vWorldNormalVec;
+            `
+        );
+        shader.vertexShader = shader.vertexShader.replace(
+            '#include <defaultnormal_vertex>',
+            `
+            #include <defaultnormal_vertex>
+            vWorldNormalVec = normalize((modelMatrix * vec4(transformedNormal, 0.0)).xyz);
+            `
+        );
+        shader.fragmentShader = shader.fragmentShader.replace(
+            '#include <common>',
+            `
+            #include <common>
+            uniform vec3 uSunDirection;
+            varying vec3 vWorldNormalVec;
+            `
+        );
         shader.fragmentShader = shader.fragmentShader.replace(
             '#include <roughnessmap_fragment>',
             `
             float roughnessFactor = roughness;
             #ifdef USE_ROUGHNESSMAP
-                vec4 texelRoughness = texture2D( roughnessMap, vRoughnessMapUv );
-                // Specular map has ocean=white, land=black.
-                // Invert so ocean has low roughness (specular water), land has high roughness (dry terrain).
+                vec4 texelRoughness = texture2D( roughnessMap, vUv );
                 float oceanMask = texelRoughness.r;
-                roughnessFactor = mix(0.92, 0.08, oceanMask);
+                // Realistic ocean specular reflection vs rough dry continental land
+                roughnessFactor = mix(0.96, 0.28, oceanMask);
+            #endif
+            `
+        );
+        shader.fragmentShader = shader.fragmentShader.replace(
+            '#include <emissivemap_fragment>',
+            `
+            #ifdef USE_EMISSIVEMAP
+                vec4 emissiveColor = texture2D( emissiveMap, vUv );
+                // City lights glow warmly exclusively on the dark/night hemisphere
+                float sunDot = dot(normalize(vWorldNormalVec), normalize(uSunDirection));
+                float nightFactor = smoothstep(0.08, -0.12, sunDot);
+                totalEmissiveRadiance = emissiveColor.rgb * nightFactor * 3.6;
             #endif
             `
         );
@@ -2031,9 +2106,9 @@
     );
     scene.add(earth);
 
-    // Custom GLSL Rayleigh & Mie Atmospheric Limb Scattering Shell
+    // Custom GLSL Exaggerated Multi-Layer Stratified Atmosphere Shell
     const rayleighMieAtmosphere = new THREE.Mesh(
-        new THREE.SphereGeometry(R_EARTH_KM + 115.0, 64, 64),
+        new THREE.SphereGeometry(R_EARTH_KM + 160.0, 64, 64),
         new THREE.ShaderMaterial({
             uniforms: {
                 uSunDir: { value: new THREE.Vector3(-1.0, 0.1, 0.2).normalize() }
@@ -2049,17 +2124,24 @@
                 }
             `,
             fragmentShader: `
-                uniform vec3 uSunDir;
                 varying vec3 vNormal;
                 varying vec3 vWorldPos;
                 void main() {
                     vec3 viewDir = normalize(cameraPosition - vWorldPos);
                     float rim = 1.0 - max(0.0, dot(vNormal, viewDir));
-                    float rayleigh = pow(rim, 3.2);
-                    float mie = pow(max(0.0, dot(-viewDir, uSunDir)), 8.0) * pow(rim, 2.0);
-                    vec3 col = vec3(0.08, 0.58, 1.0) * rayleigh * 1.15 + vec3(1.0, 0.72, 0.38) * mie * 0.65;
-                    float alpha = clamp(rayleigh * 0.75 + mie * 0.35, 0.0, 0.85);
-                    gl_FragColor = vec4(col, alpha);
+
+                    // Distinct stratified atmospheric layers
+                    float tropo = pow(rim, 5.0);   // Dense lower troposphere (0-15 km)
+                    float strato = pow(rim, 3.2);  // Mid stratosphere (15-50 km)
+                    float thermo = pow(rim, 1.5);  // High mesosphere & thermosphere (50-160 km)
+
+                    vec3 colTropo = vec3(0.15, 0.72, 1.0) * tropo * 1.35;
+                    vec3 colStrato = vec3(0.08, 0.42, 0.98) * (strato - tropo * 0.4);
+                    vec3 colThermo = vec3(0.25, 0.88, 1.0) * thermo * 0.55;
+
+                    vec3 finalCol = colTropo + colStrato + colThermo;
+                    float alpha = clamp(tropo * 0.95 + strato * 0.65 + thermo * 0.35, 0.0, 0.92);
+                    gl_FragColor = vec4(finalCol, alpha);
                 }
             `,
             transparent: true,
@@ -2109,6 +2191,7 @@
     earth.add(earthCitiesGroup);
     let showEarthCities = true;
     let earthCityObjects = [];
+    Object.defineProperty(window, 'earthCityObjects', { get: () => earthCityObjects, set: (v) => { earthCityObjects = v; } });
     let urbanInstancedMesh = null;
 
     function latLonToEarthVector3(lat, lon, altKm = 0) {
@@ -2431,19 +2514,20 @@
         const cx = 256, cy = 256;
         ctx.clearRect(0, 0, 512, 512);
 
-        // Procedural multi-arm logarithmic spiral arms
-        const numArms = 3;
+        // 1. Organic, fluffy cumulus cloud spiral feeder bands
+        const numArms = 4;
         for (let arm = 0; arm < numArms; arm++) {
             const armOffset = (arm / numArms) * Math.PI * 2.0;
-            for (let r = 24; r < 235; r += 2) {
-                const theta = armOffset + Math.log(r / 20.0) * 2.8;
+            for (let r = 20; r < 240; r += 3) {
+                const theta = armOffset + Math.log(r / 18.0) * 2.4;
                 const px = cx + Math.cos(theta) * r;
                 const py = cy + Math.sin(theta) * r;
-                const spotR = (r / 235.0) * 30.0 + 8.0;
+                const spotR = (r / 240.0) * 34.0 + 12.0;
                 const grad = ctx.createRadialGradient(px, py, 0, px, py, spotR);
-                const alpha = Math.max(0.0, Math.min(0.85, (1.0 - r / 240.0) * 0.92));
+                const alpha = Math.max(0.0, Math.min(0.78, (1.0 - (r / 250.0)) * 0.85));
                 grad.addColorStop(0, `rgba(255, 255, 255, ${alpha})`);
-                grad.addColorStop(0.5, `rgba(235, 245, 255, ${alpha * 0.45})`);
+                grad.addColorStop(0.4, `rgba(240, 248, 255, ${alpha * 0.6})`);
+                grad.addColorStop(0.8, `rgba(225, 240, 255, ${alpha * 0.2})`);
                 grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
                 ctx.fillStyle = grad;
                 ctx.beginPath();
@@ -2452,15 +2536,27 @@
             }
         }
 
-        // Eyewall ring
-        const eyeGrad = ctx.createRadialGradient(cx, cy, 14, cx, cy, 55);
+        // 2. Central dense cirrus overcast shield
+        const coreShield = ctx.createRadialGradient(cx, cy, 20, cx, cy, 140);
+        coreShield.addColorStop(0, 'rgba(255, 255, 255, 0.88)');
+        coreShield.addColorStop(0.5, 'rgba(245, 250, 255, 0.65)');
+        coreShield.addColorStop(0.85, 'rgba(230, 245, 255, 0.25)');
+        coreShield.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        ctx.fillStyle = coreShield;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 140, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 3. Crisp Eye & Eyewall
+        const eyeGrad = ctx.createRadialGradient(cx, cy, 10, cx, cy, 42);
         eyeGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-        eyeGrad.addColorStop(0.35, 'rgba(255, 255, 255, 0.92)');
-        eyeGrad.addColorStop(0.7, 'rgba(240, 248, 255, 0.7)');
+        eyeGrad.addColorStop(0.28, 'rgba(255, 255, 255, 0.05)');
+        eyeGrad.addColorStop(0.40, 'rgba(255, 255, 255, 0.95)');
+        eyeGrad.addColorStop(0.75, 'rgba(240, 248, 255, 0.75)');
         eyeGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
         ctx.fillStyle = eyeGrad;
         ctx.beginPath();
-        ctx.arc(cx, cy, 60, 0, Math.PI * 2);
+        ctx.arc(cx, cy, 50, 0, Math.PI * 2);
         ctx.fill();
 
         const tex = new THREE.CanvasTexture(cv);
@@ -2470,9 +2566,11 @@
 
     const cycloneTex = createCycloneVortexTexture();
     const stormCatalog = [
-        { name: "Super Typhoon Mawar", lat: 17.5, lon: 139.0, radiusKm: 480, spinDir: 1.0 },
-        { name: "Hurricane Milton", lat: 24.5, lon: -86.5, radiusKm: 420, spinDir: 1.0 },
-        { name: "Severe Cyclone Freddy", lat: -18.0, lon: 72.0, radiusKm: 460, spinDir: -1.0 }
+        { name: "Super Typhoon Mawar", lat: 17.5, lon: 139.0, radiusKm: 480, spinDir: 1.0, vLat: 0.00004, vLon: -0.00010 },
+        { name: "Hurricane Milton", lat: 24.5, lon: -86.5, radiusKm: 420, spinDir: 1.0, vLat: 0.00006, vLon: 0.00012 },
+        { name: "Severe Cyclone Freddy", lat: -18.0, lon: 72.0, radiusKm: 460, spinDir: -1.0, vLat: -0.00002, vLon: -0.00014 },
+        { name: "North Atlantic Polar Low", lat: 58.5, lon: -35.0, radiusKm: 620, spinDir: 1.0, vLat: 0.00003, vLon: 0.00016 },
+        { name: "Southern Ocean Gale Cyclone", lat: -52.0, lon: 65.0, radiusKm: 700, spinDir: -1.0, vLat: -0.00002, vLon: 0.00018 }
     ];
 
     stormCatalog.forEach(st => {
@@ -2489,7 +2587,7 @@
         const pos = latLonToEarthVector3(st.lat, st.lon, 8.0);
         stormMesh.position.copy(pos);
         stormMesh.lookAt(pos.clone().multiplyScalar(2.0));
-        stormMesh.userData = { spinSpeed: 0.35 * st.spinDir, name: st.name };
+        stormMesh.userData = { spinSpeed: 0.35 * st.spinDir, name: st.name, data: st };
         tropicalStormsGroup.add(stormMesh);
         tropicalStormMeshes.push(stormMesh);
     });
@@ -2499,7 +2597,96 @@
         tropicalStormsGroup.visible = !tropicalStormsGroup.visible;
         const statusEl = document.getElementById('menu-storm-status');
         if (statusEl) statusEl.innerText = tropicalStormsGroup.visible ? 'Tropical Cyclones & Hurricanes (Active)' : 'Toggle Tropical Cyclones & Hurricanes';
-        showToast(tropicalStormsGroup.visible ? 'Tropical storm vortexes active' : 'Tropical storm vortexes hidden', 'info');
+        showToast(tropicalStormsGroup.visible ? 'Dynamic atmospheric cyclones active' : 'Atmospheric cyclones hidden', 'info');
+    };
+
+    // ── Global Major Ground Stations (NASA DSN, KSAT Polar, ESA ESTRACK) ──
+    const MAJOR_GROUND_STATIONS = [
+        { name: "Houston JSC", network: "NASA SCaN", lat: 29.5593, lon: -95.0900, diamM: 34, freq: "8.4 GHz (X-Band)" },
+        { name: "Goldstone DSN", network: "NASA DSN", lat: 35.4266, lon: -116.8900, diamM: 70, freq: "8.4 GHz (X-Band)" },
+        { name: "Madrid DSN", network: "NASA/ESA", lat: 40.4314, lon: -4.2480, diamM: 70, freq: "8.4 GHz (X-Band)" },
+        { name: "Canberra DSN", network: "NASA/CSIRO", lat: -35.4014, lon: 148.9817, diamM: 70, freq: "8.4 GHz (X-Band)" },
+        { name: "Svalbard KSAT", network: "KSAT Polar", lat: 78.2297, lon: 15.4077, diamM: 13, freq: "26.0 GHz (Ka-Band)" },
+        { name: "Kourou Galliot", network: "ESA ESTRACK", lat: 5.2514, lon: -52.8047, diamM: 15, freq: "8.4 GHz (X-Band)" },
+        { name: "Cape Canaveral", network: "USSF / NASA", lat: 28.3922, lon: -80.6077, diamM: 20, freq: "2.2 GHz (S-Band)" },
+        { name: "Hartebeesthoek", network: "SANSA / NASA", lat: -25.8872, lon: 27.7072, diamM: 26, freq: "8.4 GHz (X-Band)" }
+    ];
+
+    const groundStationsGroup = new THREE.Group();
+    const groundStationObjects = [];
+    const groundStationBeamsGroup = new THREE.Group();
+    earth.add(groundStationsGroup);
+    scene.add(groundStationBeamsGroup);
+
+    function createGroundStationSprite(name, network) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 384; canvas.height = 96;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = 'rgba(6, 78, 59, 0.85)';
+        ctx.strokeStyle = '#10b981';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(8, 8, 368, 80, 16);
+        else ctx.rect(8, 8, 368, 80);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.font = 'bold 26px monospace';
+        ctx.fillStyle = '#34d399';
+        ctx.fillText(`📡 ${name}`, 24, 42);
+
+        ctx.font = '20px sans-serif';
+        ctx.fillStyle = '#a7f3d0';
+        ctx.fillText(`${network} • AOS Ready`, 24, 72);
+
+        const tex = new THREE.CanvasTexture(canvas);
+        const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
+        const sp = new THREE.Sprite(mat);
+        sp.scale.set(160, 40, 1);
+        return sp;
+    }
+
+    MAJOR_GROUND_STATIONS.forEach(gs => {
+        const gsGroup = new THREE.Group();
+        const pos = latLonToEarthVector3(gs.lat, gs.lon, 2.5);
+        const normal = pos.clone().normalize();
+
+        const ringGeo = new THREE.RingGeometry(15, 45, 24);
+        const ringMat = new THREE.MeshBasicMaterial({ color: 0x10b981, side: THREE.DoubleSide, transparent: true, opacity: 0.75 });
+        const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+        ringMesh.position.copy(pos);
+        ringMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+        gsGroup.add(ringMesh);
+
+        const dishGeo = new THREE.SphereGeometry(18, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.45);
+        const dishMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.4, side: THREE.DoubleSide });
+        const dishMesh = new THREE.Mesh(dishGeo, dishMat);
+        dishMesh.position.copy(latLonToEarthVector3(gs.lat, gs.lon, 12.0));
+        dishMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
+        gsGroup.add(dishMesh);
+
+        const sprite = createGroundStationSprite(gs.name, gs.network);
+        sprite.position.copy(latLonToEarthVector3(gs.lat, gs.lon, 120.0));
+        gsGroup.add(sprite);
+
+        groundStationsGroup.add(gsGroup);
+        groundStationObjects.push({
+            data: gs,
+            group: gsGroup,
+            sprite: sprite,
+            pos: pos,
+            normal: normal
+        });
+    });
+
+    let showGroundStations = true;
+    window.toggleGroundStations = function() {
+        showGroundStations = !showGroundStations;
+        groundStationsGroup.visible = showGroundStations;
+        groundStationBeamsGroup.visible = showGroundStations;
+        const statusEl = document.getElementById('menu-gs-status');
+        if (statusEl) statusEl.innerText = showGroundStations ? 'Toggle Ground Stations & Downlink Beams (Active)' : 'Toggle Ground Stations & Downlink Beams';
+        showToast(showGroundStations ? 'Ground stations & RF downlinks enabled' : 'Ground stations hidden', 'info');
     };
 
     window.toggleLiveWeatherClouds = function() {
@@ -2613,6 +2800,39 @@
         new THREE.LineBasicMaterial({ color: 0x64748b, transparent: true, opacity: 0.5 })
     );
     scene.add(moonOrbitLine);
+
+    // ── Mercury Mesh ──
+    const mercuryMat = new THREE.MeshStandardMaterial({
+        map: tl.load('/static/textures/mercury_1024.jpg'),
+        bumpMap: tl.load('/static/textures/mercury_bump.jpg'),
+        bumpScale: 1.6,
+        roughness: 0.92,
+        metalness: 0.05
+    });
+    const mercury = new THREE.Mesh(new THREE.SphereGeometry(R_MERCURY_KM, 64, 64), mercuryMat);
+    scene.add(mercury);
+
+    // ── Venus Mesh ──
+    const venusMat = new THREE.MeshStandardMaterial({
+        map: tl.load('/static/textures/venus_1024.jpg'),
+        bumpMap: tl.load('/static/textures/venus_bump.jpg'),
+        bumpScale: 1.2,
+        roughness: 0.75,
+        metalness: 0.02
+    });
+    const venus = new THREE.Mesh(new THREE.SphereGeometry(R_VENUS_KM, 64, 64), venusMat);
+    scene.add(venus);
+
+    // ── Mars Mesh ──
+    const marsMat = new THREE.MeshStandardMaterial({
+        map: tl.load('/static/textures/mars_1024.jpg'),
+        bumpMap: tl.load('/static/textures/mars_bump.jpg'),
+        bumpScale: 2.2,
+        roughness: 0.88,
+        metalness: 0.04
+    });
+    const mars = new THREE.Mesh(new THREE.SphereGeometry(R_MARS_KM, 64, 64), marsMat);
+    scene.add(mars);
 
     // ── Interactive Maneuver Node 3D Gizmo & Preview Line ──
     const nodeGizmoGroup = new THREE.Group();
@@ -2834,6 +3054,7 @@
 
     // ── State Management ──────────────────────────────────────────────────────
     let activeSatellites = [];
+    Object.defineProperty(window, 'activeSatellites', { get: () => activeSatellites, set: (v) => { activeSatellites = v; } });
     let selectedSatIndex = -1;
     let cameraFocusMode = 'Earth';
     let showAxesGlobal = true;
@@ -2885,8 +3106,11 @@
 
     // ── Body Constraints Configuration ────────────────────────────────────────
     const BODY_DEFAULTS = {
-        Earth: { minAlt: 100, maxAlt: 400000, defAlt: 400, maxEcc: 0.999, defInc: 51.6, defRaan: 45, hasAtm: true, hasMoon: true },
-        Moon:  { minAlt: 20,  maxAlt: 10000, defAlt: 100, maxEcc: 0.90, defInc: 90.0, defRaan: 0,  hasAtm: false, hasMoon: false }
+        Earth:   { minAlt: 100, maxAlt: 400000, defAlt: 400, maxEcc: 0.999, defInc: 51.6, defRaan: 45, hasAtm: true, hasMoon: true },
+        Moon:    { minAlt: 20,  maxAlt: 10000,  defAlt: 100, maxEcc: 0.90,  defInc: 90.0, defRaan: 0,  hasAtm: false, hasMoon: false },
+        Mars:    { minAlt: 50,  maxAlt: 200000, defAlt: 350, maxEcc: 0.95,  defInc: 25.2, defRaan: 0,  hasAtm: true, hasMoon: false },
+        Venus:   { minAlt: 100, maxAlt: 300000, defAlt: 400, maxEcc: 0.95,  defInc: 3.4,  defRaan: 0,  hasAtm: true, hasMoon: false },
+        Mercury: { minAlt: 20,  maxAlt: 50000,  defAlt: 200, maxEcc: 0.90,  defInc: 7.0,  defRaan: 0,  hasAtm: false, hasMoon: false }
     };
 
     function updateBodyConstraints() {
@@ -2929,15 +3153,18 @@
 
     // ── GUI Controls (Up to 10,000x Speedup) ───────────────────────────────────
     const gui = new lil.GUI({ title: 'Simulation Settings', container: document.getElementById('gui-container') });
-    const simSettings = { playbackSpeed: 60, cameraTarget: 'Earth' };
-    gui.add(simSettings, 'playbackSpeed', 1, 10000, 1).name('Speed (1x-10000x)');
-    let cameraTargetCtrl = gui.add(simSettings, 'cameraTarget', ['Earth', 'Moon', 'System']).name('Camera Focus');
+    const simSettings = { playbackSpeed: 5, cameraTarget: 'Earth' };
+    gui.add(simSettings, 'playbackSpeed', 1, 100, 1).name('Speed (1x-100x)');
+    let cameraTargetCtrl = gui.add(simSettings, 'cameraTarget', ['Earth', 'Moon', 'Mars', 'Venus', 'Mercury', 'System', 'Sun']).name('Camera Focus');
 
     let isSimulationPaused = false;
-    let savedSpeedBeforePause = 60;
+    let savedSpeedBeforePause = 5;
 
     window.setTimeSpeed = function(val) {
-        val = Math.max(1, Math.min(10000, Math.round(val)));
+        val = Math.max(1, Math.min(1000, Math.round(val)));
+        if (val > 20) {
+            showToast(`⚠️ WARNING: Playback speed ${val}× exceeds 20×. Extremely high speeds may break numerical integration accuracy or cause trajectory stepping.`, 'warning');
+        }
         simSettings.playbackSpeed = val;
         savedSpeedBeforePause = val;
         isSimulationPaused = false;
@@ -2945,7 +3172,10 @@
         const slider = document.getElementById('time-speed-slider');
         if (slider) slider.value = val;
         const badge = document.getElementById('time-speed-badge');
-        if (badge) badge.innerText = `${val}×`;
+        if (badge) {
+            badge.innerText = `${val}×`;
+            badge.style.color = val > 20 ? '#f59e0b' : '#00FF66';
+        }
         const btn = document.getElementById('time-play-pause-btn');
         if (btn) btn.innerText = '⏸';
     };
@@ -2955,15 +3185,23 @@
         const badge = document.getElementById('time-speed-badge');
         if (isSimulationPaused) {
             isSimulationPaused = false;
-            simSettings.playbackSpeed = savedSpeedBeforePause || 10;
+            simSettings.playbackSpeed = savedSpeedBeforePause || 5;
             if (btn) btn.innerText = '⏸';
-            if (badge) badge.innerText = `${simSettings.playbackSpeed}×`;
+            if (badge) {
+                badge.innerText = `${simSettings.playbackSpeed}×`;
+                badge.style.color = simSettings.playbackSpeed > 20 ? '#f59e0b' : '#00FF66';
+            }
+            showToast('Simulation Resumed', 'info');
         } else {
             isSimulationPaused = true;
             savedSpeedBeforePause = simSettings.playbackSpeed;
             simSettings.playbackSpeed = 0;
             if (btn) btn.innerText = '▶';
-            if (badge) badge.innerText = 'PAUSED';
+            if (badge) {
+                badge.innerText = '⏸ FROZEN';
+                badge.style.color = '#38bdf8';
+            }
+            showToast('Simulation Paused: All celestial bodies and satellite systems are completely frozen.', 'info');
         }
     };
 
@@ -2974,13 +3212,13 @@
 
     function handleFocusChange(v) {
         cameraFocusMode = v;
-        if (v === 'Earth' || v === 'Moon' || v === 'System' || v === 'Sun') {
+        if (v === 'Earth' || v === 'Moon' || v === 'Mars' || v === 'Venus' || v === 'Mercury' || v === 'System' || v === 'Sun') {
             document.getElementById('maneuver-panel').style.display = 'none';
             selectedSatIndex = -1;
             renderSidebar();
             if (v === 'Earth') {
                 if (controls) {
-                    controls.minDistance = 6388.0;
+                    controls.minDistance = 6386.0;
                     controls.target.copy(earth.position);
                     camera.position.set(earth.position.x + 16000, earth.position.y + 10000, earth.position.z + 16000);
                 }
@@ -2991,9 +3229,30 @@
                     controls.target.copy(mPos);
                     camera.position.set(mPos.x + 3600, mPos.y + 1200, mPos.z + 3600);
                 }
+            } else if (v === 'Mars') {
+                if (controls && typeof mars !== 'undefined') {
+                    controls.minDistance = 3405.0;
+                    const mPos = mars.position.clone();
+                    controls.target.copy(mPos);
+                    camera.position.set(mPos.x + 8000, mPos.y + 3500, mPos.z + 8000);
+                }
+            } else if (v === 'Venus') {
+                if (controls && typeof venus !== 'undefined') {
+                    controls.minDistance = 6068.0;
+                    const vPos = venus.position.clone();
+                    controls.target.copy(vPos);
+                    camera.position.set(vPos.x + 15000, vPos.y + 6000, vPos.z + 15000);
+                }
+            } else if (v === 'Mercury') {
+                if (controls && typeof mercury !== 'undefined') {
+                    controls.minDistance = 2455.0;
+                    const mePos = mercury.position.clone();
+                    controls.target.copy(mePos);
+                    camera.position.set(mePos.x + 6000, mePos.y + 2500, mePos.z + 6000);
+                }
             } else if (v === 'System') {
                 if (controls) {
-                    controls.minDistance = 6388.0;
+                    controls.minDistance = 6386.0;
                     controls.target.copy(earth.position);
                     camera.position.set(earth.position.x + 300000, earth.position.y + 200000, earth.position.z + 450000);
                 }
@@ -3073,7 +3332,7 @@
     }
 
     function updateCameraDropdown() {
-        const opts = ['Sun', 'Earth', 'Moon', 'System', ...activeSatellites.map(s => s.name)];
+        const opts = ['Sun', 'Earth', 'Moon', 'Mars', 'Venus', 'Mercury', 'System', ...activeSatellites.map(s => s.name)];
         if (!opts.includes(simSettings.cameraTarget)) {
             simSettings.cameraTarget = 'Earth';
             cameraFocusMode = 'Earth';
@@ -3099,9 +3358,12 @@
     }
 
     function getParentBodyWorldPos(bodyName, t) {
+        if (bodyName === 'Sun') return new THREE.Vector3(0, 0, 0);
+        if (bodyName === 'Mars' && typeof getMarsSunPosition === 'function') return getMarsSunPosition(t);
+        if (bodyName === 'Venus' && typeof getVenusSunPosition === 'function') return getVenusSunPosition(t);
+        if (bodyName === 'Mercury' && typeof getMercurySunPosition === 'function') return getMercurySunPosition(t);
         const earthPos = getEarthSunPosition(t);
         if (bodyName === 'Moon') return earthPos.clone().add(getMoonPosition(t));
-        if (bodyName === 'Sun') return new THREE.Vector3(0, 0, 0);
         return earthPos;
     }
 
@@ -3194,11 +3456,11 @@
             const x = b.x[i] * M_TO_KM;
             const y = b.y[i] * M_TO_KM;
             const z = b.z[i] * M_TO_KM;
-            pts.push(new THREE.Vector3(x, y, z));
+            pts.push(new THREE.Vector3(x, z, -y));
 
             posAttr.array[pIdx * 3] = x;
-            posAttr.array[pIdx * 3 + 1] = y;
-            posAttr.array[pIdx * 3 + 2] = z;
+            posAttr.array[pIdx * 3 + 1] = z;
+            posAttr.array[pIdx * 3 + 2] = -y;
 
             const t = b.t[i];
             let brightness = 1.0;
@@ -3212,18 +3474,27 @@
                 const span = Math.max(1.0, tHead - currentSimTime);
                 const frac = Math.max(0.0, Math.min(1.0, 1.0 - (t - currentSimTime) / span));
                 brightness = 0.35 + 0.55 * frac;
-                if (sat.reentry && sat.deorbitEpoch && t >= sat.deorbitEpoch - 3600) {
-                    colAttr.array[pIdx * 3] = 1.0;
-                    colAttr.array[pIdx * 3 + 1] = 0.35 * brightness;
-                    colAttr.array[pIdx * 3 + 2] = 0.1;
-                    pIdx++;
-                    continue;
-                }
             }
 
-            colAttr.array[pIdx * 3] = Math.min(1.0, baseColor.r * brightness * boost);
-            colAttr.array[pIdx * 3 + 1] = Math.min(1.0, baseColor.g * brightness * boost);
-            colAttr.array[pIdx * 3 + 2] = Math.min(1.0, baseColor.b * brightness * boost);
+            const altKm = Math.sqrt(x*x + y*y + z*z) - 6378.137;
+            let gradR = 0.06, gradG = 0.72, gradB = 0.50; // Neon Green (#10b981)
+            if (altKm <= 120.0 || (sat.reentry && sat.deorbitEpoch && t >= sat.deorbitEpoch - 3600)) {
+                gradR = 0.94; gradG = 0.27; gradB = 0.27; // Neon Red (#ef4444)
+            } else if (altKm <= 160.0) {
+                const ratio = (altKm - 120.0) / 40.0;
+                gradR = THREE.MathUtils.lerp(0.94, 0.96, ratio);
+                gradG = THREE.MathUtils.lerp(0.27, 0.62, ratio);
+                gradB = THREE.MathUtils.lerp(0.27, 0.07, ratio); // Amber (#f59e0b)
+            } else {
+                const ratio = Math.min(1.0, (altKm - 160.0) / 200.0);
+                gradR = THREE.MathUtils.lerp(0.96, baseColor.r, ratio);
+                gradG = THREE.MathUtils.lerp(0.62, baseColor.g, ratio);
+                gradB = THREE.MathUtils.lerp(0.07, baseColor.b, ratio);
+            }
+
+            colAttr.array[pIdx * 3] = Math.min(1.0, gradR * brightness * boost);
+            colAttr.array[pIdx * 3 + 1] = Math.min(1.0, gradG * brightness * boost);
+            colAttr.array[pIdx * 3 + 2] = Math.min(1.0, gradB * brightness * boost);
             pIdx++;
         }
 
@@ -3252,13 +3523,13 @@
 
     function getLocalPos(buf, idx) {
         if (typeof idx === 'number') {
-            return new THREE.Vector3(buf.x[idx] * M_TO_KM, buf.y[idx] * M_TO_KM, buf.z[idx] * M_TO_KM);
+            return new THREE.Vector3(buf.x[idx] * M_TO_KM, buf.z[idx] * M_TO_KM, -buf.y[idx] * M_TO_KM);
         }
         const { lo, hi, frac } = idx;
         return new THREE.Vector3(
             (buf.x[lo] + frac * (buf.x[hi] - buf.x[lo])) * M_TO_KM,
-            (buf.y[lo] + frac * (buf.y[hi] - buf.y[lo])) * M_TO_KM,
-            (buf.z[lo] + frac * (buf.z[hi] - buf.z[lo])) * M_TO_KM
+            (buf.z[lo] + frac * (buf.z[hi] - buf.z[lo])) * M_TO_KM,
+            -(buf.y[lo] + frac * (buf.y[hi] - buf.y[lo])) * M_TO_KM
         );
     }
 
@@ -3266,7 +3537,7 @@
         if (!buf.forces || !buf.forces[key] || buf.forces[key].length === 0) return new THREE.Vector3();
         const i = typeof idx === 'number' ? idx : idx.lo;
         const f = buf.forces[key][i];
-        return f ? new THREE.Vector3(f[0], f[1], f[2]) : new THREE.Vector3();
+        return f ? new THREE.Vector3(f[0], f[2], -f[1]) : new THREE.Vector3();
     }
 
     async function fetchNextChunk(sat) {
@@ -3372,39 +3643,69 @@
         const accentCol = parseInt(colorHex.replace('#', '0x'), 16) || 0x38bdf8;
 
         if (mass < 40.0) {
-            // ── CLASS 1: CubeSat / NanoSat (< 40 kg) ──
-            const busW = 6.0, busH = 14.0, busD = 6.0;
-            const busMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9, roughness: 0.25 });
-            const busMesh = new THREE.Mesh(new THREE.BoxGeometry(busW, busH, busD), busMat);
+            // ── CLASS 1: Next-Gen Aerospace Micro-Satellite (< 40 kg) ──
+            // 1. Octagonal Carbon-Fiber & Gold MLI Avionics Bus
+            const busMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.92, roughness: 0.22 });
+            const busMesh = new THREE.Mesh(new THREE.CylinderGeometry(5.5, 5.5, 12.0, 8), busMat);
             satGroup.add(busMesh);
 
-            // Gold MLI inset panels
-            const foilMat = new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.85, roughness: 0.3, emissive: 0x78350f, emissiveIntensity: 0.15 });
-            const foilMesh = new THREE.Mesh(new THREE.BoxGeometry(busW * 0.9, busH * 0.85, busD * 1.01), foilMat);
+            // Gold Kapton MLI thermal foil blanket facets
+            const foilMat = new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.88, roughness: 0.25, emissive: 0x78350f, emissiveIntensity: 0.18 });
+            const foilMesh = new THREE.Mesh(new THREE.CylinderGeometry(5.52, 5.52, 8.5, 8), foilMat);
             satGroup.add(foilMesh);
 
-            // 4 Angled Deployable Solar Panels
-            const spMat = new THREE.MeshStandardMaterial({ color: 0x1e3a8a, metalness: 0.8, roughness: 0.2, emissive: 0x172554, emissiveIntensity: 0.1, side: THREE.DoubleSide });
-            const spGeo = new THREE.BoxGeometry(10.0, 5.0, 0.4);
-            [1, -1].forEach(side => {
+            // 2. High-Efficiency Photovoltaic Solar Array Wings with Silicon Blue Cells
+            const wingSpan = 24.0, wingChord = 7.0;
+            const spMat = new THREE.MeshStandardMaterial({ color: 0x1d4ed8, metalness: 0.85, roughness: 0.2, emissive: 0x1e3a8a, emissiveIntensity: 0.15, side: THREE.DoubleSide });
+            const spGeo = new THREE.BoxGeometry(wingSpan * 0.5, 0.35, wingChord);
+            [-1, 1].forEach(side => {
                 const sp = new THREE.Mesh(spGeo, spMat);
-                sp.position.set(side * (busW * 0.5 + 5.0), 0, 0);
-                sp.rotation.y = side * 0.25;
+                sp.position.set(side * (5.5 + wingSpan * 0.25 + 0.8), 0, 0);
                 satGroup.add(sp);
+
+                // Solar panel drive yoke boom
+                const yokeMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.85 });
+                const yoke = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 3.5, 8), yokeMat);
+                yoke.rotation.z = Math.PI / 2;
+                yoke.position.set(side * 6.5, 0, 0);
+                satGroup.add(yoke);
             });
 
-            // Whip Dipole Antennas
-            const antMat = new THREE.MeshBasicMaterial({ color: 0xe2e8f0 });
-            const antGeo = new THREE.CylinderGeometry(0.12, 0.12, 16.0, 6);
-            const ant1 = new THREE.Mesh(antGeo, antMat);
-            ant1.position.set(0, busH * 0.5 + 8.0, 0);
-            satGroup.add(ant1);
+            // 3. Steerable Parabolic High-Gain Antenna Dish
+            const dishMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, metalness: 0.6, roughness: 0.3, side: THREE.DoubleSide });
+            const dish = new THREE.Mesh(new THREE.SphereGeometry(4.5, 16, 8, 0, Math.PI * 2, 0, Math.PI * 0.42), dishMat);
+            dish.position.set(0, 6.0 + 2.5, 0);
+            dish.rotation.x = Math.PI;
+            satGroup.add(dish);
 
-            // Optical Aperture
-            const lensMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.95, roughness: 0.1 });
-            const lens = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 0.8, 16), lensMat);
-            lens.position.set(0, -busH * 0.5 - 0.4, 0);
+            const horn = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 3.5, 6), new THREE.MeshBasicMaterial({ color: 0x38bdf8 }));
+            horn.position.set(0, 6.0 + 4.2, 0);
+            satGroup.add(horn);
+
+            // 4. Optical Observation Telescope Barrel (Sapphire Coated Lens)
+            const lensMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.95, roughness: 0.08 });
+            const lens = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 1.8, 2.5, 16), lensMat);
+            lens.position.set(0, -6.0 - 1.25, 0);
             satGroup.add(lens);
+
+            // 5. Dual Xenon Ion Micro-Thruster Array with glowing cyan plasma plumes
+            const thrusterMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9, roughness: 0.2 });
+            const glowPlumeMat = new THREE.MeshBasicMaterial({ color: 0x00E5FF, transparent: true, opacity: 0.85 });
+            [-1.5, 1.5].forEach(dx => {
+                const noz = new THREE.Mesh(new THREE.ConeGeometry(0.9, 1.8, 12), thrusterMat);
+                noz.position.set(dx, -6.0 - 0.8, -1.8);
+                satGroup.add(noz);
+
+                const plume = new THREE.Mesh(new THREE.ConeGeometry(0.5, 2.2, 8), glowPlumeMat);
+                plume.position.set(dx, -6.0 - 2.4, -1.8);
+                satGroup.add(plume);
+            });
+
+            // 6. Deployable Magnetometer Boom
+            const magBoom = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 14.0, 6), new THREE.MeshStandardMaterial({ color: 0x94a3b8 }));
+            magBoom.position.set(0, 0, 8.5);
+            magBoom.rotation.x = Math.PI / 2;
+            satGroup.add(magBoom);
 
         } else if (mass < 1500.0) {
             // ── CLASS 2: Standard LEO / Earth Observation / Starlink (40 - 1500 kg) ──
@@ -3590,10 +3891,13 @@
             deorbitTime: isReentry ? formatTime(reTime) : null,
             showForces: false,
             forceArrows: {
-                gravity: mkArrow(0x4ade80),
-                j2:      mkArrow(0xfacc15),
-                drag:    mkArrow(0xf87171),
-                srp:     mkArrow(0xf97316)
+                gravity:  mkArrow(0x4ade80),
+                j2:       mkArrow(0xfacc15),
+                j3:       mkArrow(0xeab308),
+                drag:     mkArrow(0xf87171),
+                srp:      mkArrow(0xf97316),
+                magnetic: mkArrow(0x06b6d4),
+                tides:    mkArrow(0xa855f7)
             },
             telemetry: satData.telemetry || null
         };
@@ -3827,7 +4131,7 @@
                 const idx = interpAt(b, Math.min(simTime, b.t[b.t.length - 1]));
                 const i = (typeof idx === 'number') ? idx : (idx ? idx.lo : 0);
                 const vx = (b.vx && b.vx[i]) || 0, vy = (b.vy && b.vy[i]) || 0, vz = (b.vz && b.vz[i]) || 0;
-                const fwd = new THREE.Vector3(vx, vy, vz).normalize();
+                const fwd = new THREE.Vector3(vx, vz, -vy).normalize();
                 if (fwd.lengthSq() > 0.1) {
                     vcamCamera.lookAt(sat.mesh.position.clone().add(fwd.multiplyScalar(1000)));
                     const nadir = bodyWorldPos.clone().sub(sat.mesh.position).normalize();
@@ -4505,7 +4809,7 @@
                 eccentricity: satSpec.eccentricity || 0.0,
                 inclination_deg: satSpec.inclination_deg || 0.0,
                 raan_deg: satSpec.raan_deg || 0.0,
-                arg_pe_deg: satSpec.arg_pe_deg || 0.0,
+                arg_periapsis_deg: satSpec.arg_periapsis_deg !== undefined ? satSpec.arg_periapsis_deg : (satSpec.arg_pe_deg || 0.0),
                 true_anomaly_deg: satSpec.true_anomaly_deg || 0.0,
                 color: satSpec.color || '#38bdf8',
                 icon: satSpec.icon || 'satellite',
@@ -5038,10 +5342,18 @@
         const i = typeof idx === 'number' ? idx : idx.lo;
         const alt_km = b.alt_km[i] || 400;
         
-        // Scale vectors proportionally so they are easy to see but NEVER phase into the Earth surface
-        const maxLen = Math.min(Math.max(100, alt_km * 0.45), 350);
+        // Scale vectors proportionally (2x scale for enhanced visibility) without clipping
+        const maxLen = Math.min(Math.max(180, alt_km * 0.75), 600);
 
-        const fTypes = { gravity: 'central', j2: 'j2', drag: 'drag', srp: 'srp' };
+        const fTypes = {
+            gravity:  'central',
+            j2:       'j2',
+            j3:       'j3',
+            drag:     'drag',
+            srp:      'srp',
+            magnetic: 'magnetic',
+            tides:    'tides'
+        };
         
         const gVec = getForce(sat.buf, idx, 'central');
         const gMag = Math.max(1e-6, gVec.length());
@@ -5061,15 +5373,21 @@
                 if (key === 'gravity') {
                     arrowLen = maxLen;
                 } else if (key === 'j2') {
-                    arrowLen = Math.min(maxLen * 0.75, Math.max(80, maxLen * Math.min(1.0, (mag / gMag) * 30.0)));
+                    arrowLen = Math.min(maxLen * 0.85, Math.max(120, maxLen * Math.min(1.0, (mag / gMag) * 35.0)));
+                } else if (key === 'j3') {
+                    arrowLen = Math.min(maxLen * 0.70, Math.max(90, maxLen * Math.min(1.0, (mag / gMag) * 1000.0)));
                 } else if (key === 'srp') {
-                    arrowLen = Math.min(maxLen * 0.70, Math.max(75, maxLen * Math.min(1.0, (mag / gMag) * 1000.0)));
+                    arrowLen = Math.min(maxLen * 0.75, Math.max(100, maxLen * Math.min(1.0, (mag / gMag) * 1500.0)));
+                } else if (key === 'magnetic') {
+                    arrowLen = Math.min(maxLen * 0.65, Math.max(85, maxLen * Math.min(1.0, (mag / gMag) * 2000.0)));
+                } else if (key === 'tides') {
+                    arrowLen = Math.min(maxLen * 0.60, Math.max(80, maxLen * Math.min(1.0, (mag / gMag) * 5000.0)));
                 } else {
-                    arrowLen = Math.min(maxLen * 0.85, Math.max(90, maxLen * Math.min(1.0, (mag / gMag) * 50.0)));
+                    arrowLen = Math.min(maxLen * 0.90, Math.max(130, maxLen * Math.min(1.0, (mag / gMag) * 60.0)));
                 }
                 
-                const headLen = Math.min(arrowLen * 0.25, 45);
-                const headWidth = headLen * 0.5;
+                const headLen = Math.min(arrowLen * 0.25, 60);
+                const headWidth = headLen * 0.55;
                 arrow.setLength(arrowLen, headLen, headWidth);
                 arrow.visible = true;
             } else {
@@ -6545,6 +6863,8 @@
     window.enterMissionMode = function(spawnDemo = false) {
         inSplashMode = false;
         document.body.classList.remove('in-splash');
+        const intro = document.getElementById('brand-intro-screen');
+        if (intro) { intro.classList.add('fade-out'); intro.style.display = 'none'; }
         const splash = document.getElementById('splash-screen');
         if (splash) splash.classList.add('hidden');
         heroSplashElements.forEach(el => { el.visible = false; });
@@ -7001,40 +7321,81 @@
         requestAnimationFrame(animate);
 
         const wallDt = clock.getDelta();
-        const dt = wallDt * simSettings.playbackSpeed;
-        simTime += dt;
+        const effectiveDt = (isSimulationPaused || simSettings.playbackSpeed === 0) ? 0 : (wallDt * simSettings.playbackSpeed);
+        if (effectiveDt > 0) {
+            simTime += effectiveDt;
+        }
 
         // 1. Dynamic Sun & Celestial Ephemeris (Earth & Moon propagate around Sun at 1 AU)
         const earthWorldPos = getEarthSunPosition(simTime);
         earth.position.copy(earthWorldPos);
-        earth.rotation.y += 7.2921e-5 * dt;
-        if (typeof weatherCloudsMesh !== 'undefined' && weatherCloudsMesh) weatherCloudsMesh.rotation.y += 7.5e-5 * dt;
+        if (effectiveDt > 0) {
+            earth.rotation.y += 7.2921e-5 * effectiveDt;
+            if (typeof weatherCloudsMesh !== 'undefined' && weatherCloudsMesh) weatherCloudsMesh.rotation.y += 7.5e-5 * effectiveDt;
+        }
+
+        // Dynamic Storm Rotation and Wind Advection
         if (typeof tropicalStormMeshes !== 'undefined') {
             tropicalStormMeshes.forEach(st => {
-                st.rotation.z += st.userData.spinSpeed * wallDt * 1.8;
+                if (st.userData && st.userData.data && effectiveDt > 0) {
+                    const data = st.userData.data;
+                    data.lat += (data.vLat || 0) * effectiveDt;
+                    data.lon += (data.vLon || 0) * effectiveDt;
+                    if (data.lon > 180) data.lon -= 360;
+                    if (data.lon < -180) data.lon += 360;
+                    const p = latLonToEarthVector3(data.lat, data.lon, 8.0);
+                    st.position.copy(p);
+                    st.lookAt(p.clone().multiplyScalar(2.0));
+                }
+                if (effectiveDt > 0) {
+                    st.rotation.z += st.userData.spinSpeed * wallDt * 1.8;
+                }
             });
         }
 
         // 2. Moon Orbit Propagation (Real 384,400 km scale relative to Earth)
         const moonLocalPos = getMoonPosition(simTime);
         moon.position.copy(earthWorldPos.clone().add(moonLocalPos));
-        moon.rotation.y += (2 * Math.PI / T_MOON_ORBIT_S) * dt;
+        if (effectiveDt > 0) {
+            moon.rotation.y += (2 * Math.PI / T_MOON_ORBIT_S) * effectiveDt;
+        }
         moonOrbitLine.position.copy(earthWorldPos);
 
+        // Mercury, Venus, Mars Real-Time Ephemeris
+        if (typeof mercury !== 'undefined') {
+            mercury.position.copy(getMercurySunPosition(simTime));
+            if (effectiveDt > 0) mercury.rotation.y += (2 * Math.PI / (58.6 * 86400)) * effectiveDt;
+        }
+        if (typeof venus !== 'undefined') {
+            venus.position.copy(getVenusSunPosition(simTime));
+            if (effectiveDt > 0) venus.rotation.y -= (2 * Math.PI / (243.0 * 86400)) * effectiveDt;
+        }
+        if (typeof mars !== 'undefined') {
+            mars.position.copy(getMarsSunPosition(simTime));
+            if (effectiveDt > 0) mars.rotation.y += (2 * Math.PI / (1.026 * 86400)) * effectiveDt;
+        }
+
         // Dynamic Sun Rotation & Directional Light
-        if (sunCoreRef) sunCoreRef.rotation.y += 0.00005 * Math.min(dt, 5.0);
-        if (sunCoronaSpikes) sunCoronaSpikes.material.rotation += 0.0003 * Math.min(wallDt, 0.05);
+        if (effectiveDt > 0) {
+            if (sunCoreRef) sunCoreRef.rotation.y += 0.00005 * Math.min(effectiveDt, 5.0);
+            if (sunCoronaSpikes) sunCoronaSpikes.material.rotation += 0.0003 * Math.min(wallDt, 0.05);
+        }
         if (sunLight) {
             sunLight.position.set(0, 0, 0);
             sunLight.target.position.copy(earthWorldPos);
         }
+        if (earthShaderRef && earthShaderRef.uniforms && earthShaderRef.uniforms.uSunDirection) {
+            const sunDirFromEarth = new THREE.Vector3(0, 0, 0).sub(earthWorldPos).normalize();
+            earthShaderRef.uniforms.uSunDirection.value.copy(sunDirFromEarth);
+        }
 
         // 3. Satellite Tracking & Positions
+        const BODY_RADII_KM = { Earth: R_EARTH_KM, Moon: R_MOON_KM, Mars: R_MARS_KM, Venus: R_VENUS_KM, Mercury: R_MERCURY_KM };
         activeSatellites.forEach(sat => {
             const bodyWorldPos = getParentBodyWorldPos(sat.parentBody, simTime);
             sat.line.position.copy(bodyWorldPos);
 
-            const bodyRadiusKm = (sat.parentBody === 'Moon' ? R_MOON_KM : R_EARTH_KM);
+            const bodyRadiusKm = (BODY_RADII_KM[sat.parentBody] || R_EARTH_KM);
             if (sat.reentry && sat.deorbitEpoch !== null && simTime >= sat.deorbitEpoch) {
                 sat.mesh.visible = false;
                 if (sat.line) sat.line.visible = false;
@@ -7102,7 +7463,7 @@
                 const vx = buf.vx[i] || 0, vy = buf.vy[i] || 0, vz = buf.vz[i] || 0;
                 const vLenSq = vx * vx + vy * vy + vz * vz;
                 if (vLenSq > 1e-4) {
-                    const forward = new THREE.Vector3(vx, vy, vz).normalize();
+                    const forward = new THREE.Vector3(vx, vz, -vy).normalize();
                     const nadir = localPos.clone().negate().normalize();
                     const normal = new THREE.Vector3().crossVectors(forward, nadir).normalize();
                     const up = new THREE.Vector3().crossVectors(normal, forward).normalize();
@@ -7113,8 +7474,8 @@
 
             // Smooth LOD: show authentic 3D satellite mesh when zoomed in close, hide 2D billboard completely
             const distToCam = camera.position.distanceTo(sat.mesh.position);
-            if (distToCam < 250.0) {
-                // Closer than 250 km: icon must disappear completely!
+            if (distToCam < 1200.0) {
+                // Closer than 1200 km: icon glyph must disappear completely!
                 if (sat.sprite) {
                     sat.sprite.visible = false;
                     sat.sprite.material.opacity = 0.0;
@@ -7123,11 +7484,11 @@
                     sat.detailedModel.visible = true;
                     sat.detailedModel.rotation.y += 0.005 * Math.min(wallDt, 0.05);
                 }
-            } else if (distToCam < 900.0) {
+            } else if (distToCam < 2800.0) {
                 // Transition zone: icon smoothly fades out, 3D model visible
                 if (sat.detailedModel) sat.detailedModel.visible = true;
                 if (sat.sprite) {
-                    const spriteAlpha = Math.max(0.0, Math.min(1.0, (distToCam - 250.0) / 450.0));
+                    const spriteAlpha = Math.max(0.0, Math.min(1.0, (distToCam - 1200.0) / 1600.0));
                     sat.sprite.material.opacity = spriteAlpha;
                     sat.sprite.visible = spriteAlpha > 0.01;
                 }
@@ -7286,35 +7647,6 @@
 
         // 6. Camera Focus Modes & Splash Mode (30s dynamic focus cycle on idle)
         if (inSplashMode) {
-            const nowSec = Date.now() / 1000.0;
-            const cycleSec = nowSec % 90.0; // 90s total loop (30s Earth, 30s Moon, 30s Cislunar)
-            
-            if (cycleSec < 30.0) {
-                // Focus: Earth panoramic orbit
-                const t = nowSec * 0.08;
-                camera.position.x = earth.position.x + Math.cos(t) * 24000;
-                camera.position.y = earth.position.y + 7000 + Math.sin(t * 0.5) * 3000;
-                camera.position.z = earth.position.z + Math.sin(t) * 24000;
-                camera.lookAt(earth.position.x, earth.position.y, earth.position.z);
-            } else if (cycleSec < 60.0) {
-                // Focus: Moon polar close-up
-                const moonPos = moon.position;
-                const t = (nowSec - 30.0) * 0.12;
-                const moonCamDist = 6500.0;
-                camera.position.x = moonPos.x + Math.cos(t) * moonCamDist;
-                camera.position.y = moonPos.y + 2000 + Math.sin(t * 0.5) * 1200;
-                camera.position.z = moonPos.z + Math.sin(t) * moonCamDist;
-                camera.lookAt(moonPos.x, moonPos.y, moonPos.z);
-            } else {
-                // Focus: Earth-Moon Cislunar system highway
-                const midPos = earth.position.clone().lerp(moon.position, 0.35);
-                const t = (nowSec - 60.0) * 0.05;
-                camera.position.x = midPos.x + Math.cos(t) * 90000;
-                camera.position.y = midPos.y + 45000;
-                camera.position.z = midPos.z + Math.sin(t) * 90000;
-                camera.lookAt(midPos.x, midPos.y, midPos.z);
-            }
-
             // Animate all template constellation satellites & anchor rings to Earth
             heroSplashElements.forEach(el => {
                 if (el.isLine) el.position.copy(earth.position);
@@ -7340,6 +7672,16 @@
                 }
                 sat.group.position.set(earth.position.x + x, earth.position.y + y, earth.position.z + z);
             });
+
+            // Cinematic close-up flyover of LEO satellite skimming above Earth surface
+            if (splashConstellationSats.length > 0 && splashConstellationSats[0].group) {
+                const heroSat = splashConstellationSats[0];
+                const heroPos = heroSat.group.position;
+                const toSatDir = heroPos.clone().sub(earth.position).normalize();
+                const camOffset = toSatDir.clone().multiplyScalar(150).add(new THREE.Vector3(-90, 60, -90));
+                camera.position.copy(heroPos.clone().add(camOffset));
+                camera.lookAt(heroPos.clone().add(toSatDir.clone().multiplyScalar(-200)));
+            }
         } else {
             heroSplashElements.forEach(el => { el.visible = false; });
             splashConstellationSats.forEach(sat => { sat.group.visible = false; });
@@ -7364,6 +7706,30 @@
                     const delta = earth.position.clone().sub(prevTarget);
                     camera.position.add(delta);
                 }
+            } else if (cameraFocusMode === 'Mars') {
+                if (controls && typeof mars !== 'undefined') {
+                    controls.minDistance = 3396.0;
+                    const prevTarget = controls.target.clone();
+                    controls.target.copy(mars.position);
+                    const delta = mars.position.clone().sub(prevTarget);
+                    camera.position.add(delta);
+                }
+            } else if (cameraFocusMode === 'Venus') {
+                if (controls && typeof venus !== 'undefined') {
+                    controls.minDistance = 6058.0;
+                    const prevTarget = controls.target.clone();
+                    controls.target.copy(venus.position);
+                    const delta = venus.position.clone().sub(prevTarget);
+                    camera.position.add(delta);
+                }
+            } else if (cameraFocusMode === 'Mercury') {
+                if (controls && typeof mercury !== 'undefined') {
+                    controls.minDistance = 2446.0;
+                    const prevTarget = controls.target.clone();
+                    controls.target.copy(mercury.position);
+                    const delta = mercury.position.clone().sub(prevTarget);
+                    camera.position.add(delta);
+                }
             } else {
                 // Focus target is a satellite name
                 const focusSat = activeSatellites.find(s => s.name === cameraFocusMode) ||
@@ -7378,7 +7744,7 @@
             }
 
             // --- Decoupled Telemetry HUD Update ---
-            const isCelestialFocus = (cameraFocusMode === 'Moon' || cameraFocusMode === 'Earth' || cameraFocusMode === 'System' || cameraFocusMode === 'Sun');
+            const isCelestialFocus = (cameraFocusMode === 'Moon' || cameraFocusMode === 'Earth' || cameraFocusMode === 'System' || cameraFocusMode === 'Sun' || cameraFocusMode === 'Mars' || cameraFocusMode === 'Venus' || cameraFocusMode === 'Mercury');
             const activeSat = (!isCelestialFocus && selectedSatIndex >= 0 && activeSatellites[selectedSatIndex])
                 ? activeSatellites[selectedSatIndex]
                 : null;
@@ -7439,14 +7805,46 @@
                         const rect = renderer.domElement.getBoundingClientRect();
                         const x = (tempV.x * .5 + .5) * rect.width;
                         const y = (tempV.y * -.5 + .5) * rect.height;
-                        statBox.style.left = `${x + 15}px`;
-                        statBox.style.top = `${y - 15}px`;
 
-                        // Scale info box dynamically with camera zoom distance to satellite
-                        const distToSat = camera.position.distanceTo(sat.mesh.position);
-                        const zoomScale = Math.max(0.68, Math.min(1.40, Math.pow(8000.0 / Math.max(600.0, distToSat), 0.28)));
-                        statBox.style.transformOrigin = 'top left';
-                        statBox.style.transform = `scale(${zoomScale.toFixed(3)})`;
+                        const leaderSvg = document.getElementById('stat-box-leader-svg');
+                        const leaderLine = document.getElementById('stat-leader-line');
+                        const leaderDot = document.getElementById('stat-leader-dot');
+
+                        if (window.isStatBoxPinned) {
+                            // Docked to upper center HUD
+                            statBox.style.left = '50%';
+                            statBox.style.top = '68px';
+                            statBox.style.transform = 'translateX(-50%)';
+                            statBox.style.border = '1.5px solid #00E5FF';
+                            statBox.style.boxShadow = '0 0 12px rgba(0,229,255,0.45)';
+
+                            if (leaderSvg && leaderLine && leaderDot) {
+                                leaderSvg.style.display = 'block';
+                                const boxRect = statBox.getBoundingClientRect();
+                                const boxCenterX = boxRect.left + boxRect.width * 0.5;
+                                const boxBottomY = boxRect.bottom;
+
+                                leaderLine.setAttribute('x1', boxCenterX);
+                                leaderLine.setAttribute('y1', boxBottomY);
+                                leaderLine.setAttribute('x2', x);
+                                leaderLine.setAttribute('y2', y);
+
+                                leaderDot.setAttribute('cx', x);
+                                leaderDot.setAttribute('cy', y);
+                            }
+                        } else {
+                            if (leaderSvg) leaderSvg.style.display = 'none';
+                            statBox.style.left = `${x + 15}px`;
+                            statBox.style.top = `${y - 15}px`;
+                            statBox.style.border = '1px solid #38bdf8';
+                            statBox.style.boxShadow = '0 4px 16px rgba(0,0,0,0.6), 0 0 8px rgba(56,189,248,0.25)';
+
+                            // Scale info box dynamically with camera zoom distance to satellite
+                            const distToSat = camera.position.distanceTo(sat.mesh.position);
+                            const zoomScale = Math.max(0.68, Math.min(1.40, Math.pow(8000.0 / Math.max(600.0, distToSat), 0.28)));
+                            statBox.style.transformOrigin = 'top left';
+                            statBox.style.transform = `scale(${zoomScale.toFixed(3)})`;
+                        }
                     }
                 }
 
@@ -7485,7 +7883,7 @@
             const nLinks = (typeof activeISLConnections !== 'undefined' && Array.isArray(activeISLConnections)) ? activeISLConnections.length : 0;
             islPillEl.innerText = `ISL: ${showISLMesh ? 'ACTIVE' : 'STANDBY'} | ${nLinks} LINKS`;
         }
-        if (typeof rayleighMieAtmosphere !== 'undefined' && rayleighMieAtmosphere && rayleighMieAtmosphere.material && rayleighMieAtmosphere.material.uniforms) {
+        if (typeof rayleighMieAtmosphere !== 'undefined' && rayleighMieAtmosphere && rayleighMieAtmosphere.material && rayleighMieAtmosphere.material.uniforms && rayleighMieAtmosphere.material.uniforms.uSunDir) {
             const sunDir = earth.position.clone().negate().normalize();
             if (sunDir.lengthSq() > 0.01) {
                 rayleighMieAtmosphere.material.uniforms.uSunDir.value.copy(sunDir);
@@ -7505,18 +7903,45 @@
             });
         }
 
-        // Hide city labels and beacons behind the Earth horizon
-        if (typeof earthCityObjects !== 'undefined' && Array.isArray(earthCityObjects) && earthCityObjects.length > 0) {
-            const camPos = camera.position;
-            const rSq = R_EARTH_KM * R_EARTH_KM;
-            earthCityObjects.forEach(city => {
-                if (city.obj) {
-                    const worldPos = new THREE.Vector3();
-                    city.obj.getWorldPosition(worldPos);
-                    const isVisible = worldPos.dot(camPos) > (rSq * 0.96);
-                    city.obj.visible = isVisible && earthCitiesVisible;
-                }
+        // Dynamic Ground Station RF Downlink Beams & AOS Pass Calculation
+        if (showGroundStations && typeof groundStationObjects !== 'undefined' && groundStationObjects.length > 0) {
+            groundStationBeamsGroup.clear();
+            const beamMat = new THREE.LineBasicMaterial({ color: 0x34d399, transparent: true, opacity: 0.85, linewidth: 2 });
+
+            activeSatellites.forEach(sat => {
+                if (sat.parentBody !== 'Earth' || !sat.mesh || !sat.mesh.visible) return;
+                const satWorldPos = sat.mesh.position;
+
+                groundStationObjects.forEach(gs => {
+                    const gsWorldPos = new THREE.Vector3();
+                    gs.group.getWorldPosition(gsWorldPos);
+                    const toCam = camera.position.clone().sub(gsWorldPos);
+                    const isFacingCamera = toCam.dot(gs.normal) > 0.05;
+                    gs.sprite.visible = isFacingCamera;
+
+                    const toSat = satWorldPos.clone().sub(gsWorldPos);
+                    const distKm = toSat.length();
+                    // Satellite line of sight and elevation angle (dot product with surface normal)
+                    const sinElev = toSat.clone().normalize().dot(gs.normal);
+                    const elevDeg = Math.asin(Math.max(-1.0, Math.min(1.0, sinElev))) * 180.0 / Math.PI;
+
+                    if (elevDeg >= 10.0 && distKm < 4200.0) {
+                        const pts = [gsWorldPos, satWorldPos];
+                        const beamLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), beamMat);
+                        groundStationBeamsGroup.add(beamLine);
+                    }
+                });
             });
+        }
+
+        // Camera Subsurface Clamp: Strictly prevent camera zooming inside the Earth
+        if (camera && earth && cameraFocusMode !== 'Sun') {
+            const distToEarth = camera.position.distanceTo(earth.position);
+            const minSafeDist = R_EARTH_KM + 15.0; // 6386 km (15 km above ground)
+            if (distToEarth < minSafeDist) {
+                const camDir = camera.position.clone().sub(earth.position).normalize();
+                camera.position.copy(earth.position.clone().add(camDir.multiplyScalar(minSafeDist)));
+            }
         }
 
         if (renderer) renderer.render(scene, camera);
@@ -7537,7 +7962,7 @@
                     const idx = interpAt(b, Math.min(simTime, b.t[b.t.length - 1]));
                     const i = (typeof idx === 'number') ? idx : (idx ? idx.lo : 0);
                     const vx = (b.vx && b.vx[i]) || 0, vy = (b.vy && b.vy[i]) || 0, vz = (b.vz && b.vz[i]) || 0;
-                    const fwd = new THREE.Vector3(vx, vy, vz).normalize();
+                    const fwd = new THREE.Vector3(vx, vz, -vy).normalize();
                     if (fwd.lengthSq() > 0.1) {
                         vcamCamera.lookAt(sat.mesh.position.clone().add(fwd.multiplyScalar(1000)));
                         const nadir = bodyWorldPos.clone().sub(sat.mesh.position).normalize();
@@ -7624,6 +8049,65 @@
                     } else {
                         cityEl.style.display = 'none';
                     }
+                }
+            }
+        }
+
+        // Broadcast live telemetry to /graphs and optical frames to /vcam
+        if (typeof window._lastBroadcastTime === 'undefined') {
+            window._lastBroadcastTime = 0;
+            window._telemetryBroadcastChannel = new BroadcastChannel('nanodynamics_telemetry');
+            window._vcamBroadcastChannel = new BroadcastChannel('nanodynamics_vcam');
+        }
+        const curPerfMs = performance.now();
+        if (curPerfMs - window._lastBroadcastTime > 100) {
+            window._lastBroadcastTime = curPerfMs;
+            const targetSat = (selectedSatIndex >= 0 && activeSatellites[selectedSatIndex])
+                ? activeSatellites[selectedSatIndex]
+                : (activeSatellites.length > 0 ? activeSatellites[0] : null);
+
+            if (targetSat && targetSat.buf && targetSat.buf.t && targetSat.buf.t.length > 0) {
+                const b = targetSat.buf;
+                const idx = interpAt(b, Math.min(simTime, b.t[b.t.length - 1]));
+                const i = (typeof idx === 'number') ? idx : (idx ? idx.lo : 0);
+                const alt = b.alt_km ? (b.alt_km[i] || 400.0) : 400.0;
+                const vx = b.vx ? (b.vx[i] || 0) : 0, vy = b.vy ? (b.vy[i] || 0) : 0, vz = b.vz ? (b.vz[i] || 0) : 0;
+                const vel = Math.sqrt(vx*vx + vy*vy + vz*vz) * 0.001;
+                const mass = (targetSat.params && targetSat.params.mass_kg) || 4.0;
+                const fDrag = (b.forces && b.forces.drag && b.forces.drag[i]) ? Math.sqrt(b.forces.drag[i][0]**2 + b.forces.drag[i][1]**2 + b.forces.drag[i][2]**2) * mass : 1e-4;
+                const fJ2 = (b.forces && b.forces.j2 && b.forces.j2[i]) ? Math.sqrt(b.forces.j2[i][0]**2 + b.forces.j2[i][1]**2 + b.forces.j2[i][2]**2) * mass : 0.01;
+                const fSrp = (b.forces && b.forces.srp && b.forces.srp[i]) ? Math.sqrt(b.forces.srp[i][0]**2 + b.forces.srp[i][1]**2 + b.forces.srp[i][2]**2) * mass : 1e-5;
+
+                window._telemetryBroadcastChannel.postMessage({
+                    satName: targetSat.name || 'Sat',
+                    simTime: simTime,
+                    alt_km: alt,
+                    vel_kms: vel,
+                    mass_kg: mass,
+                    f_drag_N: fDrag,
+                    f_j2_N: fJ2,
+                    f_srp_N: fSrp,
+                    f_mag_N: 4.5e-6,
+                    f_j3_N: 2.3e-5,
+                    effective_area_m2: (targetSat.params && targetSat.params.drag_area) || 0.03,
+                    energy_drift: 0.0,
+                    in_shadow: !!targetSat.inEclipse
+                });
+
+                if (vcamRenderer && document.getElementById('vcam-canvas')) {
+                    const canvas = document.getElementById('vcam-canvas');
+                    try {
+                        const frameData = canvas.toDataURL('image/jpeg', 0.65);
+                        window._vcamBroadcastChannel.postMessage({
+                            satName: targetSat.name || 'Sat',
+                            alt_km: alt,
+                            vel_kms: vel,
+                            lat: b.lat_deg ? b.lat_deg[i] : 29.76,
+                            lon: b.lon_deg ? b.lon_deg[i] : -95.36,
+                            epochStr: formatTime(simTime),
+                            frameData: frameData
+                        });
+                    } catch (e) {}
                 }
             }
         }
@@ -8177,12 +8661,14 @@
 
     // ── About Modal Functions ─────────────────────────────────────────────
     window.openAboutModal = function() {
-        const el = document.getElementById('about-modal-overlay');
+        const el = document.getElementById('about-nanodynamics-modal') || document.getElementById('about-modal-overlay');
         if (el) el.style.display = 'flex';
     };
     window.closeAboutModal = function() {
-        const el = document.getElementById('about-modal-overlay');
+        const el = document.getElementById('about-nanodynamics-modal');
         if (el) el.style.display = 'none';
+        const el2 = document.getElementById('about-modal-overlay');
+        if (el2) el2.style.display = 'none';
     };
 
     // ── SpaceX-Style Cinematic Vector Logo Screen Lifecycle ───────────────

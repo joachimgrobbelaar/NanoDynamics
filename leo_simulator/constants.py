@@ -65,3 +65,17 @@ ATMOSPHERE_DEFAULT_SCALE_HEIGHT: Final[float] = 58_200.0  # [m]
 ATMOSPHERE_SEA_LEVEL_RHO: Final[float] = 1.225  # [kg / m^3]
 ATMOSPHERE_SEA_LEVEL_SCALE_HEIGHT: Final[float] = 7200.0  # [m]
 
+# Higher-order Earth geopotential harmonics (EGM96 / WGS-84)
+J3_EARTH: Final[float] = -2.532656485e-6
+J4_EARTH: Final[float] = -1.619621591e-6
+C22_EARTH: Final[float] = 1.574536e-6
+S22_EARTH: Final[float] = -9.03868e-7
+
+# Solid Earth Tidal deformation (Love number k2)
+K2_EARTH_TIDE: Final[float] = 0.299
+
+# Geomagnetic dipole parameters
+B0_EARTH_SURFACE: Final[float] = 3.12e-5  # Magnetic field strength at equator [Tesla]
+MAG_POLE_TILT_RAD: Final[float] = 0.200713  # ~11.5 deg magnetic dipole tilt
+MAG_POLE_LON_RAD: Final[float] = -1.22173   # ~-70 deg West longitude of geomagnetic pole
+
