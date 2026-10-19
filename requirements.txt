@@ -6,6 +6,11 @@ torch>=2.0.0
 # Backend Web Server and API
 fastapi>=0.100.0
 uvicorn[standard]>=0.20.0
+
+# Data Ingestion & HF Hub
+datasets>=2.14.0
+pyarrow>=12.0.0
+huggingface-hub>=0.19.0
 pydantic>=2.0.0
 
 # Testing and Utilities

@@ -497,6 +497,14 @@
             <div class="splash-badge">🌌 ORBITAL DYNAMICS v2.0 BETA • WITS HONOURS</div>
             <div class="splash-subtitle" style="margin-top:8px;">Real-Scale Earth-Moon Mechanics, PINN Surrogate & Live LEO Tracking</div>
 
+            <!-- Interactive 3D CubeSat Hero Viewport -->
+            <div id="splash-cubesat-card" style="position:relative; width:340px; max-width:85vw; height:150px; margin:10px auto 14px; background:radial-gradient(circle at center, rgba(56,189,248,0.16) 0%, rgba(2,6,23,0.7) 70%); border:1px solid rgba(56,189,248,0.3); border-radius:12px; overflow:hidden; box-shadow:0 8px 30px rgba(0,0,0,0.7);">
+                <canvas id="splash-cubesat-canvas" style="width:100%; height:100%; display:block; cursor:grab;"></canvas>
+                <div style="position:absolute; bottom:6px; left:0; right:0; text-align:center; font-size:9px; color:#38bdf8; font-family:'SF Mono', Monaco, monospace; letter-spacing:0.12em; text-transform:uppercase; pointer-events:none; text-shadow:0 1px 4px rgba(0,0,0,0.8);">
+                    🛰️ Overview 1 VR CubeSat • 3D Telemetry Preview (Drag to Rotate)
+                </div>
+            </div>
+
             <div class="splash-menu">
                 <button class="splash-btn primary" onclick="splashStartNewMission()">
                     <div class="splash-btn-left">
@@ -748,6 +756,41 @@
 
         <h3 class="sx-telemetry-header">Active Satellites</h3>
         <ul id="sat-list"></ul>
+
+        <!-- 3D Spacecraft Fleet Deployment & Model Switcher -->
+        <div id="spacecraft-fleet-selector" style="background:#05070B; border:1px solid rgba(56,189,248,0.22); border-radius:4px; padding:8px; margin-bottom:10px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <span style="font-size:10px; font-weight:700; color:#38bdf8; font-family:var(--sx-font-mono); letter-spacing:0.08em;">🛰️ 3D SPACECRAFT FLEET</span>
+                <span style="font-size:9px; color:#94a3b8; font-family:var(--sx-font-mono);">11 GLB Models</span>
+            </div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:4px; margin-bottom:6px;">
+                <button onclick="deployQuickSpacecraft('space_station')" style="background:#090d16; border:1px solid rgba(56,189,248,0.3); color:#38bdf8; border-radius:3px; padding:3px 4px; font-size:10px; font-weight:600; cursor:pointer; text-align:left;" title="Deploy International Space Station (ISS)">🛰️ Space Station</button>
+                <button onclick="deployQuickSpacecraft('hubble')" style="background:#090d16; border:1px solid rgba(56,189,248,0.3); color:#00e5ff; border-radius:3px; padding:3px 4px; font-size:10px; font-weight:600; cursor:pointer; text-align:left;" title="Deploy Hubble Space Telescope">🔭 Hubble HST</button>
+                <button onclick="deployQuickSpacecraft('landsat_8')" style="background:#090d16; border:1px solid rgba(56,189,248,0.3); color:#4ade80; border-radius:3px; padding:3px 4px; font-size:10px; font-weight:600; cursor:pointer; text-align:left;" title="Deploy Landsat 8 Topo">🌍 Landsat 8</button>
+                <button onclick="deployQuickSpacecraft('space_shuttle')" style="background:#090d16; border:1px solid rgba(56,189,248,0.3); color:#f8fafc; border-radius:3px; padding:3px 4px; font-size:10px; font-weight:600; cursor:pointer; text-align:left;" title="Deploy Space Shuttle Discovery">🚀 Shuttle OV-103</button>
+                <button onclick="deployQuickSpacecraft('cubesat_vr')" style="background:#090d16; border:1px solid rgba(56,189,248,0.3); color:#38bdf8; border-radius:3px; padding:3px 4px; font-size:10px; font-weight:600; cursor:pointer; text-align:left;" title="Deploy Overview 1 VR Camera CubeSat">📦 VR CubeSat</button>
+                <button onclick="deployQuickSpacecraft('cubesat_club')" style="background:#090d16; border:1px solid rgba(56,189,248,0.3); color:#f59e0b; border-radius:3px; padding:3px 4px; font-size:10px; font-weight:600; cursor:pointer; text-align:left;" title="Deploy Space Club CubeSat">🏷️ Club CubeSat</button>
+                <button onclick="deployQuickSpacecraft('tie_fighter')" style="background:#090d16; border:1px solid rgba(239,68,68,0.45); color:#f87171; border-radius:3px; padding:3px 4px; font-size:10px; font-weight:600; cursor:pointer; text-align:left;" title="Deploy Imperial TIE Fighter">👾 TIE Fighter</button>
+                <button onclick="deployQuickSpacecraft('vega')" style="background:#090d16; border:1px solid rgba(192,132,252,0.4); color:#c084fc; border-radius:3px; padding:3px 4px; font-size:10px; font-weight:600; cursor:pointer; text-align:left;" title="Deploy Vega Launcher AVUM">🚀 Vega Stage</button>
+            </div>
+            <div style="display:flex; gap:4px; align-items:center;">
+                <select id="selected-sat-model-dropdown" style="flex:1; background:#020617; color:#f8fafc; border:1px solid rgba(56,189,248,0.3); border-radius:3px; font-size:10px; padding:3px 5px;" onchange="changeSelectedSatelliteModel(this.value)">
+                    <option value="auto">Assign 3D Model to Selected Sat...</option>
+                    <option value="space_station">🛰️ Space Station (ISS)</option>
+                    <option value="hubble">🔭 Hubble Space Telescope</option>
+                    <option value="landsat_8">🌍 Landsat 8 Clean Topo</option>
+                    <option value="space_shuttle">🚀 Space Shuttle Discovery</option>
+                    <option value="cubesat_vr">📦 Overview 1 VR CubeSat</option>
+                    <option value="cubesat_club">🏷️ Space Club CubeSat</option>
+                    <option value="tie_fighter">👾 Imperial TIE Fighter</option>
+                    <option value="vega">🚀 Vega Spacecraft</option>
+                    <option value="satellite">📡 Comms Satellite</option>
+                    <option value="simple_satellite">🛰️ Low-Poly Satellite</option>
+                    <option value="need_some_space">🛸 Need Some Space Probe</option>
+                </select>
+                <button onclick="applyModelToSelectedSat()" style="background:#0284c7; color:#fff; border:none; border-radius:3px; padding:3px 8px; font-size:10px; font-weight:700; cursor:pointer;" title="Apply to Selected Sat">Set</button>
+            </div>
+        </div>
 
         <h3 class="sx-telemetry-header">🛰️ ISL Laser Mesh & Kinematics</h3>
         <div id="isl-routing-panel" style="background:#05070B; padding:8px; border-radius:4px; border:1px solid rgba(56,189,248,0.18); font-size:11px; margin-bottom:10px;">
@@ -1522,6 +1565,19 @@
                 <button onclick="refreshLiveCatalogOnline()" style="background:#0284c7; color:white; border:none; padding:6px 12px; border-radius:4px; font-size:12px; font-weight:600; cursor:pointer;">🔄 Refresh Live Feed</button>
             </div>
 
+            <!-- 3D Model Quick Deploy Chips in Modal -->
+            <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:10px; background:#0b1120; padding:6px 10px; border-radius:4px; border:1px solid rgba(56,189,248,0.2);">
+                <span style="font-size:10px; color:#38bdf8; font-weight:700; font-family:monospace;">FEATURED 3D MODELS:</span>
+                <button onclick="deployQuickSpacecraft('space_station')" style="background:#1e293b; color:#38bdf8; border:1px solid rgba(56,189,248,0.3); border-radius:3px; padding:2px 6px; font-size:10px; cursor:pointer;">+ ISS Space Station</button>
+                <button onclick="deployQuickSpacecraft('hubble')" style="background:#1e293b; color:#00e5ff; border:1px solid rgba(56,189,248,0.3); border-radius:3px; padding:2px 6px; font-size:10px; cursor:pointer;">+ Hubble HST</button>
+                <button onclick="deployQuickSpacecraft('landsat_8')" style="background:#1e293b; color:#4ade80; border:1px solid rgba(56,189,248,0.3); border-radius:3px; padding:2px 6px; font-size:10px; cursor:pointer;">+ Landsat 8</button>
+                <button onclick="deployQuickSpacecraft('space_shuttle')" style="background:#1e293b; color:#f8fafc; border:1px solid rgba(56,189,248,0.3); border-radius:3px; padding:2px 6px; font-size:10px; cursor:pointer;">+ Shuttle Discovery</button>
+                <button onclick="deployQuickSpacecraft('cubesat_vr')" style="background:#1e293b; color:#38bdf8; border:1px solid rgba(56,189,248,0.3); border-radius:3px; padding:2px 6px; font-size:10px; cursor:pointer;">+ VR CubeSat</button>
+                <button onclick="deployQuickSpacecraft('cubesat_club')" style="background:#1e293b; color:#f59e0b; border:1px solid rgba(56,189,248,0.3); border-radius:3px; padding:2px 6px; font-size:10px; cursor:pointer;">+ Club CubeSat</button>
+                <button onclick="deployQuickSpacecraft('tie_fighter')" style="background:#1e293b; color:#f87171; border:1px solid rgba(239,68,68,0.4); border-radius:3px; padding:2px 6px; font-size:10px; cursor:pointer;">+ TIE Fighter</button>
+                <button onclick="deployQuickSpacecraft('vega')" style="background:#1e293b; color:#c084fc; border:1px solid rgba(192,132,252,0.4); border-radius:3px; padding:2px 6px; font-size:10px; cursor:pointer;">+ Vega AVUM</button>
+            </div>
+
             <div style="max-height:360px; overflow-y:auto; border:1px solid #334155; border-radius:6px; background:#0f172a;">
                 <table style="width:100%; border-collapse:collapse; font-size:12px; text-align:left;">
                     <thead style="background:#1e293b; color:#94a3b8; position:sticky; top:0; z-index:10;">
@@ -1774,6 +1830,7 @@
     <!-- Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/lil-gui@0.18"></script>
     <script src="/static/js/mission_guide.js"></script>
 
@@ -1863,6 +1920,171 @@
         controls.maxDistance = 1500000000;
     } catch (e) {
         console.error("WebGL failed:", e);
+    }
+
+    // ── High-Fidelity 3D Spacecraft Models Registry ────────────────────────────
+    const SPACECRAFT_MODELS = {
+        space_station: {
+            name: "International Space Station (ISS)",
+            file: "/static/models/space_station.glb",
+            scale: 55.0,
+            preset: { name: "ISS (Space Station)", altitude_km: 420.0, inclination_deg: 51.64, eccentricity: 0.0005, mass: 420000.0, cd: 2.2, drag_area: 1600.0, color: "#38bdf8" }
+        },
+        hubble: {
+            name: "Hubble Space Telescope (HST)",
+            file: "/static/models/hubble.glb",
+            scale: 45.0,
+            preset: { name: "Hubble Space Telescope", altitude_km: 540.0, inclination_deg: 28.47, eccentricity: 0.0003, mass: 11110.0, cd: 2.2, drag_area: 30.0, color: "#00e5ff" }
+        },
+        landsat_8: {
+            name: "Landsat 8 Topo Earth Observation",
+            file: "/static/models/landsat_8.glb",
+            scale: 45.0,
+            preset: { name: "Landsat 8 Clean Topo", altitude_km: 705.0, inclination_deg: 98.2, eccentricity: 0.001, mass: 2071.0, cd: 2.2, drag_area: 12.0, color: "#4ade80" }
+        },
+        space_shuttle: {
+            name: "Space Shuttle Discovery (OV-103)",
+            file: "/static/models/space_shuttle.glb",
+            scale: 50.0,
+            preset: { name: "Space Shuttle Discovery", altitude_km: 350.0, inclination_deg: 28.5, eccentricity: 0.001, mass: 78000.0, cd: 2.0, drag_area: 110.0, color: "#f8fafc" }
+        },
+        cubesat_vr: {
+            name: "Overview 1 VR Camera CubeSat",
+            file: "/static/models/cubesat_vr.glb",
+            scale: 60.0,
+            preset: { name: "Overview 1 VR CubeSat", altitude_km: 450.0, inclination_deg: 51.6, eccentricity: 0.001, mass: 4.0, cd: 2.2, drag_area: 0.03, color: "#38bdf8" }
+        },
+        cubesat_club: {
+            name: "Space Club Educational CubeSat",
+            file: "/static/models/cubesat_club.glb",
+            scale: 65.0,
+            preset: { name: "Space Club CubeSat", altitude_km: 500.0, inclination_deg: 97.4, eccentricity: 0.001, mass: 1.33, cd: 2.2, drag_area: 0.01, color: "#f59e0b" }
+        },
+        tie_fighter: {
+            name: "Imperial TIE Fighter (Custom)",
+            file: "/static/models/tie_fighter.glb",
+            scale: 50.0,
+            preset: { name: "Imperial TIE Fighter", altitude_km: 480.0, inclination_deg: 45.0, eccentricity: 0.002, mass: 6000.0, cd: 1.8, drag_area: 8.0, color: "#ef4444" }
+        },
+        vega: {
+            name: "Vega Launcher Upper Stage (AVUM)",
+            file: "/static/models/vega.glb",
+            scale: 50.0,
+            preset: { name: "Vega Spacecraft", altitude_km: 650.0, inclination_deg: 98.0, eccentricity: 0.001, mass: 1500.0, cd: 2.2, drag_area: 4.5, color: "#c084fc" }
+        },
+        satellite: {
+            name: "Standard Communications Satellite",
+            file: "/static/models/satellite.glb",
+            scale: 55.0,
+            preset: { name: "Comms Satellite", altitude_km: 600.0, inclination_deg: 35.0, eccentricity: 0.001, mass: 3500.0, cd: 2.2, drag_area: 25.0, color: "#06b6d4" }
+        },
+        simple_satellite: {
+            name: "Low-Poly Micro-Satellite",
+            file: "/static/models/simple_satellite.glb",
+            scale: 60.0,
+            preset: { name: "MicroSat Low-Poly", altitude_km: 520.0, inclination_deg: 53.0, eccentricity: 0.001, mass: 25.0, cd: 2.2, drag_area: 0.2, color: "#10b981" }
+        },
+        need_some_space: {
+            name: "Deep Space Probe Explorer",
+            file: "/static/models/need_some_space.glb",
+            scale: 50.0,
+            preset: { name: "Deep Space Probe", altitude_km: 800.0, inclination_deg: 30.0, eccentricity: 0.003, mass: 850.0, cd: 2.2, drag_area: 5.0, color: "#ec4899" }
+        }
+    };
+
+    function autoDetectModelKey(name) {
+        if (!name) return null;
+        const n = String(name).toLowerCase();
+        if (n.includes('tie') || n.includes('fighter')) return 'tie_fighter';
+        if (n.includes('hubble') || n.includes('hst')) return 'hubble';
+        if (n.includes('iss') || n.includes('station')) return 'space_station';
+        if (n.includes('landsat')) return 'landsat_8';
+        if (n.includes('shuttle') || n.includes('discovery') || n.includes('ov-103')) return 'space_shuttle';
+        if (n.includes('vega')) return 'vega';
+        if (n.includes('vr') || n.includes('overview')) return 'cubesat_vr';
+        if (n.includes('club')) return 'cubesat_club';
+        if (n.includes('probe') || n.includes('deep space')) return 'need_some_space';
+        if (n.includes('cubesat')) return 'cubesat_vr';
+        return null;
+    }
+
+    const gltfModelCache = {};
+    function loadOrCloneSpacecraftModel(modelKey, onLoaded) {
+        if (!modelKey || !SPACECRAFT_MODELS[modelKey]) return;
+        const def = SPACECRAFT_MODELS[modelKey];
+        if (gltfModelCache[modelKey]) {
+            const cloned = gltfModelCache[modelKey].clone(true);
+            onLoaded(cloned, def);
+            return;
+        }
+        if (typeof THREE.GLTFLoader === 'undefined') {
+            console.warn("THREE.GLTFLoader is not available yet.");
+            return;
+        }
+        const loader = new THREE.GLTFLoader();
+        loader.load(def.file, (gltf) => {
+            const root = gltf.scene;
+            const bbox = new THREE.Box3().setFromObject(root);
+            const center = bbox.getCenter(new THREE.Vector3());
+            root.position.sub(center);
+            const size = bbox.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z) || 1.0;
+            const normScale = (def.scale || 50.0) / maxDim;
+            root.scale.set(normScale, normScale, normScale);
+
+            root.traverse((node) => {
+                if (node.isMesh) {
+                    node.castShadow = true;
+                    node.receiveShadow = true;
+                    if (node.material) {
+                        node.material.side = THREE.DoubleSide;
+                    }
+                }
+            });
+
+            gltfModelCache[modelKey] = root;
+            const cloned = root.clone(true);
+            onLoaded(cloned, def);
+        }, undefined, (err) => {
+            console.warn(`Could not load GLTF model ${def.file}:`, err);
+        });
+    }
+
+    // ── Constellation Celestial Sky Dome in Skybox ─────────────────────────────
+    let constellationSkyDome = null;
+    try {
+        if (typeof THREE.GLTFLoader !== 'undefined') {
+            const skyLoader = new THREE.GLTFLoader();
+            skyLoader.load('/static/models/constellation_sky_dome.glb', (gltf) => {
+                const dome = gltf.scene;
+                const bbox = new THREE.Box3().setFromObject(dome);
+                const size = bbox.getSize(new THREE.Vector3());
+                const maxDim = Math.max(size.x, size.y, size.z) || 1.0;
+                const targetRadius = 9.0e8; // ~6 AU celestial radius
+                const scale = (targetRadius * 2.0) / maxDim;
+                dome.scale.set(scale, scale, scale);
+                dome.position.set(0, 0, 0);
+
+                dome.traverse((node) => {
+                    if (node.isMesh) {
+                        node.material.side = THREE.BackSide;
+                        node.material.depthWrite = false;
+                        node.material.transparent = true;
+                        node.material.opacity = 0.90;
+                        if (node.material.emissive) {
+                            node.material.emissive.setHex(0x0369a1);
+                            node.material.emissiveIntensity = 0.85;
+                        }
+                    }
+                });
+                scene.add(dome);
+                constellationSkyDome = dome;
+            }, undefined, (e) => {
+                console.warn("Could not load constellation sky dome:", e);
+            });
+        }
+    } catch (e) {
+        console.warn("Sky dome setup error:", e);
     }
 
     // ── Real Heliocentric Astronomical Scale & Solar Ephemeris ────────────────
@@ -2194,6 +2416,50 @@
         earthMat
     );
     scene.add(earth);
+
+    // ── Animated Ocean Wave Overlay & Realistic Water Dynamics ─────────────────
+    let oceanMeshGroup = null;
+    let oceanAnimationMixer = null;
+    try {
+        if (typeof THREE.GLTFLoader !== 'undefined') {
+            const oceanLoader = new THREE.GLTFLoader();
+            oceanLoader.load('/static/models/animated_ocean.glb', (gltf) => {
+                const ocean = gltf.scene;
+                const bbox = new THREE.Box3().setFromObject(ocean);
+                const size = bbox.getSize(new THREE.Vector3());
+                const maxDim = Math.max(size.x, size.y, size.z) || 1.0;
+                const scale = (R_EARTH_KM * 2.003) / maxDim; // Layer just over Earth's crust
+                ocean.scale.set(scale, scale, scale);
+                ocean.position.set(0, 0, 0);
+
+                ocean.traverse((node) => {
+                    if (node.isMesh) {
+                        node.material.transparent = true;
+                        node.material.opacity = 0.45;
+                        node.material.roughness = 0.12;
+                        node.material.metalness = 0.82;
+                        node.material.depthWrite = false;
+                        if (node.material.color) {
+                            node.material.color.setHex(0x0284c7);
+                        }
+                    }
+                });
+
+                if (gltf.animations && gltf.animations.length > 0) {
+                    oceanAnimationMixer = new THREE.AnimationMixer(ocean);
+                    const action = oceanAnimationMixer.clipAction(gltf.animations[0]);
+                    action.play();
+                }
+
+                earth.add(ocean);
+                oceanMeshGroup = ocean;
+            }, undefined, (err) => {
+                console.warn("Could not load animated ocean:", err);
+            });
+        }
+    } catch (e) {
+        console.warn("Ocean overlay error:", e);
+    }
 
     // Custom GLSL Exaggerated Multi-Layer Stratified Atmosphere Shell
     const rayleighMieAtmosphere = new THREE.Mesh(
@@ -3741,6 +4007,21 @@
         const mass = p.mass_kg || p.mass || 500.0;
         const dragArea = p.drag_area || 2.0;
         const accentCol = parseInt(colorHex.replace('#', '0x'), 16) || 0x38bdf8;
+
+        // Check if a specific 3D model is specified or auto-detect from name
+        const modelKey = p.model_key || p.modelKey || (typeof autoDetectModelKey === 'function' ? autoDetectModelKey(p.name) : null);
+        if (modelKey && typeof loadOrCloneSpacecraftModel === 'function' && SPACECRAFT_MODELS[modelKey]) {
+            loadOrCloneSpacecraftModel(modelKey, (gltfModel) => {
+                while (satGroup.children.length > 0) {
+                    satGroup.remove(satGroup.children[0]);
+                }
+                satGroup.add(gltfModel);
+            });
+            // Lightweight placeholder until model loads
+            const placeholderMat = new THREE.MeshBasicMaterial({ color: accentCol, wireframe: true });
+            satGroup.add(new THREE.Mesh(new THREE.BoxGeometry(6, 6, 6), placeholderMat));
+            return satGroup;
+        }
 
         if (mass < 40.0) {
             // ── CLASS 1: Next-Gen Aerospace Micro-Satellite (< 40 kg) ──
@@ -6977,6 +7258,9 @@
         if (splash) splash.classList.add('hidden');
         heroSplashElements.forEach(el => { el.visible = false; });
         splashConstellationSats.forEach(s => { s.group.visible = false; });
+        if (typeof splashCubeSatViewer !== 'undefined' && splashCubeSatViewer && splashCubeSatViewer.stop) {
+            splashCubeSatViewer.stop();
+        }
         if (spawnDemo && activeSatellites.length === 0) {
             spawnDefaultDemoSatellite();
         }
@@ -6990,6 +7274,9 @@
         const splash = document.getElementById('splash-screen');
         if (splash) splash.classList.remove('hidden');
         heroSplashElements.forEach(el => { el.visible = true; });
+        if (typeof initSplashCubeSatViewer === 'function') {
+            initSplashCubeSatViewer();
+        }
         updateBodyAxes();
     };
 
@@ -7440,6 +7727,16 @@
         if (effectiveDt > 0) {
             earth.rotation.y += 7.2921e-5 * effectiveDt;
             if (typeof weatherCloudsMesh !== 'undefined' && weatherCloudsMesh) weatherCloudsMesh.rotation.y += 7.5e-5 * effectiveDt;
+        }
+
+        // Celestial Sidereal Drift of Constellation Sky Dome
+        if (typeof constellationSkyDome !== 'undefined' && constellationSkyDome) {
+            constellationSkyDome.rotation.y += 0.000015;
+        }
+
+        // Real-Time Undulating Ocean Wave Dynamics
+        if (typeof oceanAnimationMixer !== 'undefined' && oceanAnimationMixer) {
+            oceanAnimationMixer.update(wallDt * 0.85);
         }
 
         // Dynamic Storm Rotation and Wind Advection
@@ -8809,6 +9106,190 @@
             intro.style.display = 'flex';
             intro.classList.remove('fade-out');
             setTimeout(dismissBrandIntro, 2000);
+        }
+    };
+
+    // ── Interactive 3D CubeSat Hero Viewport on Splash Screen ────────────────
+    let splashCubeSatViewer = null;
+    function initSplashCubeSatViewer() {
+        const canvas = document.getElementById('splash-cubesat-canvas');
+        if (!canvas) return;
+        try {
+            const width = canvas.clientWidth || 340;
+            const height = canvas.clientHeight || 150;
+            const splashScene = new THREE.Scene();
+            const splashCamera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
+            splashCamera.position.set(0, 1.2, 3.2);
+            splashCamera.lookAt(0, 0, 0);
+
+            const splashRenderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+            splashRenderer.setSize(width, height, false);
+            splashRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+            const ambLight = new THREE.AmbientLight(0xffffff, 0.85);
+            splashScene.add(ambLight);
+            const dirLight = new THREE.DirectionalLight(0x38bdf8, 2.2);
+            dirLight.position.set(4, 5, 5);
+            splashScene.add(dirLight);
+            const rimLight = new THREE.DirectionalLight(0xf59e0b, 1.5);
+            rimLight.position.set(-4, -2, -4);
+            splashScene.add(rimLight);
+
+            let cubeSatModel = null;
+            let isDragging = false;
+            let prevMouseX = 0, prevMouseY = 0;
+
+            canvas.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                prevMouseX = e.clientX;
+                prevMouseY = e.clientY;
+                canvas.style.cursor = 'grabbing';
+            });
+            window.addEventListener('mouseup', () => {
+                isDragging = false;
+                canvas.style.cursor = 'grab';
+            });
+            window.addEventListener('mousemove', (e) => {
+                if (!isDragging || !cubeSatModel) return;
+                const dx = e.clientX - prevMouseX;
+                const dy = e.clientY - prevMouseY;
+                cubeSatModel.rotation.y += dx * 0.015;
+                cubeSatModel.rotation.x += dy * 0.015;
+                prevMouseX = e.clientX;
+                prevMouseY = e.clientY;
+            });
+
+            if (typeof THREE.GLTFLoader !== 'undefined') {
+                const loader = new THREE.GLTFLoader();
+                loader.load('/static/models/cubesat_vr.glb', (gltf) => {
+                    const root = gltf.scene;
+                    const bbox = new THREE.Box3().setFromObject(root);
+                    const center = bbox.getCenter(new THREE.Vector3());
+                    root.position.sub(center);
+                    const size = bbox.getSize(new THREE.Vector3());
+                    const maxDim = Math.max(size.x, size.y, size.z) || 1.0;
+                    const s = 1.7 / maxDim;
+                    root.scale.set(s, s, s);
+                    splashScene.add(root);
+                    cubeSatModel = root;
+                }, undefined, (err) => {
+                    console.warn("Could not load splash cubesat model:", err);
+                });
+            }
+
+            let splashAnimId = null;
+            function renderSplashCubeSat() {
+                if (!inSplashMode) {
+                    if (splashAnimId) cancelAnimationFrame(splashAnimId);
+                    return;
+                }
+                if (cubeSatModel && !isDragging) {
+                    cubeSatModel.rotation.y += 0.009;
+                    cubeSatModel.rotation.x += 0.003;
+                }
+                splashRenderer.render(splashScene, splashCamera);
+                splashAnimId = requestAnimationFrame(renderSplashCubeSat);
+            }
+            splashAnimId = requestAnimationFrame(renderSplashCubeSat);
+            splashCubeSatViewer = {
+                stop: () => {
+                    if (splashAnimId) cancelAnimationFrame(splashAnimId);
+                }
+            };
+        } catch (e) {
+            console.warn("Could not initialize splash cubesat viewer:", e);
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initSplashCubeSatViewer);
+    } else {
+        setTimeout(initSplashCubeSatViewer, 100);
+    }
+
+    // ── Quick Spacecraft Deployment & Model Assignment Functions ───────────────
+    window.deployQuickSpacecraft = async function(modelKey) {
+        if (!SPACECRAFT_MODELS[modelKey]) {
+            showToast(`Unknown model key: ${modelKey}`, 'warning');
+            return;
+        }
+        const def = SPACECRAFT_MODELS[modelKey];
+        const p = {
+            name: def.preset.name,
+            altitude_km: def.preset.altitude_km,
+            eccentricity: def.preset.eccentricity,
+            inclination_deg: def.preset.inclination_deg,
+            raan_deg: 45.0,
+            mass: def.preset.mass,
+            drag_area: def.preset.drag_area,
+            cd: def.preset.cd,
+            color: def.preset.color,
+            icon: "satellite",
+            model_key: modelKey,
+            parent_body: "Earth",
+            propagation_mode: "rk45",
+            t_start: simTime
+        };
+
+        showToast(`Deploying ${def.name} into orbit...`, 'info');
+        try {
+            const res = await fetch('/simulate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(p)
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                showToast(`Deployment error: ${err.detail || 'failed'}`, 'error');
+                return;
+            }
+            const data = await res.json();
+            data.model_key = modelKey;
+            if (data.params) data.params.model_key = modelKey;
+
+            if (inSplashMode) {
+                enterMissionMode(false);
+            }
+            addSatelliteToScene(data);
+            selectedSatIndex = activeSatellites.length - 1;
+            updateSatList();
+            renderSidebar();
+            focusSatellite(selectedSatIndex);
+            closeLiveTrackingModal();
+            showToast(`✅ Deployed ${def.name} successfully!`, 'success');
+        } catch (e) {
+            showToast(`Network error deploying spacecraft: ${e.message}`, 'error');
+        }
+    };
+
+    window.changeSelectedSatelliteModel = function(modelKey) {
+        if (selectedSatIndex < 0 || selectedSatIndex >= activeSatellites.length) {
+            showToast('Select a satellite first from the list.', 'info');
+            return;
+        }
+        const sat = activeSatellites[selectedSatIndex];
+        if (!sat) return;
+
+        sat.model_key = modelKey;
+        if (sat.params) sat.params.model_key = modelKey;
+
+        if (modelKey !== 'auto' && SPACECRAFT_MODELS[modelKey]) {
+            loadOrCloneSpacecraftModel(modelKey, (gltfModel) => {
+                if (sat.detailedModel) {
+                    while (sat.detailedModel.children.length > 0) {
+                        sat.detailedModel.remove(sat.detailedModel.children[0]);
+                    }
+                    sat.detailedModel.add(gltfModel);
+                    showToast(`Assigned ${SPACECRAFT_MODELS[modelKey].name} 3D model!`, 'success');
+                }
+            });
+        }
+    };
+
+    window.applyModelToSelectedSat = function() {
+        const select = document.getElementById('selected-sat-model-dropdown');
+        if (select) {
+            changeSelectedSatelliteModel(select.value);
         }
     };
 

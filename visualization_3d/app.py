@@ -153,7 +153,7 @@ BODIES = {
         "omega": 7.2921150e-5,
         "has_atmosphere": True,
         "min_alt_km": 100.0,
-        "max_alt_km": 400000.0,
+        "max_alt_km": 2000.0,
         "default_alt_km": 400.0,
         "default_ecc": 0.001,
         "default_inc": 51.6,
@@ -268,6 +268,7 @@ class SatelliteParams(BaseModel):
     # Visual representation
     color: str = Field("#38bdf8", description="Hex color for trajectory and indicator")
     icon: str = Field("satellite", description="Avatar icon type: satellite, rocket, astronaut, alien, ufo, sphere")
+    model_key: str | None = Field("auto", description="3D model asset: auto, cubesat_vr, cubesat_club, landsat_8, hubble, space_shuttle, space_station, tie_fighter, vega, satellite, simple_satellite, need_some_space")
     t_start: float = Field(0.0, ge=0.0, description="Initial simulation epoch in seconds")
     propagation_mode: str = Field("rk45", description="Propagation mode: 'rk45', 'pinn_local', 'pinn_esp32', or 'pinn'")
     hardware_device_id: str | None = Field("esp32-node-1", description="Target ESP32 Device ID for HIL execution")
@@ -590,6 +591,32 @@ def get_space_weather(refresh: bool = False):
         "source": sw.source,
         "timestamp": sw.timestamp,
     }
+
+
+@app.get("/api/aerodynamics")
+def get_aerodynamics_profile(
+    alt_km: float = 400.0,
+    f107: float = 150.0,
+    ap: float = 15.0,
+    cd: float = 2.2,
+    area_to_mass: float = 0.01,
+    velocity_ms: float = 7600.0,
+):
+    """Evaluate thermospheric density and drag acceleration via nanodynamics functional aerodynamics model."""
+    from nanodynamics.modules.space_weather_atmos.functions import compute_atmospheric_drag_density, is_storm_condition
+    result = compute_atmospheric_drag_density(
+        alt_km=alt_km,
+        f107=f107,
+        ap=ap,
+        cd=cd,
+        area_to_mass=area_to_mass,
+        velocity_ms=velocity_ms,
+    )
+    result["is_storm"] = is_storm_condition(kp_value=min(9.0, ap / 5.0))
+    result["alt_km"] = alt_km
+    result["f107"] = f107
+    result["ap"] = ap
+    return result
 
 
 class POIOrbitRequest(BaseModel):
