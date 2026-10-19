@@ -301,71 +301,107 @@
         /* Translucent Glassmorphic Splash Screen with Live 3D Background */
         #splash-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(90deg, rgba(2, 6, 23, 0.88) 0%, rgba(2, 6, 23, 0.75) 32%, rgba(15, 23, 42, 0.25) 65%, rgba(2, 6, 23, 0.05) 100%);
+            background: radial-gradient(circle at 18% 42%, rgba(15, 23, 42, 0.88) 0%, rgba(2, 6, 23, 0.84) 42%, rgba(2, 6, 23, 0.5) 75%, rgba(2, 6, 23, 0.18) 100%);
             z-index: 500; display: flex; flex-direction: column; justify-content: space-between;
             padding: 40px 60px; box-sizing: border-box; color: white;
-            transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.6s;
+            transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.6s;
             pointer-events: auto;
-            backdrop-filter: blur(1.5px);
+            backdrop-filter: blur(14px) saturate(140%);
         }
         #splash-screen.hidden {
             opacity: 0; visibility: hidden; pointer-events: none;
         }
-        .splash-header { max-width: 600px; }
+        .splash-header {
+            max-width: 580px;
+            background: rgba(15, 23, 42, 0.65);
+            border: 1px solid rgba(56, 189, 248, 0.22);
+            border-radius: 18px;
+            padding: 32px 36px;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
         .splash-title {
-            font-size: 40px; font-weight: 800; letter-spacing: 0.08em;
-            background: linear-gradient(135deg, #ffffff 0%, #38bdf8 50%, #818cf8 100%);
+            font-size: 38px; font-weight: 900; letter-spacing: 0.12em;
+            background: linear-gradient(135deg, #ffffff 0%, #38bdf8 55%, #818cf8 100%);
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
             margin: 0 0 6px 0; text-transform: uppercase;
         }
         .splash-subtitle {
-            font-size: 14px; color: #94a3b8; letter-spacing: 0.04em; margin: 0 0 16px 0;
-            font-family: "SF Mono", Monaco, Consolas, monospace;
+            font-size: 13px; color: #94a3b8; letter-spacing: 0.04em; margin: 0 0 16px 0;
+            font-family: "SF Mono", Monaco, Consolas, monospace; line-height: 1.5;
         }
         .splash-badge {
-            display: inline-block; background: rgba(56, 189, 248, 0.15); border: 1px solid #0284c7;
-            color: #38bdf8; font-size: 11px; padding: 3px 8px; border-radius: 4px; font-weight: 600;
+            display: inline-flex; align-items: center; gap: 6px;
+            background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.4);
+            color: #38bdf8; font-size: 10.5px; padding: 4px 10px; border-radius: 20px; font-weight: 700;
+            letter-spacing: 0.06em; text-transform: uppercase;
         }
         .splash-menu {
-            display: flex; flex-direction: column; gap: 12px; width: 360px; margin-top: 24px;
+            display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 22px;
         }
         .splash-btn {
-            background: rgba(30, 41, 59, 0.85); backdrop-filter: blur(8px);
-            color: white; border: 1px solid #334155; padding: 14px 18px;
-            border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer;
+            background: rgba(30, 41, 59, 0.72); backdrop-filter: blur(10px);
+            color: white; border: 1px solid rgba(148, 163, 184, 0.18); padding: 13px 18px;
+            border-radius: 10px; font-size: 13.5px; font-weight: 600; cursor: pointer;
             text-align: left; display: flex; align-items: center; justify-content: space-between;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 4px 14px rgba(0,0,0,0.35);
         }
         .splash-btn:hover {
-            background: rgba(37, 99, 235, 0.9); border-color: #60a5fa; transform: translateX(8px);
-            box-shadow: 0 6px 20px rgba(37, 99, 235, 0.5);
+            background: rgba(2, 132, 199, 0.28); border-color: #38bdf8; transform: translateX(6px);
+            box-shadow: 0 8px 24px rgba(2, 132, 199, 0.35); color: #f8fafc;
         }
         .splash-btn.primary {
-            background: linear-gradient(135deg, #2563eb, #1d4ed8); border-color: #3b82f6;
+            background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); border-color: #38bdf8;
+            box-shadow: 0 6px 20px rgba(2, 132, 199, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.25);
         }
         .splash-btn.primary:hover {
-            background: linear-gradient(135deg, #3b82f6, #2563eb); transform: translateX(8px);
+            background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+            box-shadow: 0 10px 28px rgba(14, 165, 233, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+            transform: translateX(6px);
         }
-        .splash-btn-icon { font-size: 18px; }
+        .splash-btn-icon { font-size: 16px; opacity: 0.85; transition: transform 0.2s ease; }
+        .splash-btn:hover .splash-btn-icon { transform: translateX(3px); opacity: 1; }
         .splash-footer {
             font-size: 11px; color: #64748b; display: flex; justify-content: space-between; align-items: center;
+            background: rgba(15, 23, 42, 0.6); padding: 10px 20px; border-radius: 10px;
+            border: 1px solid rgba(51, 65, 85, 0.4); backdrop-filter: blur(8px);
         }
 
         /* Mission Loading Transition Overlay */
         #mission-loading-overlay {
             display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(2, 6, 23, 0.94); backdrop-filter: blur(12px); z-index: 600;
+            background: rgba(2, 6, 23, 0.92); backdrop-filter: blur(16px); z-index: 600;
             flex-direction: column; justify-content: center; align-items: center; color: white;
             transition: opacity 0.4s ease;
         }
-        @keyframes pulse-ring {
-            0% { transform: scale(0.9); opacity: 0.8; }
-            50% { transform: scale(1.1); opacity: 1; }
-            100% { transform: scale(0.9); opacity: 0.8; }
+        .loading-gyro-wrap {
+            position: relative; width: 84px; height: 84px; display: flex;
+            justify-content: center; align-items: center; margin-bottom: 20px;
         }
-        .loading-orbit-icon {
-            font-size: 40px; animation: pulse-ring 1.8s ease-in-out infinite; margin-bottom: 16px;
+        .loading-gyro-ring {
+            position: absolute; border-radius: 50%; border: 2px dashed rgba(56, 189, 248, 0.4);
+            animation: gyroSpin 3.5s linear infinite;
+        }
+        .loading-gyro-ring.outer { width: 80px; height: 80px; border-top-color: #38bdf8; border-right-color: transparent; }
+        .loading-gyro-ring.inner { width: 56px; height: 56px; border: 2px solid rgba(0, 255, 204, 0.3); border-bottom-color: #00ffcc; animation-duration: 2.2s; animation-direction: reverse; }
+        .loading-gyro-core {
+            width: 14px; height: 14px; border-radius: 50%; background: #38bdf8;
+            box-shadow: 0 0 16px #38bdf8, 0 0 32px #00ffcc;
+            animation: pulseCore 1.4s ease-in-out infinite alternate;
+        }
+        @keyframes gyroSpin { to { transform: rotate(360deg); } }
+        @keyframes pulseCore { from { transform: scale(0.85); opacity: 0.7; } to { transform: scale(1.2); opacity: 1; } }
+        .loading-progress-bar-wrap {
+            width: 240px; height: 4px; background: rgba(51, 65, 85, 0.6);
+            border-radius: 3px; overflow: hidden; margin-top: 14px;
+        }
+        .loading-progress-bar-fill {
+            width: 100%; height: 100%; background: linear-gradient(90deg, #0284c7, #38bdf8, #00ffcc);
+            animation: indeterminateScan 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+        }
+        @keyframes indeterminateScan {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
         }
 
         /* SpaceX-style Cinematic Vector Logo Boot Screen */
@@ -424,9 +460,16 @@
 
     <!-- Brief Mission Loading Screen -->
     <div id="mission-loading-overlay">
-        <div class="loading-orbit-icon">🛰️</div>
-        <div style="font-size:18px; font-weight:700; letter-spacing:0.05em; color:#38bdf8; margin-bottom:8px;">Initializing Orbital Mission...</div>
-        <div id="loading-subtext" style="font-size:12px; color:#94a3b8; font-family:monospace;">Propagating 8th-Order Runge-Kutta Ephemeris & Geopotential...</div>
+        <div class="loading-gyro-wrap">
+            <div class="loading-gyro-ring outer"></div>
+            <div class="loading-gyro-ring inner"></div>
+            <div class="loading-gyro-core"></div>
+        </div>
+        <div style="font-size:18px; font-weight:800; letter-spacing:0.08em; color:#38bdf8; margin-bottom:8px; text-transform:uppercase;">Initializing Orbital Mission</div>
+        <div id="loading-subtext" style="font-size:12px; color:#94a3b8; font-family:'SF Mono', Monaco, monospace; letter-spacing:0.04em;">Propagating 8th-Order Runge-Kutta Ephemeris & Geopotential...</div>
+        <div class="loading-progress-bar-wrap">
+            <div class="loading-progress-bar-fill"></div>
+        </div>
     </div>
 
     <!-- KSP1-style Splash Screen Overlay -->
@@ -2063,7 +2106,7 @@
             '#include <defaultnormal_vertex>',
             `
             #include <defaultnormal_vertex>
-            vWorldNormalVec = normalize((modelMatrix * vec4(transformedNormal, 0.0)).xyz);
+            vWorldNormalVec = normalize((modelMatrix * vec4(objectNormal, 0.0)).xyz);
             `
         );
         shader.fragmentShader = shader.fragmentShader.replace(
@@ -2114,21 +2157,22 @@
                 uSunDir: { value: new THREE.Vector3(-1.0, 0.1, 0.2).normalize() }
             },
             vertexShader: `
-                varying vec3 vNormal;
+                varying vec3 vWorldNormal;
                 varying vec3 vWorldPos;
                 void main() {
-                    vNormal = normalize(normalMatrix * normal);
+                    vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
                     vec4 wp = modelMatrix * vec4(position, 1.0);
                     vWorldPos = wp.xyz;
                     gl_Position = projectionMatrix * viewMatrix * wp;
                 }
             `,
             fragmentShader: `
-                varying vec3 vNormal;
+                uniform vec3 uSunDir;
+                varying vec3 vWorldNormal;
                 varying vec3 vWorldPos;
                 void main() {
                     vec3 viewDir = normalize(cameraPosition - vWorldPos);
-                    float rim = 1.0 - max(0.0, dot(vNormal, viewDir));
+                    float rim = 1.0 - max(0.0, dot(vWorldNormal, viewDir));
 
                     // Distinct stratified atmospheric layers
                     float tropo = pow(rim, 5.0);   // Dense lower troposphere (0-15 km)
@@ -2140,8 +2184,11 @@
                     vec3 colThermo = vec3(0.25, 0.88, 1.0) * thermo * 0.55;
 
                     vec3 finalCol = colTropo + colStrato + colThermo;
-                    float alpha = clamp(tropo * 0.95 + strato * 0.65 + thermo * 0.35, 0.0, 0.92);
-                    gl_FragColor = vec4(finalCol, alpha);
+                    // Modulate by Sun illumination: glow brightly on day limb, smoothly attenuate on night side
+                    float sunDot = dot(vWorldNormal, normalize(uSunDir));
+                    float dayFactor = smoothstep(-0.25, 0.25, sunDot) * 0.85 + 0.15;
+                    float alpha = clamp((tropo * 0.95 + strato * 0.65 + thermo * 0.35) * dayFactor, 0.0, 0.92);
+                    gl_FragColor = vec4(finalCol * dayFactor, alpha);
                 }
             `,
             transparent: true,
@@ -7383,10 +7430,14 @@
         if (sunLight) {
             sunLight.position.set(0, 0, 0);
             sunLight.target.position.copy(earthWorldPos);
+            sunLight.target.updateMatrixWorld();
         }
         if (earthShaderRef && earthShaderRef.uniforms && earthShaderRef.uniforms.uSunDirection) {
             const sunDirFromEarth = new THREE.Vector3(0, 0, 0).sub(earthWorldPos).normalize();
             earthShaderRef.uniforms.uSunDirection.value.copy(sunDirFromEarth);
+            if (typeof rayleighMieAtmosphere !== 'undefined' && rayleighMieAtmosphere && rayleighMieAtmosphere.material && rayleighMieAtmosphere.material.uniforms && rayleighMieAtmosphere.material.uniforms.uSunDir) {
+                rayleighMieAtmosphere.material.uniforms.uSunDir.value.copy(sunDirFromEarth);
+            }
         }
 
         // 3. Satellite Tracking & Positions
