@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NANODYNAMICS V3 // EMPIRICAL ASTRODYNAMICS & DUAL-ESP32 PINN COCKPIT</title>
+  <style>
+    :root {
+      --bg-obsidian: #04060A;
+      --bg-glass: rgba(8, 13, 23, 0.78);
+      --border-cyan: rgba(0, 229, 255, 0.26);
+      --cyan: #00E5FF;
+      --emerald: #00FF66;
+      --gold: #FFD21E;
+      --magenta: #FF2E93;
+      --text-main: #E2E8F0;
+      --text-dim: #94A3B8;
+      --font-mono: ui-monospace, 'JetBrains Mono', 'Fira Code', monospace;
+    }
+    * { box-sizing: border-box; }
+    body, html {
+      margin: 0; padding: 0; width: 100%; height: 100%;
+      background: var(--bg-obsidian);
+      color: var(--text-main);
+      font-family: var(--font-mono);
+      overflow: hidden;
+    }
+    #webgl-viewport {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+    }
+    .top-bar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 44px;
+      background: rgba(4, 6, 10, 0.88);
+      border-bottom: 1px solid var(--border-cyan);
+      backdrop-filter: blur(18px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 18px;
+      z-index: 20;
+    }
+    .brand {
+      display: flex; align-items: center; gap: 12px;
+      font-size: 11px; font-weight: 700; letter-spacing: 0.16em;
+      color: var(--cyan);
+    }
+    .trl-pill {
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: rgba(0, 255, 102, 0.12);
+      border: 1px solid rgba(0, 255, 102, 0.45);
+      color: var(--emerald);
+      font-size: 10px;
+    }
+    .hud-grid {
+      position: fixed;
+      top: 56px; bottom: 16px; left: 16px; right: 16px;
+      display: flex;
+      justify-content: space-between;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .hud-col {
+      width: 350px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      pointer-events: auto;
+      max-height: 100%;
+      overflow-y: auto;
+    }
+    .glass-card {
+      background: var(--bg-glass);
+      border: 1px solid var(--border-cyan);
+      border-radius: 6px;
+      padding: 12px 14px;
+      backdrop-filter: blur(18px);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.65), inset 0 0 18px rgba(0, 229, 255, 0.04);
+    }
+    .card-hdr {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 10px; font-weight: 700; letter-spacing: 0.14em;
+      color: var(--cyan);
+      border-bottom: 1px solid rgba(0, 229, 255, 0.18);
+      padding-bottom: 6px; margin-bottom: 10px;
+    }
+    .metric-row {
+      display: flex; justify-content: space-between;
+      font-size: 10px; padding: 3px 0;
+      color: var(--text-dim);
+    }
+    .metric-row b { color: var(--text-main); }
+    .btn-cyber {
+      background: rgba(0, 229, 255, 0.14);
+      border: 1px solid var(--cyan);
+      color: var(--cyan);
+      font-family: var(--font-mono);
+      font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
+      padding: 7px 11px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn-cyber:hover {
+      background: var(--cyan);
+      color: #04060A;
+      box-shadow: 0 0 16px rgba(0, 229, 255, 0.55);
+    }
+    .ctrl-label {
+      display: flex; justify-content: space-between;
+      font-size: 10px; color: var(--text-dim); margin-top: 6px;
+    }
+    input[type="range"] { width: 100%; accent-color: var(--cyan); }
+    canvas.spark {
+      width: 100%; height: 82px;
+      background: rgba(4, 6, 10, 0.72);
+      border: 1px solid rgba(0, 229, 255, 0.18);
+      border-radius: 4px;
+      margin-top: 5px;
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+  <div id="webgl-viewport"></div>
+
+  <header class="top-bar">
+    <div class="brand">
+      <span>NANODYNAMICS V3 // FLIGHT-GRADE ASTRODYNAMICS & TINYML HIL</span>
+      <span class="trl-pill">TRL 1–9 MODULAR ARCHITECTURE</span>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button class="btn-cyber" onclick="setCameraMode('leo')">🌍 LEO / SENTINEL-1A</button>
+      <button class="btn-cyber" onclick="setCameraMode('cislunar')">🌕 CISLUNAR CR3BP L1/L2</button>
+      <button class="btn-cyber" onclick="runPropagationCompare()">⚡ SYNC DOP853 vs ESP32 PINN</button>
+    </div>
+  </header>
+
+  <div class="hud-grid">
+    <!-- Left Column: Empirical Telemetry & Force Model Controls -->
+    <div class="hud-col">
+      <div class="glass-card">
+        <div class="card-hdr">
+          <span>01 // ESA & NASA EMPIRICAL TELEMETRY</span>
+          <span style="color:var(--emerald);">LIVE DB</span>
+        </div>
+        <div class="metric-row"><span>ESA Sentinel-1A (.EOF):</span><b id="emp-eof-count">6 OSVs (ITRF->GCRF)</b></div>
+        <div class="metric-row"><span>NASA Swarm-A (.SP3):</span><b id="emp-sp3-swarm">6 Epochs (462 km)</b></div>
+        <div class="metric-row"><span>NASA GRACE-FO (.SP3):</span><b id="emp-sp3-grace">6 Epochs (490 km)</b></div>
+        <div class="metric-row"><span>NAIF SPICE Ephemeris:</span><b style="color:var(--gold);">DE440s + J2000</b></div>
+      </div>
+
+      <div class="glass-card">
+        <div class="card-hdr">
+          <span>02 // MULTI-BODY & SPACE WEATHER CONDITIONING</span>
+          <span style="color:var(--gold);">p_k VECTOR</span>
+        </div>
+        <div class="ctrl-label"><span>ORBIT ALTITUDE</span><b id="val-alt">693 km</b></div>
+        <input type="range" id="inp-alt" min="220" max="2000" value="693" oninput="updateUiLabels()" onchange="runPropagationCompare()" />
+
+        <div class="ctrl-label"><span>SOLAR FLUX F10.7 (SFU)</span><b id="val-f107">155.0</b></div>
+        <input type="range" id="inp-f107" min="70" max="280" value="155" oninput="updateUiLabels()" onchange="runPropagationCompare()" />
+
+        <div class="ctrl-label"><span>GEOMAGNETIC Kp INDEX</span><b id="val-kp">3.0</b></div>
+        <input type="range" id="inp-kp" min="0" max="9" step="0.5" value="3.0" oninput="updateUiLabels()" onchange="runPropagationCompare()" />
+
+        <div class="ctrl-label"><span>BALLISTIC COEFF B (m²/kg)</span><b id="val-b">0.0062</b></div>
+        <input type="range" id="inp-b" min="0.001" max="0.050" step="0.001" value="0.006" oninput="updateUiLabels()" onchange="runPropagationCompare()" />
+      </div>
+
+      <div class="glass-card">
+        <div class="card-hdr">
+          <span>03 // DUAL-ESP32 FREERTOS HIL MESH</span>
+          <span style="color:var(--emerald);" id="hw-usb-badge">● /dev/ttyUSB0</span>
+        </div>
+        <div class="metric-row"><span>Node 1 Gateway (Core 0/1):</span><b>ESP-NOW Ch1 + WS</b></div>
+        <div class="metric-row"><span>Node 2 Inference (Core 1):</span><b style="color:var(--cyan);">TFLM INT8 (32KB Arena)</b></div>
+        <div class="metric-row"><span>Node 2 Manifold (Core 0):</span><b style="color:var(--emerald);">Symplectic Projection</b></div>
+        <div class="metric-row"><span>CR3BP Jacobi Drift |ΔC/C₀|:</span><b id="val-jacobi" style="color:var(--gold);">0.00e+00</b></div>
+      </div>
+    </div>
+
+    <!-- Right Column: Real-Time Residual & Hamiltonian Conservation Plots -->
+    <div class="hud-col">
+      <div class="glass-card">
+        <div class="card-hdr">
+          <span>04 // DOP853 vs SYMPLECTIC PINN RESIDUAL</span>
+          <span id="lbl-pos-err" style="color:var(--cyan);">0.00 m</span>
+        </div>
+        <canvas id="spark-pos" class="spark" width="320" height="82"></canvas>
+      </div>
+
+      <div class="glass-card">
+        <div class="card-hdr">
+          <span>05 // HAMILTONIAN ENERGY DRIFT |ΔH / H₀|</span>
+          <span id="lbl-ham-err" style="color:var(--emerald);">0.00e+00</span>
+        </div>
+        <canvas id="spark-ham" class="spark" width="320" height="82"></canvas>
+      </div>
+
+      <div class="glass-card">
+        <div class="card-hdr">
+          <span>06 // ON-CHIP PINN INFERENCE LATENCY (ms)</span>
+          <span id="lbl-lat-ms" style="color:var(--gold);">0.42 ms</span>
+        </div>
+        <canvas id="spark-lat" class="spark" width="320" height="82"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/console.js"></script>
+</body>
+</html>

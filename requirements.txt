@@ -1,18 +1,12 @@
-# Core Dynamics, Numerical Integration, and AI Surrogate
+# Core Astrodynamics, Numerical Integration & Symplectic PINN
 numpy>=1.24.0
 scipy>=1.10.0
 torch>=2.0.0
 
-# Backend Web Server and API
+# Backend Web Server and API (web_console/server.py)
 fastapi>=0.100.0
 uvicorn[standard]>=0.20.0
 pydantic>=2.0.0
 
-# Testing and Utilities
+# Testing
 pytest>=7.0.0
-httpx>=0.24.0
-requests>=2.28.0
-matplotlib>=3.7.0
-
-# Optional: Firebase persistence (falls back to local JSON if not configured)
-firebase-admin>=6.0.0

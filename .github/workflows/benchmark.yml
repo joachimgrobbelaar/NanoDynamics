@@ -1,0 +1,22 @@
+name: Astrodynamics & PINN Benchmark Suite
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 4 * * 1"
+
+jobs:
+  numerical-vs-pinn-benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          pip install numpy scipy pyyaml torch pytest
+      - name: Execute DOP853 vs Symplectic PINN Regression Benchmark
+        run: |
+          PYTHONPATH=. pytest -v tests/test_propagator.py tests/test_hamiltonian.py
