@@ -339,16 +339,16 @@
             display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 22px;
         }
         .splash-btn {
-            background: rgba(30, 41, 59, 0.72); backdrop-filter: blur(10px);
-            color: white; border: 1px solid rgba(148, 163, 184, 0.18); padding: 13px 18px;
-            border-radius: 10px; font-size: 13.5px; font-weight: 600; cursor: pointer;
+            background: rgba(15, 23, 42, 0.72); backdrop-filter: blur(12px);
+            color: white; border: 1px solid rgba(56, 189, 248, 0.2); padding: 11px 16px;
+            border-radius: 12px; font-size: 13.5px; font-weight: 600; cursor: pointer;
             text-align: left; display: flex; align-items: center; justify-content: space-between;
             transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
             box-shadow: 0 4px 14px rgba(0,0,0,0.35);
         }
         .splash-btn:hover {
-            background: rgba(2, 132, 199, 0.28); border-color: #38bdf8; transform: translateX(6px);
-            box-shadow: 0 8px 24px rgba(2, 132, 199, 0.35); color: #f8fafc;
+            background: rgba(2, 132, 199, 0.25); border-color: #38bdf8; transform: translateX(6px);
+            box-shadow: 0 8px 24px rgba(2, 132, 199, 0.35); color: #ffffff;
         }
         .splash-btn.primary {
             background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); border-color: #38bdf8;
@@ -359,6 +359,11 @@
             box-shadow: 0 10px 28px rgba(14, 165, 233, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.35);
             transform: translateX(6px);
         }
+        .splash-btn-left { display: flex; align-items: center; gap: 12px; }
+        .splash-btn-icon-svg { color: #38bdf8; flex-shrink: 0; }
+        .splash-btn.primary .splash-btn-icon-svg { color: #ffffff; }
+        .splash-btn-title { font-size: 13px; font-weight: 700; color: #f8fafc; display: block; }
+        .splash-btn-desc { font-size: 10px; color: #94a3b8; font-family: 'SF Mono', Monaco, monospace; display: block; margin-top: 2px; }
         .splash-btn-icon { font-size: 16px; opacity: 0.85; transition: transform 0.2s ease; }
         .splash-btn:hover .splash-btn-icon { transform: translateX(3px); opacity: 1; }
         .splash-footer {
@@ -494,27 +499,63 @@
 
             <div class="splash-menu">
                 <button class="splash-btn primary" onclick="splashStartNewMission()">
-                    <span>🚀 Start New Mission</span>
+                    <div class="splash-btn-left">
+                        <svg class="splash-btn-icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09zM12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4.5c1.62-1.63 5-2 5-2"/><path d="M12 15v5s3.03-.55 4.5-2c1.63-1.62 2-5 2-5"/></svg>
+                        <div>
+                            <span class="splash-btn-title">Start New Mission</span>
+                            <span class="splash-btn-desc">Deploy LEO Satellite & Propagate Orbit</span>
+                        </div>
+                    </div>
                     <span class="splash-btn-icon">→</span>
                 </button>
                 <button class="splash-btn" onclick="splashOpenLoadModal()">
-                    <span>📂 Load Mission / Scenario</span>
+                    <div class="splash-btn-left">
+                        <svg class="splash-btn-icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+                        <div>
+                            <span class="splash-btn-title">Load Mission / Scenario</span>
+                            <span class="splash-btn-desc">Preset Collision Avoidance, GTO & Deorbit</span>
+                        </div>
+                    </div>
                     <span class="splash-btn-icon">⇲</span>
                 </button>
                 <button class="splash-btn" onclick="splashOpenLiveTracking()">
-                    <span>🛰️ Live LEO Constellation Tracker</span>
+                    <div class="splash-btn-left">
+                        <svg class="splash-btn-icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1"/></svg>
+                        <div>
+                            <span class="splash-btn-title">Live LEO Constellation Tracker</span>
+                            <span class="splash-btn-desc">Real-Time CelesTrak TLE Constellations</span>
+                        </div>
+                    </div>
                     <span class="splash-btn-icon">📡</span>
                 </button>
                 <button class="splash-btn" onclick="openSettingsModal()">
-                    <span>⚙️ Project & Simulation Settings</span>
+                    <div class="splash-btn-left">
+                        <svg class="splash-btn-icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                        <div>
+                            <span class="splash-btn-title">Project & Simulation Settings</span>
+                            <span class="splash-btn-desc">J₂-J₄, SRP, US Standard Atmosphere</span>
+                        </div>
+                    </div>
                     <span class="splash-btn-icon">⚙</span>
                 </button>
                 <button class="splash-btn" onclick="splashOpenExperimentLab()">
-                    <span>🧪 Experimentation Lab & ML</span>
+                    <div class="splash-btn-left">
+                        <svg class="splash-btn-icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v7.31L4.69 18.2A2 2 0 0 0 6.41 21h11.18a2 2 0 0 0 1.72-2.8L14 9.31V2"/><line x1="8" y1="2" x2="16" y2="2"/><line x1="7" y1="15" x2="17" y2="15"/></svg>
+                        <div>
+                            <span class="splash-btn-title">Experimentation Lab & ML</span>
+                            <span class="splash-btn-desc">Monte Carlo Sweeps & PINN Neural Surrogate</span>
+                        </div>
+                    </div>
                     <span class="splash-btn-icon">⚗</span>
                 </button>
                 <button class="splash-btn" onclick="enterMissionMode()">
-                    <span>🌌 View Live Celestial System</span>
+                    <div class="splash-btn-left">
+                        <svg class="splash-btn-icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+                        <div>
+                            <span class="splash-btn-title">View Live Celestial System</span>
+                            <span class="splash-btn-desc">Explore 1-AU Earth-Moon-Sun Ephemeris</span>
+                        </div>
+                    </div>
                     <span class="splash-btn-icon">🪐</span>
                 </button>
             </div>
@@ -1806,8 +1847,13 @@
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.0001, 2000000000);
     let renderer, controls;
     try {
-        renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true });
+        renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true, powerPreference: 'high-performance' });
         renderer.setClearColor(0x020617, 1.0);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.35;
+        if (THREE.sRGBEncoding) renderer.outputEncoding = THREE.sRGBEncoding;
+        if (renderer.outputColorSpace) renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
         controls = new THREE.OrbitControls(camera, renderer.domElement);
@@ -1896,27 +1942,27 @@
     }
     const earthOrbitLine = new THREE.LineLoop(
         new THREE.BufferGeometry().setFromPoints(earthOrbitPts),
-        new THREE.LineBasicMaterial({ color: 0x0284c7, transparent: true, opacity: 0.35 })
+        new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending })
     );
     scene.add(earthOrbitLine);
 
-    const mercuryOrbitLine = createPlanetOrbitLine(R_MERCURY_ORBIT_KM, MERCURY_INC_RAD, 0x94a3b8, 0.30);
-    const venusOrbitLine = createPlanetOrbitLine(R_VENUS_ORBIT_KM, VENUS_INC_RAD, 0xfacc15, 0.30);
-    const marsOrbitLine = createPlanetOrbitLine(R_MARS_ORBIT_KM, MARS_INC_RAD, 0xef4444, 0.35);
+    const mercuryOrbitLine = createPlanetOrbitLine(R_MERCURY_ORBIT_KM, MERCURY_INC_RAD, 0x94a3b8, 0.75);
+    const venusOrbitLine = createPlanetOrbitLine(R_VENUS_ORBIT_KM, VENUS_INC_RAD, 0xfacc15, 0.80);
+    const marsOrbitLine = createPlanetOrbitLine(R_MARS_ORBIT_KM, MARS_INC_RAD, 0xf87171, 0.85);
     scene.add(mercuryOrbitLine);
     scene.add(venusOrbitLine);
     scene.add(marsOrbitLine);
 
     // ── Heliocentric Sun Directional Illumination ──
-    const sunLight = new THREE.DirectionalLight(0xfffdf0, 1.85);
+    const sunLight = new THREE.DirectionalLight(0xfffdf0, 2.2);
     sunLight.position.set(0, 0, 0);
     scene.add(sunLight);
     scene.add(sunLight.target);
 
     // Ambient & fill illumination adjusted for deep black night side and realistic space contrast
-    const ambientLight = new THREE.AmbientLight(0x1e293b, 0.22);
+    const ambientLight = new THREE.AmbientLight(0x334155, 0.45);
     scene.add(ambientLight);
-    const hemiLight = new THREE.HemisphereLight(0x0284c7, 0x020617, 0.25);
+    const hemiLight = new THREE.HemisphereLight(0x38bdf8, 0x0f172a, 0.55);
     scene.add(hemiLight);
 
     // ── Photorealistic Procedural Solar Photosphere & Smooth Cinematic Corona ──
@@ -2930,10 +2976,17 @@
 
     const maneuverPreviewLine = new THREE.Line(
         new THREE.BufferGeometry(),
-        new THREE.LineDashedMaterial({ color: 0xfacc15, dashSize: 200, gapSize: 100, linewidth: 2, transparent: true, opacity: 0.9 })
+        new THREE.LineDashedMaterial({ color: 0xffd000, dashSize: 160, gapSize: 80, linewidth: 3, transparent: true, opacity: 1.0, blending: THREE.AdditiveBlending })
     );
     maneuverPreviewLine.visible = false;
     scene.add(maneuverPreviewLine);
+
+    const maneuverPreviewHalo = new THREE.Line(
+        new THREE.BufferGeometry(),
+        new THREE.LineBasicMaterial({ color: 0xf59e0b, linewidth: 4, transparent: true, opacity: 0.75, blending: THREE.AdditiveBlending })
+    );
+    maneuverPreviewHalo.visible = false;
+    scene.add(maneuverPreviewHalo);
 
     // ── Coordinate Axes for Earth and Moon ──
     const axesHelperEarth = new THREE.AxesHelper(R_EARTH_KM * 1.5);
@@ -5171,7 +5224,8 @@
 
         // Position Gizmo directly from orbital state coordinates
         const localPos = new THREE.Vector3(b.x[ptIdx] * M_TO_KM, b.y[ptIdx] * M_TO_KM, b.z[ptIdx] * M_TO_KM);
-        const bodyPos = (sat.parentBody === 'Moon' && typeof moon !== 'undefined') ? moon.position : new THREE.Vector3(0,0,0);
+        activeManeuver.localPos = localPos;
+        const bodyPos = getParentBodyWorldPos(sat.parentBody, simTime);
         const worldPos = bodyPos.clone().add(localPos);
         nodeGizmoGroup.position.copy(worldPos);
         arrowPrograde.setDirection(u_v);
@@ -5256,10 +5310,14 @@
                 }
                 maneuverPreviewLine.geometry.setFromPoints(pts);
                 maneuverPreviewLine.computeLineDistances();
-                if (sat.parentBody === 'Moon') {
-                    maneuverPreviewLine.position.copy(moon.position);
-                } else {
-                    maneuverPreviewLine.position.set(0, 0, 0);
+                if (typeof maneuverPreviewHalo !== 'undefined') {
+                    maneuverPreviewHalo.geometry.setFromPoints(pts);
+                }
+                const bodyWorldPos = getParentBodyWorldPos(sat.parentBody, simTime);
+                maneuverPreviewLine.position.copy(bodyWorldPos);
+                if (typeof maneuverPreviewHalo !== 'undefined') {
+                    maneuverPreviewHalo.position.copy(bodyWorldPos);
+                    maneuverPreviewHalo.visible = true;
                 }
                 maneuverPreviewLine.visible = true;
 
@@ -5278,6 +5336,9 @@
         activeManeuver.satIndex = -1;
         nodeGizmoGroup.visible = false;
         maneuverPreviewLine.visible = false;
+        if (typeof maneuverPreviewHalo !== 'undefined') {
+            maneuverPreviewHalo.visible = false;
+        }
         document.getElementById('maneuver-panel').style.display = 'none';
     }
 
@@ -7686,13 +7747,16 @@
             });
         }
 
-        // 5. Update Maneuver preview anchor if lunar
+        // 5. Update Maneuver preview and gizmo anchor
         if (activeManeuver.satIndex >= 0 && activeSatellites[activeManeuver.satIndex]) {
             const mSat = activeSatellites[activeManeuver.satIndex];
-            if (mSat.parentBody === 'Moon') {
-                maneuverPreviewLine.position.copy(moon.position);
-            } else {
-                maneuverPreviewLine.position.set(0, 0, 0);
+            const mBodyPos = getParentBodyWorldPos(mSat.parentBody, simTime);
+            maneuverPreviewLine.position.copy(mBodyPos);
+            if (typeof maneuverPreviewHalo !== 'undefined') {
+                maneuverPreviewHalo.position.copy(mBodyPos);
+            }
+            if (nodeGizmoGroup.visible && activeManeuver.localPos) {
+                nodeGizmoGroup.position.copy(mBodyPos.clone().add(activeManeuver.localPos));
             }
         }
 
@@ -7724,15 +7788,15 @@
                 sat.group.position.set(earth.position.x + x, earth.position.y + y, earth.position.z + z);
             });
 
-            // Cinematic close-up flyover of LEO satellite skimming above Earth surface
-            if (splashConstellationSats.length > 0 && splashConstellationSats[0].group) {
-                const heroSat = splashConstellationSats[0];
-                const heroPos = heroSat.group.position;
-                const toSatDir = heroPos.clone().sub(earth.position).normalize();
-                const camOffset = toSatDir.clone().multiplyScalar(150).add(new THREE.Vector3(-90, 60, -90));
-                camera.position.copy(heroPos.clone().add(camOffset));
-                camera.lookAt(heroPos.clone().add(toSatDir.clone().multiplyScalar(-200)));
-            }
+            // Cinematic focused framing of Earth with gentle orbital drift
+            const splashAngle = performance.now() * 0.00004;
+            const camOrbitDist = R_EARTH_KM + 14000.0;
+            const camX = earth.position.x + Math.cos(splashAngle) * camOrbitDist;
+            const camY = earth.position.y + 4500.0;
+            const camZ = earth.position.z + Math.sin(splashAngle) * camOrbitDist;
+            camera.position.set(camX, camY, camZ);
+            camera.lookAt(earth.position);
+            if (controls) controls.target.copy(earth.position);
         } else {
             heroSplashElements.forEach(el => { el.visible = false; });
             splashConstellationSats.forEach(sat => { sat.group.visible = false; });
