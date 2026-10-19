@@ -1,4 +1,4 @@
-# Lightweight Python base for the Nanodynamics-v3 Flight-Director console
+# Multi-stage / lightweight Python base
 FROM python:3.11-slim
 
 # Prevent Python from writing .pyc and buffer stdout/stderr
@@ -29,5 +29,8 @@ COPY . .
 # Expose Render default port
 EXPOSE 8000
 
-# Start the v3 FastAPI / Uvicorn web console respecting Render's dynamic $PORT environment variable
-CMD uvicorn web_console.server:app --host 0.0.0.0 --port ${PORT:-8000}
+# Working directory set to visualization_3d for relative static/saved_sims asset loading
+WORKDIR /app/visualization_3d
+
+# Start FastAPI / Uvicorn server respecting Render's dynamic $PORT environment variable
+CMD uvicorn app:app --host 0.0.0.0 --port ${PORT:-8000}

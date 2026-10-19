@@ -1,7 +1,6 @@
 services:
   - type: web
     name: nanodynamics-simulator
-    branch: v2
     env: docker
     plan: free
     region: oregon

@@ -1,0 +1,6 @@
+firebase-functions
+firebase-admin
+numpy
+scipy
+pydantic
+torch

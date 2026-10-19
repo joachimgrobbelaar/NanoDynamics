@@ -1,0 +1,192 @@
+/* ============================================================================
+ * NANODYNAMICS // SPACEX GNC TELEMETRY DESIGN TOKENS (WCAG AAA COMPLIANT)
+ * ============================================================================
+ * Contrast ratios against #05070B / #090D14:
+ *   - Primary text (#E2E8F0): >= 15.2:1 (Target >= 12:1)
+ *   - Nominal Cyan (#00E5FF): >= 11.8:1 (Target >= 7:1)
+ *   - Orbit Green  (#00FF66): >= 13.9:1 (Target >= 7:1)
+ *   - Hazard Amber (#FF9100): >=  8.7:1 (High-visibility alert)
+ *   - Abort Red    (#FF1744): >=  5.4:1 (High-visibility abort alert)
+ * ============================================================================ */
+
+:root {
+    --sx-bg-obsidian: #05070B;
+    --sx-bg-panel: #090D14;
+    --sx-glass-bg: rgba(8, 12, 22, 0.75);
+    --sx-glass-blur: blur(16px);
+    --sx-laser-border: 1px solid rgba(56, 189, 248, 0.18);
+    --sx-laser-glow: inset 0 0 12px rgba(56, 189, 248, 0.04);
+
+    --sx-text-primary: #E2E8F0;
+    --sx-text-muted: #94A3B8;
+    --sx-cyan-nominal: #00E5FF;
+    --sx-green-orbit: #00FF66;
+    --sx-amber-hazard: #FF9100;
+    --sx-red-abort: #FF1744;
+
+    --sx-font-mono: ui-monospace, 'JetBrains Mono', 'Roboto Mono', monospace;
+    --sx-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Glassmorphic Panel Primitive */
+.sx-glass-panel {
+    background: rgba(8, 12, 22, 0.75);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(56, 189, 248, 0.18);
+    box-shadow: inset 0 0 12px rgba(56, 189, 248, 0.04);
+    color: var(--sx-text-primary);
+}
+
+/* Tracked Monospace Telemetry Header */
+.sx-telemetry-header {
+    font-family: var(--sx-font-mono);
+    letter-spacing: 0.14em;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--sx-cyan-nominal);
+}
+
+/* 36px Ultra-Slim Command Deck Header (#top-nav) */
+#top-nav {
+    height: 36px !important;
+    min-height: 36px !important;
+    max-height: 36px !important;
+    padding: 0 10px !important;
+    background: rgba(5, 7, 11, 0.92) !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
+    border-bottom: 1px solid rgba(56, 189, 248, 0.18) !important;
+    box-shadow: inset 0 0 12px rgba(56, 189, 248, 0.04) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    z-index: 120 !important;
+}
+
+.sx-brand-mark {
+    font-family: var(--sx-font-mono);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    color: var(--sx-text-primary);
+    white-space: nowrap;
+}
+
+.sx-met-clock {
+    font-family: var(--sx-font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--sx-cyan-nominal);
+    background: rgba(5, 7, 11, 0.85);
+    border: 1px solid rgba(0, 229, 255, 0.28);
+    padding: 2px 7px;
+    border-radius: 3px;
+    white-space: nowrap;
+}
+
+.sx-status-pill {
+    font-family: var(--sx-font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 2px 8px;
+    border-radius: 3px;
+    background: rgba(5, 7, 11, 0.9);
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    color: var(--sx-cyan-nominal);
+    white-space: nowrap;
+}
+
+.sx-status-pill.orbit-green {
+    color: var(--sx-green-orbit);
+    border-color: rgba(0, 255, 102, 0.3);
+}
+
+.sx-status-pill.hazard-amber {
+    color: var(--sx-amber-hazard);
+    border-color: rgba(255, 145, 0, 0.4);
+}
+
+.sx-status-pill.abort-red {
+    color: var(--sx-red-abort);
+    border-color: rgba(255, 23, 68, 0.45);
+}
+
+/* Tactile Action Buttons */
+.sx-cmd-btn, #top-nav .nav-btn {
+    font-family: var(--sx-font-mono) !important;
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.06em !important;
+    height: 24px !important;
+    padding: 0 7px !important;
+    background: rgba(9, 13, 20, 0.88) !important;
+    color: var(--sx-text-primary) !important;
+    border: 1px solid rgba(56, 189, 248, 0.22) !important;
+    border-radius: 3px !important;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    transition: transform 40ms var(--sx-ease-out), border-color 140ms var(--sx-ease-out), box-shadow 140ms var(--sx-ease-out);
+}
+
+.sx-cmd-btn:hover, #top-nav .nav-btn:hover {
+    border-color: var(--sx-cyan-nominal) !important;
+    box-shadow: 0 0 10px rgba(0, 229, 255, 0.22);
+    color: #FFFFFF !important;
+}
+
+.sx-cmd-btn:active, #top-nav .nav-btn:active {
+    transform: translateY(1px) scale(0.98);
+}
+
+/* Collapsible Cyber-Drawer Telemetry HUD (#sidebar) */
+#sidebar {
+    top: 36px !important;
+    height: calc(100vh - 36px) !important;
+    width: 290px !important;
+    background: rgba(8, 12, 22, 0.78) !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
+    border-right: 1px solid rgba(56, 189, 248, 0.18) !important;
+    box-shadow: inset 0 0 12px rgba(56, 189, 248, 0.04) !important;
+    transition: width 220ms var(--sx-ease-out), padding 220ms var(--sx-ease-out) !important;
+}
+
+#sidebar.collapsed {
+    width: 24px !important;
+    min-width: 24px !important;
+    max-width: 24px !important;
+    padding: 6px 2px !important;
+    overflow: hidden !important;
+}
+
+#sidebar.collapsed > *:not(#cyber-drawer-ribbon) {
+    display: none !important;
+}
+
+#cyber-drawer-ribbon {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding-top: 6px;
+    cursor: pointer;
+}
+
+#sidebar.collapsed #cyber-drawer-ribbon {
+    display: flex !important;
+}
+
+.sx-ribbon-led {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--sx-green-orbit);
+    box-shadow: 0 0 6px var(--sx-green-orbit);
+}

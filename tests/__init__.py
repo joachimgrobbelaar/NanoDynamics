@@ -1,1 +1,1 @@
-"""Unit and physics acceptance test suite for Nanodynamics-v3."""
+"""Unit and integration tests for leo_simulator."""

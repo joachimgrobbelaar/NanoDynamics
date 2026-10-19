@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LEO Satellite Simulator & PINN Surrogate — Honours Thesis Briefing Document</title>
+<style>
+  @page {
+    size: A4;
+    margin: 20mm 18mm 20mm 18mm;
+    @bottom-right {
+      content: "Page " counter(page) " of " counter(pages);
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      font-size: 8pt;
+      color: #64748b;
+    }
+    @bottom-left {
+      content: "Wits School of Mechanical, Industrial & Aeronautical Engineering";
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      font-size: 8pt;
+      color: #64748b;
+    }
+  }
+
+  body {
+    font-family: "Latin Modern Roman", "Times New Roman", Times, serif;
+    font-size: 10.5pt;
+    line-height: 1.5;
+    color: #1e293b;
+    margin: 0;
+    padding: 0;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color: #0f172a;
+    font-weight: 700;
+  }
+
+  h1 {
+    font-size: 18pt;
+    text-align: center;
+    margin-bottom: 2px;
+    color: #0369a1;
+  }
+
+  .subtitle {
+    text-align: center;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 11pt;
+    color: #475569;
+    margin-bottom: 15px;
+  }
+
+  .meta-box {
+    border-top: 1.5px solid #0284c7;
+    border-bottom: 1.5px solid #0284c7;
+    background-color: #f8fafc;
+    padding: 8px 12px;
+    margin-bottom: 20px;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 9pt;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  h2 {
+    font-size: 13pt;
+    border-bottom: 1px solid #cbd5e1;
+    padding-bottom: 3px;
+    margin-top: 22px;
+    margin-bottom: 10px;
+    color: #0369a1;
+  }
+
+  h3 {
+    font-size: 11pt;
+    margin-top: 14px;
+    margin-bottom: 6px;
+    color: #0f172a;
+  }
+
+  p {
+    margin: 0 0 8px 0;
+    text-align: justify;
+  }
+
+  ul, ol {
+    margin: 0 0 10px 0;
+    padding-left: 20px;
+  }
+
+  li {
+    margin-bottom: 4px;
+  }
+
+  .formula-box {
+    background: #f1f5f9;
+    border-left: 3px solid #0284c7;
+    padding: 8px 12px;
+    margin: 10px 0;
+    font-family: "Latin Modern Math", "Cambria Math", "Times New Roman", serif;
+    font-size: 10.5pt;
+  }
+
+  .key-point {
+    background: #ecfdf5;
+    border-left: 3px solid #10b981;
+    padding: 6px 10px;
+    margin: 8px 0;
+    font-size: 9.5pt;
+  }
+
+  .figure-suggestion {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-left: 3px solid #f59e0b;
+    padding: 8px 12px;
+    margin: 10px 0;
+    font-size: 9.5pt;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 9pt;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  }
+
+  th, td {
+    border: 1px solid #cbd5e1;
+    padding: 6px 8px;
+    text-align: left;
+  }
+
+  th {
+    background-color: #f1f5f9;
+    color: #0f172a;
+    font-weight: 600;
+  }
+
+  .page-break {
+    page-break-before: always;
+  }
+
+  code {
+    font-family: "Courier New", Courier, monospace;
+    font-size: 9pt;
+    background: #f1f5f9;
+    padding: 1px 3px;
+    border-radius: 3px;
+  }
+</style>
+</head>
+<body>
+
+<h1>LEO Orbit Dynamics Simulator & PINN Surrogate</h1>
+<div class="subtitle">Honours Research Briefing Document & Thesis Outline | Meeting with Prof. G. Ferrer</div>
+
+<div class="meta-box">
+  <div><strong>Candidate:</strong> Aeronautical Engineering Honours Student</div>
+  <div><strong>Institution:</strong> University of the Witwatersrand</div>
+  <div><strong>Date:</strong> October 2026</div>
+</div>
+
+<h2>1. Executive Summary & Core Research Objectives</h2>
+<p>
+This investigation presents a high-fidelity astrodynamics simulation suite coupled with an edge-deployable <strong>Physics-Informed Neural Network (PINN) / Deep Learning Surrogate</strong> for Low Earth Orbit (LEO) satellites. Ground truth is generated via high-order adaptive numerical integration (Runge-Kutta Dormand-Prince <code>RK45</code>) incorporating geopotential zonal harmonics (<i>J</i><sub>2</sub>) and dynamic thermospheric aerodynamic drag. The ML surrogate model is trained on non-dimensionalized transition state pairs to enable real-time orbit propagation on resource-constrained satellite flight computers (e.g. ESP32 microcontrollers).
+</p>
+
+<h2>2. Meeting Talking Points for Prof. Ferrer</h2>
+<ul>
+  <li><strong>Mathematical Rigour & Integrator Baseline:</strong> Ground truth trajectories are generated strictly using high-order variable step-size numerical methods (DOP853/RK45) with local error tolerances of 10<sup>&minus;9</sup>.</li>
+  <li><strong>Dual Perturbation Coupling:</strong> Simultaneously models conservative gravitational <i>J</i><sub>2</sub> field effects (nodal precession and apsidal rotation) and non-conservative atmospheric drag (co-rotating atmosphere with altitude-dependent scale heights).</li>
+  <li><strong>Surrogate Paradigm Shift (Residual Transition Map):</strong> Rather than learning absolute whole-trajectory positions (which fail to generalize across multi-orbit rollouts), the neural network learns a one-step <em>residual velocity/position flow field</em>: <strong>S</strong><sub>t+&Delta;t</sub> = <strong>S</strong><sub>t</sub> + <i>N</i><sub>&theta;</sub>(<strong>S</strong><sub>t</sub>). This shrinks network size to &lt;10k parameters (&approx; 36 KB fp32, &approx; 9 KB int8), maintaining &lt;5% rollout drift over 24 hours.</li>
+  <li><strong>Physics-Informed Loss Enforcement:</strong> Employs PyTorch auto-differentiation (<code>torch.autograd</code>) to penalize violations of Newton's second law directly in backpropagation.</li>
+  <li><strong>Automated Parametric Sweep Engine:</strong> Supports automated Monte Carlo and parametric sweeps across ballistic coefficients (<i>B = m / (C<sub>d</sub>A)</i>), orbital inclination, eccentricity, and perigee altitudes.</li>
+</ul>
+
+<div class="page-break"></div>
+
+<h2>3. Thorough Theoretical Formulation & Governing Equations</h2>
+
+<h3>3.1. Fundamental Equations of Motion (Two-Body with Perturbations)</h3>
+<p>
+In the Earth-Centered Inertial (ECI J2000) frame, the state vector <strong>S</strong>(<i>t</i>) = [<strong>r</strong>(<i>t</i>)<sup>T</sup>, <strong>v</strong>(<i>t</i>)<sup>T</sup>]<sup>T</sup> &isin; &reals;<sup>6</sup> evolves according to:
+</p>
+<div class="formula-box">
+  d<strong>r</strong>/dt = <strong>v</strong><br><br>
+  d<strong>v</strong>/dt = &minus; (&mu;<sub>&oplus;</sub> / ||<strong>r</strong>||<sup>3</sup>) <strong>r</strong> + <strong>a</strong><sub>J2</sub>(<strong>r</strong>) + <strong>a</strong><sub>drag</sub>(<strong>r</strong>, <strong>v</strong>) + <strong>a</strong><sub>3B</sub>(<strong>r</strong>, <i>t</i>)
+</div>
+<p>where &mu;<sub>&oplus;</sub> = 3.986004418 &times; 10<sup>14</sup> m<sup>3</sup>/s<sup>2</sup> is Earth's geocentric standard gravitational parameter.</p>
+
+<h3>3.2. Geopotential Oblateness (<i>J</i><sub>2</sub>) Zonal Harmonic</h3>
+<p>
+Earth's equatorial oblateness generates a non-spherical gravitational acceleration field derived from the gradient of the zonal gravitational potential <i>U</i><sub>J2</sub>:
+</p>
+<div class="formula-box">
+  <strong>a</strong><sub>J2</sub>(<strong>r</strong>) = &minus; (3/2) &middot; (<i>J</i><sub>2</sub> &mu;<sub>&oplus;</sub> <i>R</i><sub>&oplus;</sub><sup>2</sup> / <i>r</i><sup>4</sup>) &middot; 
+  [ (x/r)(1 &minus; 5 z<sup>2</sup>/r<sup>2</sup>), &nbsp; (y/r)(1 &minus; 5 z<sup>2</sup>/r<sup>2</sup>), &nbsp; (z/r)(3 &minus; 5 z<sup>2</sup>/r<sup>2</sup>) ]<sup>T</sup>
+</div>
+<p>
+<strong>Analytical Secular Rates for Model Validation:</strong> The secular drift rate of the Right Ascension of the Ascending Node (d&Omega;/dt) and Argument of Perigee (d&omega;/dt) serve as analytical validation truth:
+</p>
+<div class="formula-box">
+  d&Omega;/dt = &minus; (3/2) n&#772; <i>J</i><sub>2</sub> (<i>R</i><sub>&oplus;</sub> / <i>p</i>)<sup>2</sup> cos <i>i</i><br><br>
+  d&omega;/dt = + (3/4) n&#772; <i>J</i><sub>2</sub> (<i>R</i><sub>&oplus;</sub> / <i>p</i>)<sup>2</sup> (5 cos<sup>2</sup> <i>i</i> &minus; 1)
+</div>
+<p>where n&#772; = &radic;(&mu;<sub>&oplus;</sub> / <i>a</i><sup>3</sup>) is mean motion, <i>p</i> = <i>a</i>(1 &minus; <i>e</i><sup>2</sup>) is the semi-latus rectum, <i>R</i><sub>&oplus;</sub> = 6378.137 km, and <i>J</i><sub>2</sub> = 1.08263 &times; 10<sup>&minus;3</sup>.</p>
+
+<h3>3.3. Aerodynamic Drag in a Co-Rotating Thermosphere</h3>
+<p>
+The drag acceleration opposes the satellite's velocity vector relative to the rotating atmosphere (<strong>v</strong><sub>rel</sub>):
+</p>
+<div class="formula-box">
+  <strong>v</strong><sub>rel</sub> = <strong>v</strong> &minus; <strong>&omega;</strong><sub>&oplus;</sub> &times; <strong>r</strong><br><br>
+  <strong>a</strong><sub>drag</sub> = &minus; (1/2) &middot; &rho;(<i>h</i>) &middot; (<i>C<sub>d</sub>A / m</i>) &middot; ||<strong>v</strong><sub>rel</sub>|| <strong>v</strong><sub>rel</sub> = &minus; (1/2) &middot; (&rho;(<i>h</i>) / <i>B</i>) &middot; ||<strong>v</strong><sub>rel</sub>|| <strong>v</strong><sub>rel</sub>
+</div>
+<p>
+where <strong>&omega;</strong><sub>&oplus;</sub> = [0, 0, 7.292115 &times; 10<sup>&minus;5</sup>]<sup>T</sup> rad/s, <i>B</i> = <i>m</i> / (<i>C<sub>d</sub>A</i>) is the Ballistic Coefficient (kg/m<sup>2</sup>), and &rho;(<i>h</i>) = &rho;<sub>0</sub> exp(&minus;(<i>h</i> &minus; <i>h</i><sub>0</sub>) / <i>H</i>) with segmented scale heights <i>H</i>(<i>h</i>).
+</p>
+
+<h3>3.4. Non-Dimensionalization & Normalization Scaling</h3>
+<p>
+To prevent gradient vanishing and numerical divergence during deep learning backpropagation, canonical units map all variables to &Omicron;(1):
+</p>
+<div class="formula-box">
+  r&#771; = <strong>r</strong> / <i>R</i><sub>scale</sub>, &quad; v&#771; = <strong>v</strong> / <i>v</i><sub>scale</sub>, &quad; t&#771; = <i>t</i> / <i>T</i><sub>scale</sub><br>
+  <span style="font-size: 9pt; color: #475569;">(with <i>R</i><sub>scale</sub> = 6,378,137 m, &nbsp; <i>v</i><sub>scale</sub> = 8,000 m/s, &nbsp; <i>T</i><sub>scale</sub> = 5,400 s)</span>
+</div>
+
+<h3>3.5. PINN Loss & Physics Residual Optimization</h3>
+<p>
+The composite loss function penalizes empirical data discrepancy alongside differential equation residuals:
+</p>
+<div class="formula-box">
+  L<sub>total</sub> = L<sub>data</sub> + &lambda;<sub>phys</sub> &middot; L<sub>physics</sub><br><br>
+  L<sub>data</sub> = (1/N) &sum; || S&#771;<sub>k+1</sub> &minus; S&#770;<sub>k+1</sub> ||<sup>2</sup><br><br>
+  L<sub>physics</sub> = (1/N) &sum; [ || &part;r&#770;/&part;t &minus; v&#770; ||<sup>2</sup> + || &part;v&#770;/&part;t &minus; <strong>a</strong><sub>total</sub>(r&#770;, v&#770;) ||<sup>2</sup> ]
+</div>
+
+<div class="page-break"></div>
+
+<h2>4. Quantitative Figures & Visual Proofs for Thesis</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width: 25%;">Figure ID & Topic</th>
+      <th style="width: 45%;">Description & Visual Elements</th>
+      <th style="width: 30%;">Quantitative Metric / Thesis Value</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Fig 1: RAAN Nodal Regression Validation</strong></td>
+      <td>Numerical RK45 &Omega;(<i>t</i>) trajectory overlaid against analytical first-order <i>J</i><sub>2</sub> secular regression over 8 hours (<i>i</i> = 51.6&deg;).</td>
+      <td>Evaluates <i>R</i><sup>2</sup> &gt; 0.9999 and confirms osculating sinusoidal sub-orbit oscillations superimposed on the secular trend.</td>
+    </tr>
+    <tr>
+      <td><strong>Fig 2: Multi-Force Altitude Decay Comparison</strong></td>
+      <td>3-curve comparison: Keplerian Two-Body (conservative), <i>J</i><sub>2</sub>-only (periodic altitude fluctuations), and Full Dynamics (<i>J</i><sub>2</sub> + Drag).</td>
+      <td>Quantifies perigee decay rate (km/day) and kinetic energy dissipation rate d&epsilon;/dt = <strong>a</strong><sub>drag</sub> &middot; <strong>v</strong>.</td>
+    </tr>
+    <tr>
+      <td><strong>Fig 3: Six Orbital Elements Evolution</strong></td>
+      <td>2 &times; 2 subplot displaying (<i>a</i>(<i>t</i>), <i>e</i>(<i>t</i>), <i>i</i>(<i>t</i>), &Omega;(<i>t</i>)) under full perturbation regime.</td>
+      <td>Demonstrates conservation of inclination short-period boundaries and secular semi-major axis erosion.</td>
+    </tr>
+    <tr>
+      <td><strong>Fig 4: Ballistic Sweep vs Lifetime</strong></td>
+      <td>Parametric sweep of <i>B</i> &isin; [10, 120] kg/m<sup>2</sup> and initial altitude <i>h</i> &isin; [200, 500] km vs orbital lifetime (days).</td>
+      <td>Empirical lifetime scaling law: <i>T</i><sub>deorbit</sub> &prop; <i>B</i> &middot; exp(&alpha; <i>h</i>).</td>
+    </tr>
+    <tr>
+      <td><strong>Fig 5: PINN vs RK45 Multi-Orbit Drift</strong></td>
+      <td>24-hour error accumulation plot: ||<strong>r</strong><sub>PINN</sub>(<i>t</i>) &minus; <strong>r</strong><sub>RK45</sub>(<i>t</i>)|| vs elapsed time across 16 orbital revolutions.</td>
+      <td>Validates &lt;5% cumulative positional error threshold and 98.4% compute-time reduction.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>5. Proposed Thesis Chapter Breakdown</h2>
+
+<ol>
+  <li><strong>Chapter 1: Introduction & Research Problem</strong>
+    <ul>
+      <li>1.1 Background on LEO Mega-Constellations & SmallSat Missions</li>
+      <li>1.2 Computational Bottlenecks of Onboard Orbital Propagation</li>
+      <li>1.3 Problem Statement: Real-Time Surrogate Modeling via PINNs</li>
+      <li>1.4 Aims, Objectives, and Scope of Work</li>
+    </ul>
+  </li>
+  <li><strong>Chapter 2: Literature Review & Theoretical Astrodynamics</strong>
+    <ul>
+      <li>2.1 Two-Body Orbital Mechanics & Keplerian State Formulations</li>
+      <li>2.2 Geopotential Harmonics & Earth Oblateness (<i>J</i><sub>2</sub> &minus; <i>J</i><sub>6</sub>)</li>
+      <li>2.3 Upper Atmospheric Density Modeling & Aerodynamic Deceleration</li>
+      <li>2.4 Numerical Integration Techniques (Runge-Kutta Dormand-Prince, Symplectic Methods)</li>
+      <li>2.5 Physics-Informed Machine Learning in Computational Mechanics</li>
+    </ul>
+  </li>
+  <li><strong>Chapter 3: Numerical Simulator Architecture & Ingestion Pipeline</strong>
+    <ul>
+      <li>3.1 Modular Dynamics Engine (<code>leo_simulator</code>)</li>
+      <li>3.2 Automated Parametric Sweep & Experiment Logging Architecture</li>
+      <li>3.3 Data Sanitization, Uniform Splitting, and Deterministic Ingestion (<code>ai/ingest.py</code>)</li>
+      <li>3.4 TLE Live Ingestion & SGP4 Oscar Verification</li>
+    </ul>
+  </li>
+  <li><strong>Chapter 4: Physics-Informed Neural Network (PINN) Design & Training</strong>
+    <ul>
+      <li>4.1 Non-Dimensional State-Space Formulation</li>
+      <li>4.2 Residual Transition Architecture for Microcontrollers</li>
+      <li>4.3 Loss Function Derivation: Data Loss, Momentum Residual, and Autograd Formulation</li>
+      <li>4.4 Training Dynamics, Early Stopping, and Learning Rate Schedules</li>
+    </ul>
+  </li>
+  <li><strong>Chapter 5: Results, Verification & Parametric Sensitivity Analysis</strong>
+    <ul>
+      <li>5.1 Benchmark Verification against Analytical Perturbation Theory</li>
+      <li>5.2 Orbital Lifetime Analysis across Ballistic Coefficients & Altitudes</li>
+      <li>5.3 Conjunction Detection & Orbital Collision Impulse Resolution</li>
+      <li>5.4 PINN Rollout Drift & Computational Speedup Analysis</li>
+    </ul>
+  </li>
+  <li><strong>Chapter 6: Hardware-in-the-Loop / TinyML Feasibility (ESP32 Port)</strong>
+    <ul>
+      <li>6.1 Model Quantization (Float32 to Int8) & Memory Footprint (< 200 KB RAM)</li>
+      <li>6.2 Execution Latency per Inference Step on Edge Microcontrollers</li>
+    </ul>
+  </li>
+  <li><strong>Chapter 7: Conclusions & Future Recommendations</strong></li>
+</ol>
+
+</body>
+</html>

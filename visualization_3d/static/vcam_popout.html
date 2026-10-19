@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NanoDynamics | Onboard Optical Camera Feed & Constellation Mosaic</title>
+    <style>
+        :root {
+            --bg-base: #030712;
+            --cyan: #00E5FF;
+            --blue: #38bdf8;
+            --border: rgba(56, 189, 248, 0.28);
+            --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: var(--bg-base);
+            color: #f8fafc;
+            font-family: var(--font-mono);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        header {
+            background: #050b18;
+            border-bottom: 1px solid var(--border);
+            padding: 10px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 50;
+        }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--cyan);
+            letter-spacing: 0.1em;
+        }
+
+        .mode-group {
+            display: flex;
+            gap: 6px;
+            background: #0f172a;
+            padding: 3px;
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .mode-btn {
+            background: transparent;
+            border: none;
+            color: #94a3b8;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .mode-btn.active, .mode-btn:hover {
+            background: #0284c7;
+            color: #ffffff;
+        }
+
+        .main-viewport {
+            flex: 1;
+            position: relative;
+            background: #000000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #vcam-display-canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+        }
+
+        /* Overlay HUD Viewfinder */
+        .hud-overlay {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+        }
+
+        .hud-top {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            text-shadow: 0 0 4px rgba(0,0,0,0.9);
+        }
+
+        .hud-center {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .reticle {
+            width: 80px;
+            height: 80px;
+            border: 1px solid rgba(56, 189, 248, 0.45);
+            border-radius: 50%;
+            position: relative;
+        }
+
+        .reticle::before, .reticle::after {
+            content: '';
+            position: absolute;
+            background: rgba(56, 189, 248, 0.7);
+        }
+
+        .reticle::before {
+            top: 50%;
+            left: -15px;
+            right: -15px;
+            height: 1px;
+            transform: translateY(-50%);
+        }
+
+        .reticle::after {
+            left: 50%;
+            top: -15px;
+            bottom: -15px;
+            width: 1px;
+            transform: translateX(-50%);
+        }
+
+        .hud-bottom {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            font-size: 11px;
+            text-shadow: 0 0 4px rgba(0,0,0,0.9);
+        }
+
+        .mosaic-banner {
+            display: none;
+            position: absolute;
+            top: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(16, 185, 129, 0.2);
+            border: 1px solid #10b981;
+            color: #10b981;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-title">
+            <span>📷 ONBOARD SATELLITE OPTICAL CAM</span>
+            <span style="opacity:0.4;">|</span>
+            <span id="target-sat-badge" style="color:#f8fafc; font-size:11px;">TARGET: SAT-01</span>
+        </div>
+
+        <div class="mode-group">
+            <button class="mode-btn active" id="btn-nadir" onclick="switchMode('nadir')">🌍 Nadir Earth Obs</button>
+            <button class="mode-btn" id="btn-fwd" onclick="switchMode('forward')">🚀 Prograde Horizon</button>
+            <button class="mode-btn" id="btn-zen" onclick="switchMode('zenith')">🌌 Zenith Stars</button>
+            <button class="mode-btn" id="btn-mosaic" onclick="switchMode('mosaic')" style="color:#10b981;">🌐 Constellation Stitch</button>
+        </div>
+
+        <div style="display:flex; gap:8px;">
+            <button onclick="captureSnapshot()" style="background:#0284c7; border:1px solid #38bdf8; color:white; padding:4px 12px; font-family:var(--font-mono); font-size:11px; border-radius:3px; cursor:pointer;">📸 Snapshot</button>
+        </div>
+    </header>
+
+    <div class="main-viewport">
+        <canvas id="vcam-display-canvas"></canvas>
+
+        <div id="mosaic-status" class="mosaic-banner">
+            SYNTHETIC APERTURE MOSAIC: 3 ADJACENT NODES STITCHED
+        </div>
+
+        <div class="hud-overlay">
+            <div class="hud-top">
+                <div>
+                    <div>OPTICAL PAYLOAD: HIGH-RES MULTISPECTRAL</div>
+                    <div id="hud-fov" style="color:var(--cyan);">FOV: 45.0° | RESOLUTION: 1080p</div>
+                </div>
+                <div style="text-align:right;">
+                    <div id="hud-latlon">SUB-SAT: 29.76°N, 95.36°W (Houston)</div>
+                    <div id="hud-alt-vel" style="color:#facc15;">ALT: 400.0 km | VEL: 7.67 km/s</div>
+                </div>
+            </div>
+
+            <div class="hud-center">
+                <div class="reticle"></div>
+            </div>
+
+            <div class="hud-bottom">
+                <div>
+                    <div id="hud-phase">ORBIT PHASE: DAYLIGHT (SOLAR FLUX 100%)</div>
+                    <div id="hud-epoch">EPOCH: T+00:00:00</div>
+                </div>
+                <div style="text-align:right;">
+                    <div>NANODYNAMICS OPTICAL SYSTEM</div>
+                    <div id="hud-mode-label" style="color:var(--cyan);">MODE: NADIR EARTH OBSERVATION</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const vcamChannel = new BroadcastChannel('nanodynamics_vcam');
+        const canvas = document.getElementById('vcam-display-canvas');
+        const ctx = canvas.getContext('2d');
+        let currentMode = 'nadir';
+
+        function resizeCanvas() {
+            canvas.width = canvas.clientWidth || window.innerWidth;
+            canvas.height = canvas.clientHeight || (window.innerHeight - 50);
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        vcamChannel.onmessage = function(event) {
+            const msg = event.data;
+            if (!msg) return;
+
+            // 1. Update HUD telemetry
+            if (msg.satName) document.getElementById('target-sat-badge').innerText = `TARGET: ${msg.satName}`;
+            if (msg.alt_km && msg.vel_kms) {
+                document.getElementById('hud-alt-vel').innerText = `ALT: ${msg.alt_km.toFixed(1)} km | VEL: ${msg.vel_kms.toFixed(2)} km/s`;
+            }
+            if (msg.lat !== undefined && msg.lon !== undefined) {
+                document.getElementById('hud-latlon').innerText = `SUB-SAT: ${msg.lat.toFixed(2)}°N, ${msg.lon.toFixed(2)}°W`;
+            }
+            if (msg.epochStr) document.getElementById('hud-epoch').innerText = `EPOCH: ${msg.epochStr}`;
+
+            // 2. Draw incoming image stream
+            if (msg.frameData) {
+                const img = new Image();
+                img.onload = function() {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    if (currentMode === 'mosaic' && msg.mosaicFrames && msg.mosaicFrames.length > 1) {
+                        // Multi-Satellite Synthetic Aperture Stitched View
+                        renderStitchedMosaic(msg.mosaicFrames);
+                    } else {
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    }
+                };
+                img.src = msg.frameData;
+            }
+        };
+
+        function renderStitchedMosaic(frames) {
+            const count = frames.length;
+            const pieceW = canvas.width / count;
+            frames.forEach((f, idx) => {
+                const subImg = new Image();
+                subImg.onload = function() {
+                    ctx.drawImage(subImg, idx * pieceW, 0, pieceW, canvas.height);
+                    // Draw seam divider line
+                    ctx.strokeStyle = 'rgba(16, 185, 129, 0.7)';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo((idx + 1) * pieceW, 0);
+                    ctx.lineTo((idx + 1) * pieceW, canvas.height);
+                    ctx.stroke();
+
+                    // Seam label
+                    ctx.fillStyle = '#10b981';
+                    ctx.font = '10px JetBrains Mono, monospace';
+                    ctx.fillText(`NODE ${idx + 1} APERTURE`, idx * pieceW + 10, 30);
+                };
+                subImg.src = f;
+            });
+        }
+
+        function switchMode(mode) {
+            currentMode = mode;
+            ['nadir', 'fwd', 'zen', 'mosaic'].forEach(m => {
+                const btn = document.getElementById('btn-' + m);
+                if (btn) btn.classList.remove('active');
+            });
+            const activeBtn = document.getElementById(mode === 'forward' ? 'btn-fwd' : (mode === 'zenith' ? 'btn-zen' : (mode === 'mosaic' ? 'btn-mosaic' : 'btn-nadir')));
+            if (activeBtn) activeBtn.classList.add('active');
+
+            const mosaicBanner = document.getElementById('mosaic-status');
+            if (mosaicBanner) mosaicBanner.style.display = (mode === 'mosaic') ? 'block' : 'none';
+
+            const modeLabel = document.getElementById('hud-mode-label');
+            if (modeLabel) {
+                modeLabel.innerText = `MODE: ${mode.toUpperCase()}`;
+            }
+
+            // Send command back to main simulation
+            vcamChannel.postMessage({ action: 'setMode', mode: mode });
+        }
+
+        function captureSnapshot() {
+            const a = document.createElement('a');
+            a.href = canvas.toDataURL('image/jpeg', 0.95);
+            a.download = `sat_optical_${currentMode}_${Date.now()}.jpg`;
+            a.click();
+        }
+    </script>
+</body>
+</html>

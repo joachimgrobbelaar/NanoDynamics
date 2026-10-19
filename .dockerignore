@@ -9,8 +9,13 @@ __pycache__
 venv
 */venv
 functions/venv
+ai/data/
+ai/nc/
+hardware_in_the_loop/.pio/
 .agents
 videos
+visualization_3d/screenshots/
+output/
 *.mp4
 *.webm
 *.png
