@@ -1,8 +1,22 @@
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyo
+.mypy_cache/
 .pytest_cache/
 .ruff_cache/
+.coverage
+htmlcov/
+
+# Environments
+.env
+*.env
+venv/
+env/
+.venv/
+
+# NanoDynamics: AI model data & training outputs
 ai/data/
 ai/checkpoints/*
 !ai/checkpoints/agent/
@@ -11,7 +25,17 @@ ai/checkpoints/*
 !ai/checkpoints/agent/training_history.jsonl
 !ai/checkpoints/transition.pt
 
+# Firebase / Firestore
 functions/venv/
 firestore-debug.log
+
+# Logs & temp
 *.log
 .agents/
+trajectory_*.json
+output/
+
+# IDE
+.vscode/
+.idea/
+*.swp
