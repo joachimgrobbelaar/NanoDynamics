@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: nanodynamics-simulator
+    env: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
+    healthCheckPath: /
+    envVars:
+      - key: PORT
+        value: 8000

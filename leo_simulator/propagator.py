@@ -47,6 +47,7 @@ class PropagationResult:
     message: str
     reentry_detected: bool = False
     reentry_time: float | None = None
+    telemetry: dict | None = None
 
     @property
     def final_altitude(self) -> float:
@@ -121,6 +122,8 @@ class OrbitPropagator:
         include_drag: bool = True,
         include_earth_rotation: bool = True,
         include_moon: bool = False,
+        include_srp: bool = False,
+        cr: float = 1.3,
         mu: float = MU_EARTH,
         r_earth: float = R_EARTH,
         j2: float = J2_EARTH,
@@ -176,6 +179,8 @@ class OrbitPropagator:
             include_drag=self.include_drag,
             include_earth_rotation=self.include_earth_rotation,
             include_moon=self.include_moon,
+            include_srp=include_srp,
+            cr=cr,
             mu=self.mu,
             r_earth=self.r_earth,
             j2=self.j2,

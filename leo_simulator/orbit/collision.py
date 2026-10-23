@@ -7,6 +7,7 @@ exchange impulses, and post-collision velocity deflections for orbiting bodies.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from typing import Tuple
 
 import numpy as np
@@ -164,3 +165,86 @@ def compute_orbital_collision_impulse(
         restitution=e,
         momentum_error=p_err,
     )
+
+
+def generate_collision_debris_fragments(
+    sat_name: str,
+    parent_mass: float,
+    parent_drag_area: float,
+    parent_cd: float,
+    col_pos: np.ndarray | list[float],
+    post_vel: np.ndarray | list[float],
+    relative_speed: float,
+    num_fragments: int = 2,
+    core_mass_fraction: float = 0.50,
+    parent_body: str = "Earth",
+    propagation_mode: str = "rk45",
+) -> tuple[dict, list[dict]]:
+    """Partition colliding satellite into a reduced surviving core and daughter fragments.
+    
+    Zero-sum momentum dispersion is strictly enforced across daughter fragments:
+        sum(m_frag * delta_v_frag) == 0
+    
+    Returns:
+        core_spec: Updated specifications for surviving core (reduced mass, etc.)
+        daughters: List of independent daughter fragment specifications with initial states.
+    """
+    pos = np.asarray(col_pos, dtype=np.float64)
+    v_base = np.asarray(post_vel, dtype=np.float64)
+
+    # Core retains fraction of mass
+    core_mass = max(1.0, parent_mass * core_mass_fraction)
+    debris_mass_total = max(0.5, parent_mass * (1.0 - core_mass_fraction))
+    m_frag = debris_mass_total / max(1, num_fragments)
+
+    core_spec = {
+        "mass": float(core_mass),
+        "drag_area": float(parent_drag_area * ((core_mass / parent_mass) ** (2.0 / 3.0))),
+    }
+
+    daughters = []
+    if num_fragments <= 0:
+        return core_spec, daughters
+
+    # Characteristic dispersion speed: 2% to 6% of relative impact velocity (min 20 m/s, max 400 m/s)
+    v_disp_base = float(np.clip(relative_speed * 0.04, 20.0, 400.0))
+
+    candidate_dvs = []
+    for _ in range(num_fragments):
+        u = float(np.random.uniform(-1.0, 1.0))
+        theta = float(np.random.uniform(0.0, 2.0 * math.pi))
+        r_xy = math.sqrt(max(0.0, 1.0 - u * u))
+        dir_vec = np.array([r_xy * math.cos(theta), r_xy * math.sin(theta), u], dtype=np.float64)
+        speed = v_disp_base * float(np.random.uniform(0.85, 1.15))
+        candidate_dvs.append(dir_vec * speed)
+
+    candidate_dvs = np.array(candidate_dvs)
+    # Subtract center-of-mass dispersion to enforce exact zero-sum momentum
+    cm_dv = np.mean(candidate_dvs, axis=0)
+    exact_dvs = candidate_dvs - cm_dv
+
+    frag_labels = ["Alpha", "Beta", "Gamma", "Delta", "Epsilon"]
+    for k in range(num_fragments):
+        label = frag_labels[k % len(frag_labels)] if k < len(frag_labels) else f"F{k+1}"
+        delta_v = exact_dvs[k]
+        v_frag = v_base + delta_v
+
+        # Scaled area with higher A/m ratio for debris
+        frag_area = float(parent_drag_area * ((m_frag / parent_mass) ** (2.0 / 3.0)))
+
+        daughters.append({
+            "name": f"{sat_name}-{label}",
+            "parent_satellite": sat_name,
+            "parent_body": parent_body,
+            "mass": float(m_frag),
+            "drag_area": float(frag_area),
+            "cd": float(parent_cd * 1.15),
+            "propagation_mode": propagation_mode,
+            "initial_state": pos.tolist() + v_frag.tolist(),
+            "color": "#f97316" if k % 2 == 0 else "#eab308",
+            "icon": "space_station",
+            "is_daughter": True,
+        })
+
+    return core_spec, daughters
+

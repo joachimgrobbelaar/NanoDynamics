@@ -1,0 +1,64 @@
+{
+  "devices": [
+    {
+      "id": "esp32-node-1",
+      "name": "CubeSat Primary Flight Computer",
+      "mac_address": "7C:9E:BD:44:52:E4",
+      "ip_address": "",
+      "transport": "espnow_gateway",
+      "channel": 1,
+      "status": "online",
+      "last_ping_ms": 0.5,
+      "last_seen": 1792001508.2002075,
+      "assigned_satellite": null
+    },
+    {
+      "id": "esp32-694",
+      "name": "CubeSat Swarm Node 2",
+      "mac_address": "24:6F:28:B1:C2:A4",
+      "ip_address": "",
+      "transport": "espnow_monitor",
+      "channel": 1,
+      "status": "offline",
+      "last_ping_ms": null,
+      "last_seen": 1791995110.6941123,
+      "assigned_satellite": null
+    },
+    {
+      "id": "esp32-2222",
+      "name": "CubeSat Flight Computer Beta",
+      "mac_address": "",
+      "ip_address": "",
+      "transport": "wifi_udp",
+      "channel": 1,
+      "status": "offline",
+      "last_ping_ms": null,
+      "last_seen": 1792001532.2220774,
+      "assigned_satellite": null
+    },
+    {
+      "id": "esp32-node-2",
+      "name": "ESP32 DevKit V1 (TFLite INT8 PINN + Symplectic)",
+      "mac_address": "24:6F:28:1A:9C:02",
+      "ip_address": "ESP-NOW CH1",
+      "transport": "espnow_edge",
+      "channel": 1,
+      "status": "online",
+      "last_ping_ms": 1.85,
+      "last_seen": 1792139496.0484567,
+      "assigned_satellite": null
+    }
+  ],
+  "pinn_params": {
+    "dt_s": 12.0,
+    "b_coeff": 0.018,
+    "symplectic_enabled": true,
+    "transport_mode": "espnow_gateway",
+    "gateway_port": "/dev/ttyUSB0",
+    "edge_port": "/dev/ttyUSB1",
+    "wifi_ssid": "The Collective Genius Tutors",
+    "wifi_host_ip": "192.168.1.38",
+    "softap_ssid": "NANODYNAMICS-ESP32-GW",
+    "softap_ip": "192.168.4.1"
+  }
+}

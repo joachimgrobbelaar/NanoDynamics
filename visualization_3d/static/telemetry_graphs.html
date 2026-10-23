@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NanoDynamics | Telemetry & Astrodynamics Telemetry Station</title>
+    <!-- Chart.js CDN with robust fallbacks -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --bg-base: #060913;
+            --bg-card: #0b1120ee;
+            --border: rgba(56, 189, 248, 0.22);
+            --border-hover: rgba(56, 189, 248, 0.45);
+            --cyan: #00E5FF;
+            --blue: #38bdf8;
+            --amber: #f59e0b;
+            --red: #ef4444;
+            --green: #10b981;
+            --purple: #a855f7;
+            --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+            --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: #e2e8f0;
+            font-family: var(--font-sans);
+            font-size: 13px;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* Top Command Header */
+        header {
+            background: #04060c;
+            border-bottom: 1px solid var(--border);
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .brand-badge {
+            background: linear-gradient(135deg, rgba(0,229,255,0.15), rgba(56,189,248,0.05));
+            border: 1px solid var(--cyan);
+            border-radius: 4px;
+            padding: 4px 10px;
+            font-family: var(--font-mono);
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            color: var(--cyan);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .channel-pill {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 9999px;
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            color: var(--green);
+        }
+
+        .channel-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--green);
+            animation: pulse 1.8s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.85); }
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn {
+            background: #1e293b;
+            color: #f1f5f9;
+            border: 1px solid var(--border);
+            padding: 5px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-family: var(--font-mono);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .btn:hover {
+            background: #334155;
+            border-color: var(--cyan);
+            color: #ffffff;
+        }
+
+        .btn-primary {
+            background: #0284c7;
+            border-color: #38bdf8;
+        }
+
+        .btn-primary:hover {
+            background: #0369a1;
+        }
+
+        /* KPI Quick Metrics Bar */
+        .metrics-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 12px;
+            padding: 14px 20px;
+            background: rgba(11, 17, 32, 0.5);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .metric-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .metric-label {
+            font-size: 10px;
+            font-family: var(--font-mono);
+            color: #94a3b8;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .metric-value {
+            font-size: 16px;
+            font-family: var(--font-mono);
+            font-weight: 700;
+            color: #f8fafc;
+        }
+
+        .metric-sub {
+            font-size: 9px;
+            color: #64748b;
+            font-family: var(--font-mono);
+        }
+
+        /* Main Chart Grid */
+        .chart-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            padding: 16px 20px;
+            flex: 1;
+        }
+
+        @media (max-width: 1024px) {
+            .chart-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .chart-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 14px 16px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+        }
+
+        .chart-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .chart-title {
+            font-family: var(--font-mono);
+            font-weight: 700;
+            font-size: 12px;
+            color: var(--cyan);
+            letter-spacing: 0.08em;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .chart-container {
+            position: relative;
+            flex: 1;
+            min-height: 250px;
+            width: 100%;
+        }
+
+        /* Footer */
+        footer {
+            padding: 8px 20px;
+            background: #04060c;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 10px;
+            color: #64748b;
+            font-family: var(--font-mono);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-left">
+            <div class="brand-badge">
+                <span>🛰️ NANODYNAMICS</span>
+                <span style="opacity:0.4;">|</span>
+                <span style="font-size:11px; color:#f8fafc;">TELEMETRY STATION</span>
+            </div>
+            <div id="conn-status" class="channel-pill">
+                <div class="channel-dot"></div>
+                <span id="conn-text">RECEIVING TELEMETRY</span>
+            </div>
+            <span id="active-sat-label" style="font-family:var(--font-mono); font-size:11px; color:#38bdf8;">TARGET: --</span>
+        </div>
+
+        <div class="controls">
+            <button class="btn" onclick="togglePauseSync()" id="pause-btn">⏸️ Pause</button>
+            <button class="btn" onclick="clearData()">🧹 Clear</button>
+            <button class="btn btn-primary" onclick="exportCSV()">📥 Export CSV</button>
+            <button class="btn" onclick="exportJSON()">📊 JSON</button>
+            <button class="btn" onclick="exportLaTeX()">📐 LaTeX (PGFPlots)</button>
+            <button class="btn" onclick="exportSnapshot()">📸 PNG</button>
+        </div>
+    </header>
+
+    <!-- Real-time Quick Metric Readouts -->
+    <section class="metrics-bar">
+        <div class="metric-card">
+            <span class="metric-label">Altitude</span>
+            <span id="val-alt" class="metric-value">-- km</span>
+            <span id="sub-alt" class="metric-sub">Peri: -- | Apo: --</span>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Orbital Velocity</span>
+            <span id="val-vel" class="metric-value">-- km/s</span>
+            <span id="sub-vel" class="metric-sub">Mach -- (LEO)</span>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Decay Rate (da/dt)</span>
+            <span id="val-decay" class="metric-value" style="color:var(--amber);">-- m/day</span>
+            <span id="sub-lifetime" class="metric-sub">Est. Lifetime: --</span>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Drag Perturbation</span>
+            <span id="val-drag" class="metric-value" style="color:var(--red);">-- N</span>
+            <span id="sub-area" class="metric-sub">Eff Area: -- m²</span>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">SRP Solar Flux</span>
+            <span id="val-srp" class="metric-value" style="color:#facc15);">-- N</span>
+            <span id="sub-shadow" class="metric-sub">Shadow: --%</span>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Energy Drift (ΔE/E₀)</span>
+            <span id="val-energy" class="metric-value" style="color:var(--green);">0.00e+0</span>
+            <span class="metric-sub">Symplectic Hamiltonian</span>
+        </div>
+    </section>
+
+    <!-- Multi-Axis Chart Grid -->
+    <main class="chart-grid">
+        <!-- 1. Kinematics Chart -->
+        <div class="chart-card">
+            <div class="chart-card-header">
+                <span class="chart-title">📈 ORBITAL KINEMATICS (ALTITUDE & VELOCITY)</span>
+                <span style="font-family:var(--font-mono); font-size:10px; color:#64748b;">Axes: km / km/s</span>
+            </div>
+            <div class="chart-container">
+                <canvas id="chart-kinematics"></canvas>
+            </div>
+        </div>
+
+        <!-- 2. Perturbation Forces Breakdown -->
+        <div class="chart-card">
+            <div class="chart-card-header">
+                <span class="chart-title">🔬 PERTURBATION FORCES BREAKDOWN</span>
+                <span style="font-family:var(--font-mono); font-size:10px; color:#64748b;">Unit: Newtons (N)</span>
+            </div>
+            <div class="chart-container">
+                <canvas id="chart-forces"></canvas>
+            </div>
+        </div>
+
+        <!-- 3. Orbital Decay & Semimajor Axis Rate -->
+        <div class="chart-card">
+            <div class="chart-card-header">
+                <span class="chart-title">📉 ORBITAL DECAY RATE & RE-ENTRY ESTIMATION</span>
+                <span style="font-family:var(--font-mono); font-size:10px; color:#64748b;">da/dt (m/day)</span>
+            </div>
+            <div class="chart-container">
+                <canvas id="chart-decay"></canvas>
+            </div>
+        </div>
+
+        <!-- 4. Energy & Invariant Conservation -->
+        <div class="chart-card">
+            <div class="chart-card-header">
+                <span class="chart-title">⚛️ HAMILTONIAN DRIFT & GEOMAGNETIC COUPLING</span>
+                <span style="font-family:var(--font-mono); font-size:10px; color:#64748b;">Fractional / μT</span>
+            </div>
+            <div class="chart-container">
+                <canvas id="chart-energy"></canvas>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <span>Real-Time BroadcastChannel: <code>nanodynamics_telemetry</code></span>
+        <span id="pts-count">Data Points Recorded: 0</span>
+        <span>Standard: WGS-84 / EGM96 Geopotential / NASA NRLMSISE-00</span>
+    </footer>
+
+    <script>
+        const MAX_POINTS = 300;
+        let isPaused = false;
+        const telemetryHistory = [];
+
+        // Chart.js default styles
+        Chart.defaults.color = '#94a3b8';
+        Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.07)';
+        Chart.defaults.font.family = 'JetBrains Mono, monospace';
+        Chart.defaults.font.size = 10;
+
+        // 1. Kinematics Chart
+        const ctxKin = document.getElementById('chart-kinematics').getContext('2d');
+        const chartKin = new Chart(ctxKin, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'Altitude (km)',
+                        borderColor: '#00E5FF',
+                        backgroundColor: 'rgba(0, 229, 255, 0.1)',
+                        data: [],
+                        yAxisID: 'yAlt',
+                        borderWidth: 2,
+                        tension: 0.15,
+                        pointRadius: 0
+                    },
+                    {
+                        label: 'Velocity (km/s)',
+                        borderColor: '#a855f7',
+                        backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                        data: [],
+                        yAxisID: 'yVel',
+                        borderWidth: 1.8,
+                        borderDash: [4, 4],
+                        tension: 0.15,
+                        pointRadius: 0
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { display: true, ticks: { maxTicksLimit: 8 } },
+                    yAlt: { type: 'linear', position: 'left', title: { display: true, text: 'Altitude (km)' } },
+                    yVel: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Velocity (km/s)' } }
+                },
+                animation: false
+            }
+        });
+
+        // 2. Perturbation Forces Breakdown Chart
+        const ctxForces = document.getElementById('chart-forces').getContext('2d');
+        const chartForces = new Chart(ctxForces, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    { label: 'Drag (N)', borderColor: '#ef4444', data: [], borderWidth: 1.8, pointRadius: 0 },
+                    { label: 'J2 Oblateness (N)', borderColor: '#3b82f6', data: [], borderWidth: 1.5, pointRadius: 0 },
+                    { label: 'SRP Solar Flux (N)', borderColor: '#eab308', data: [], borderWidth: 1.5, pointRadius: 0 },
+                    { label: 'Geomagnetic (N)', borderColor: '#10b981', data: [], borderWidth: 1.5, pointRadius: 0 },
+                    { label: 'J3/J4 Harmonics (N)', borderColor: '#ec4899', data: [], borderWidth: 1.5, borderDash: [2, 2], pointRadius: 0 }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { display: true, ticks: { maxTicksLimit: 8 } },
+                    y: { type: 'logarithmic', title: { display: true, text: 'Force (Newtons)' } }
+                },
+                animation: false
+            }
+        });
+
+        // 3. Decay Rate Chart
+        const ctxDecay = document.getElementById('chart-decay').getContext('2d');
+        const chartDecay = new Chart(ctxDecay, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'Semi-major Axis Decay (m/day)',
+                        borderColor: '#f59e0b',
+                        backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                        fill: true,
+                        data: [],
+                        borderWidth: 2,
+                        pointRadius: 0
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { display: true, ticks: { maxTicksLimit: 8 } },
+                    y: { title: { display: true, text: 'da/dt (m/day)' } }
+                },
+                animation: false
+            }
+        });
+
+        // 4. Energy Drift Chart
+        const ctxEnergy = document.getElementById('chart-energy').getContext('2d');
+        const chartEnergy = new Chart(ctxEnergy, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'Fractional Energy Drift (ΔE/E₀)',
+                        borderColor: '#10b981',
+                        data: [],
+                        borderWidth: 1.8,
+                        pointRadius: 0
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { display: true, ticks: { maxTicksLimit: 8 } },
+                    y: { title: { display: true, text: 'Relative Drift' } }
+                },
+                animation: false
+            }
+        });
+
+        // Listen for Real-Time Telemetry from Main 3D Simulator
+        let lastReceivedTime = Date.now();
+        const telemetryChannel = new BroadcastChannel('nanodynamics_telemetry');
+
+        telemetryChannel.onmessage = function(event) {
+            if (isPaused) return;
+            const data = event.data;
+            if (!data) return;
+            lastReceivedTime = Date.now();
+            updateUI(data);
+        };
+
+        // Liveness Watchdog
+        setInterval(() => {
+            const diff = Date.now() - lastReceivedTime;
+            const pill = document.getElementById('conn-status');
+            const txt = document.getElementById('conn-text');
+            if (diff > 3500) {
+                pill.style.background = 'rgba(239, 68, 68, 0.12)';
+                pill.style.borderColor = 'rgba(239, 68, 68, 0.35)';
+                pill.style.color = '#ef4444';
+                txt.innerText = 'STANDBY / PAUSED';
+            } else {
+                pill.style.background = 'rgba(16, 185, 129, 0.12)';
+                pill.style.borderColor = 'rgba(16, 185, 129, 0.35)';
+                pill.style.color = '#10b981';
+                txt.innerText = 'RECEIVING TELEMETRY';
+            }
+        }, 1000);
+
+        function updateUI(d) {
+            const timeLabel = d.timeStr || (d.simTime ? `T+${d.simTime.toFixed(0)}s` : new Date().toLocaleTimeString());
+            const alt = Number(d.alt_km || 0);
+            const vel = Number(d.vel_kms || 0);
+            const mass = Number(d.mass_kg || 4.0);
+
+            // Forces in Newtons
+            const fDrag = d.f_drag_N !== undefined ? Number(d.f_drag_N) : (d.a_drag_ms2 ? d.a_drag_ms2 * mass : 0);
+            const fJ2 = d.f_j2_N !== undefined ? Number(d.f_j2_N) : (d.a_j2_ms2 ? d.a_j2_ms2 * mass : 0);
+            const fSrp = d.f_srp_N !== undefined ? Number(d.f_srp_N) : (d.a_srp_ms2 ? d.a_srp_ms2 * mass : 0);
+            const fMag = d.f_mag_N !== undefined ? Number(d.f_mag_N) : (d.a_mag_ms2 ? d.a_mag_ms2 * mass : 0);
+            const fJ3 = d.f_j3_N !== undefined ? Number(d.f_j3_N) : (d.a_j3_ms2 ? d.a_j3_ms2 * mass : 0);
+
+            // Decay calculation
+            const da_dt = d.decay_rate_m_day !== undefined ? Number(d.decay_rate_m_day) : (-fDrag / mass * 86400 * 2.0);
+            const lifetimeStr = d.lifetime_str || (da_dt < -0.01 ? `${Math.max(1, Math.round(alt * 1000 / Math.abs(da_dt)))} days` : 'Stable (>100 yr)');
+            const eDrift = Number(d.energy_drift || 0);
+
+            // Update Metric Cards
+            document.getElementById('active-sat-label').innerText = `TARGET: ${d.satName || 'Sat-01'}`;
+            document.getElementById('val-alt').innerText = `${alt.toFixed(2)} km`;
+            document.getElementById('sub-alt').innerText = `Peri: ${(d.periapsis_km || alt).toFixed(1)} | Apo: ${(d.apoapsis_km || alt).toFixed(1)}`;
+            document.getElementById('val-vel').innerText = `${vel.toFixed(3)} km/s`;
+            document.getElementById('val-decay').innerText = `${da_dt.toFixed(2)} m/day`;
+            document.getElementById('sub-lifetime').innerText = `Est. Lifetime: ${lifetimeStr}`;
+            document.getElementById('val-drag').innerText = `${fDrag.toExponential(3)} N`;
+            document.getElementById('sub-area').innerText = `Eff Area: ${(d.effective_area_m2 || 0.03).toFixed(3)} m²`;
+            document.getElementById('val-srp').innerText = `${fSrp.toExponential(3)} N`;
+            document.getElementById('sub-shadow').innerText = `Shadow: ${d.in_shadow ? '100%' : '0%'}`;
+            document.getElementById('val-energy').innerText = eDrift.toExponential(2);
+
+            // Append to Chart Data
+            [chartKin, chartForces, chartDecay, chartEnergy].forEach(c => {
+                c.data.labels.push(timeLabel);
+                if (c.data.labels.length > MAX_POINTS) c.data.labels.shift();
+            });
+
+            chartKin.data.datasets[0].data.push(alt);
+            chartKin.data.datasets[1].data.push(vel);
+            if (chartKin.data.datasets[0].data.length > MAX_POINTS) {
+                chartKin.data.datasets[0].data.shift();
+                chartKin.data.datasets[1].data.shift();
+            }
+            chartKin.update();
+
+            chartForces.data.datasets[0].data.push(Math.max(1e-12, fDrag));
+            chartForces.data.datasets[1].data.push(Math.max(1e-12, fJ2));
+            chartForces.data.datasets[2].data.push(Math.max(1e-12, fSrp));
+            chartForces.data.datasets[3].data.push(Math.max(1e-12, fMag));
+            chartForces.data.datasets[4].data.push(Math.max(1e-12, fJ3));
+            if (chartForces.data.datasets[0].data.length > MAX_POINTS) {
+                chartForces.data.datasets.forEach(ds => ds.data.shift());
+            }
+            chartForces.update();
+
+            chartDecay.data.datasets[0].data.push(da_dt);
+            if (chartDecay.data.datasets[0].data.length > MAX_POINTS) chartDecay.data.datasets[0].data.shift();
+            chartDecay.update();
+
+            chartEnergy.data.datasets[0].data.push(eDrift);
+            if (chartEnergy.data.datasets[0].data.length > MAX_POINTS) chartEnergy.data.datasets[0].data.shift();
+            chartEnergy.update();
+
+            // Record into export history
+            telemetryHistory.push({
+                time: timeLabel,
+                satName: d.satName || 'Sat',
+                alt_km: alt,
+                vel_kms: vel,
+                da_dt_m_day: da_dt,
+                f_drag_N: fDrag,
+                f_j2_N: fJ2,
+                f_srp_N: fSrp,
+                f_mag_N: fMag,
+                f_j3_N: fJ3,
+                effective_area_m2: d.effective_area_m2 || 0.03,
+                energy_drift: eDrift
+            });
+
+            document.getElementById('pts-count').innerText = `Data Points Recorded: ${telemetryHistory.length}`;
+        }
+
+        function togglePauseSync() {
+            isPaused = !isPaused;
+            document.getElementById('pause-btn').innerText = isPaused ? '▶️ Resume' : '⏸️ Pause';
+        }
+
+        function clearData() {
+            telemetryHistory.length = 0;
+            [chartKin, chartForces, chartDecay, chartEnergy].forEach(c => {
+                c.data.labels = [];
+                c.data.datasets.forEach(ds => ds.data = []);
+                c.update();
+            });
+            document.getElementById('pts-count').innerText = 'Data Points Recorded: 0';
+        }
+
+        function exportCSV() {
+            if (telemetryHistory.length === 0) {
+                alert('No telemetry recorded yet to export.');
+                return;
+            }
+            const keys = Object.keys(telemetryHistory[0]);
+            let csv = keys.join(',') + '\n';
+            telemetryHistory.forEach(row => {
+                csv += keys.map(k => row[k]).join(',') + '\n';
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `nanodynamics_telemetry_${Date.now()}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function exportJSON() {
+            if (telemetryHistory.length === 0) {
+                alert('No telemetry recorded yet to export.');
+                return;
+            }
+            const blob = new Blob([JSON.stringify(telemetryHistory, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `nanodynamics_telemetry_${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function exportLaTeX() {
+            if (telemetryHistory.length === 0) {
+                alert('No telemetry recorded yet to export.');
+                return;
+            }
+            // Generate downsampled data points for LaTeX
+            const step = Math.max(1, Math.floor(telemetryHistory.length / 80));
+            let altCoords = '';
+            let velCoords = '';
+            let dragCoords = '';
+            let j2Coords = '';
+
+            telemetryHistory.forEach((row, idx) => {
+                if (idx % step === 0 || idx === telemetryHistory.length - 1) {
+                    const t = idx;
+                    altCoords += `        (${t}, ${row.alt_km.toFixed(2)})\n`;
+                    velCoords += `        (${t}, ${row.vel_kms.toFixed(3)})\n`;
+                    dragCoords += `        (${t}, ${Math.max(1e-12, row.f_drag_N).toExponential(3)})\n`;
+                    j2Coords += `        (${t}, ${Math.max(1e-12, row.f_j2_N).toExponential(3)})\n`;
+                }
+            });
+
+            const satName = telemetryHistory[0].satName || 'Satellite';
+            const texContent = `% ==============================================================================
+% NanoDynamics v3 | Astrodynamic Telemetry Publication Plot (PGFPlots / TikZ)
+% Generated for: ${satName} | Samples: ${telemetryHistory.length}
+% ==============================================================================
+\\documentclass{standalone}
+\\usepackage{tikz}
+\\usepackage{pgfplots}
+\\pgfplotsset{compat=1.18}
+
+\\begin{document}
+\\begin{tikzpicture}
+  \\begin{axis}[
+    title={\\textbf{NanoDynamics v3 Orbital Telemetry: ${satName}}},
+    xlabel={Telemetry Sample Index},
+    ylabel={Altitude [km]},
+    grid=major,
+    legend pos=north east,
+    width=14cm,
+    height=8cm
+  ]
+    \\addplot[color=cyan, thick, mark=none] coordinates {
+${altCoords}    };
+    \\addlegendentry{Altitude $h(t)$ [km]}
+  \\end{axis}
+\\end{tikzpicture}
+
+\\begin{tikzpicture}
+  \\begin{axis}[
+    title={\\textbf{Perturbation Force Breakdown: Aerodynamic Drag vs J2 Oblateness}},
+    xlabel={Telemetry Sample Index},
+    ylabel={Force [N]},
+    ymode=log,
+    grid=major,
+    legend pos=north east,
+    width=14cm,
+    height=8cm
+  ]
+    \\addplot[color=red, thick, mark=none] coordinates {
+${dragCoords}    };
+    \\addlegendentry{Atmospheric Drag $F_{\\mathrm{drag}}$ [N]}
+
+    \\addplot[color=blue, thick, dashed, mark=none] coordinates {
+${j2Coords}    };
+    \\addlegendentry{Earth Oblateness $F_{J_2}$ [N]}
+  \\end{axis}
+\\end{tikzpicture}
+\\end{document}
+`;
+            const blob = new Blob([texContent], { type: 'text/plain;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `nanodynamics_telemetry_${Date.now()}.tex`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function exportSnapshot() {
+            const canvas = document.getElementById('chart-kinematics');
+            if (!canvas) return;
+            const a = document.createElement('a');
+            a.href = canvas.toDataURL('image/png');
+            a.download = `telemetry_chart_${Date.now()}.png`;
+            a.click();
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NANODYNAMICS // ESP32 PINN EDGE CONSOLE & WI-FI PROVISIONING</title>
+  <link rel="stylesheet" href="/static/css/spacex_tokens.css" />
+  <style>
+    :root {
+      --bg-obsidian: #05070B;
+      --bg-panel: rgba(9, 13, 20, 0.86);
+      --bg-card: rgba(13, 19, 30, 0.92);
+      --border-laser: rgba(0, 229, 255, 0.22);
+      --cyan: #00E5FF;
+      --green: #00FF66;
+      --amber: #FF9100;
+      --red: #FF1744;
+      --hf-gold: #FFD21E;
+      --text-primary: #E2E8F0;
+      --text-muted: #94A3B8;
+      --font-mono: ui-monospace, 'JetBrains Mono', 'Roboto Mono', monospace;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 0;
+      background: radial-gradient(circle at 18% 12%, rgba(0, 229, 255, 0.08), transparent 42%),
+                  radial-gradient(circle at 85% 80%, rgba(255, 210, 30, 0.06), transparent 45%),
+                  var(--bg-obsidian);
+      color: var(--text-primary);
+      font-family: var(--font-mono);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Command Ribbon Header */
+    .top-ribbon {
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 18px;
+      background: rgba(5, 7, 11, 0.94);
+      border-bottom: 1px solid var(--border-laser);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(16px);
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      color: var(--cyan);
+    }
+
+    .hf-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255, 210, 30, 0.12);
+      border: 1px solid rgba(255, 210, 30, 0.45);
+      color: var(--hf-gold);
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+    }
+
+    .status-pills {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .pill {
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(15, 23, 42, 0.75);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .dot.online { background: var(--green); box-shadow: 0 0 8px var(--green); }
+    .dot.amber { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+
+    .btn-action {
+      background: rgba(0, 229, 255, 0.12);
+      color: var(--cyan);
+      border: 1px solid rgba(0, 229, 255, 0.45);
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.14s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .btn-action:hover {
+      background: var(--cyan);
+      color: #05070B;
+      box-shadow: 0 0 14px rgba(0, 229, 255, 0.45);
+    }
+    .btn-action.primary-green {
+      background: rgba(0, 255, 102, 0.14);
+      color: var(--green);
+      border-color: rgba(0, 255, 102, 0.5);
+    }
+    .btn-action.primary-green:hover {
+      background: var(--green);
+      color: #05070B;
+      box-shadow: 0 0 14px rgba(0, 255, 102, 0.5);
+    }
+
+    /* Main Grid Layout */
+    .workspace {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 16px;
+      padding: 16px 18px 28px;
+      max-width: 1760px;
+      margin: 0 auto;
+    }
+
+    @media (max-width: 1180px) {
+      .workspace { grid-template-columns: 1fr; }
+    }
+
+    .col-left, .col-right {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-laser);
+      border-radius: 6px;
+      padding: 14px 16px;
+      box-shadow: inset 0 0 16px rgba(0, 229, 255, 0.03);
+      backdrop-filter: blur(16px);
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(56, 189, 248, 0.16);
+      padding-bottom: 8px;
+      margin-bottom: 12px;
+    }
+
+    .panel-title {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--cyan);
+    }
+
+    /* KPI Strip */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+    @media (max-width: 900px) {
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    .kpi-card {
+      background: var(--bg-card);
+      border: 1px solid rgba(56, 189, 248, 0.18);
+      border-radius: 5px;
+      padding: 12px 14px;
+    }
+    .kpi-label {
+      font-size: 9px;
+      letter-spacing: 0.12em;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+    .kpi-value {
+      font-size: 22px;
+      font-weight: 700;
+      margin-top: 4px;
+      color: var(--text-primary);
+    }
+    .kpi-sub {
+      font-size: 10px;
+      color: var(--cyan);
+      margin-top: 3px;
+    }
+
+    /* Hardware Node Cards */
+    .node-card {
+      background: var(--bg-card);
+      border: 1px solid rgba(0, 229, 255, 0.2);
+      border-radius: 5px;
+      padding: 11px 12px;
+      margin-bottom: 10px;
+    }
+    .node-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+    }
+    .node-meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5px 10px;
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+    .node-meta span b {
+      color: var(--text-primary);
+    }
+
+    /* Forms & Sliders */
+    .form-group {
+      margin-bottom: 10px;
+    }
+    .form-group label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+      letter-spacing: 0.06em;
+    }
+    .form-input {
+      width: 100%;
+      background: #05070B;
+      border: 1px solid rgba(56, 189, 248, 0.32);
+      color: var(--text-primary);
+      padding: 7px 10px;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+    .form-input:focus {
+      outline: none;
+      border-color: var(--cyan);
+      box-shadow: 0 0 8px rgba(0, 229, 255, 0.25);
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--cyan);
+      cursor: pointer;
+    }
+
+    /* Charts Grid */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    @media (max-width: 900px) {
+      .charts-grid { grid-template-columns: 1fr; }
+    }
+
+    .chart-box {
+      background: var(--bg-card);
+      border: 1px solid rgba(56, 189, 248, 0.16);
+      border-radius: 5px;
+      padding: 10px 12px;
+    }
+    .chart-title {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    canvas.telemetry-canvas {
+      width: 100%;
+      height: 165px;
+      display: block;
+      background: rgba(5, 7, 11, 0.65);
+      border-radius: 4px;
+    }
+
+    /* Live Requests Table */
+    .table-wrap {
+      max-height: 310px;
+      overflow-y: auto;
+      border: 1px solid rgba(56, 189, 248, 0.16);
+      border-radius: 4px;
+    }
+    table.req-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 10px;
+    }
+    table.req-table th {
+      position: sticky;
+      top: 0;
+      background: #080C14;
+      color: var(--cyan);
+      text-align: left;
+      padding: 8px 10px;
+      letter-spacing: 0.1em;
+      border-bottom: 1px solid rgba(0, 229, 255, 0.25);
+    }
+    table.req-table td {
+      padding: 6px 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      color: var(--text-primary);
+      white-space: nowrap;
+    }
+    table.req-table tr:hover td {
+      background: rgba(0, 229, 255, 0.06);
+    }
+
+    .toast-banner {
+      font-size: 10px;
+      padding: 7px 10px;
+      border-radius: 4px;
+      margin-top: 8px;
+      display: none;
+    }
+    .toast-banner.ok {
+      display: block;
+      background: rgba(0, 255, 102, 0.12);
+      border: 1px solid rgba(0, 255, 102, 0.45);
+      color: var(--green);
+    }
+    .toast-banner.err {
+      display: block;
+      background: rgba(255, 23, 68, 0.14);
+      border: 1px solid rgba(255, 23, 68, 0.5);
+      color: #FF8A80;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- TOP COMMAND RIBBON -->
+  <header class="top-ribbon">
+    <div class="brand-group">
+      <span>NANODYNAMICS // PINN HIL EDGE TELEMETRY & WI-FI PORTAL</span>
+      <span class="hf-badge">🤗 HF TINYML INT8 + SYMPLECTIC MANIFOLD</span>
+    </div>
+    <div class="status-pills">
+      <div class="pill" id="gw-pill">
+        <span class="dot online" id="gw-dot"></span>
+        <span id="gw-pill-text">NODE 1 GW: /dev/ttyUSB0 (7C:9E:BD:44:52:E4)</span>
+      </div>
+      <div class="pill" id="ap-pill">
+        <span>SOFT-AP: NANODYNAMICS-ESP32-GW (192.168.4.1)</span>
+      </div>
+      <button class="btn-action primary-green" id="btn-run-burst" onclick="runHardwareBurst(20)">⚡ RUN 20-STEP PINN HIL BURST</button>
+      <button class="btn-action" id="btn-auto-stream" onclick="toggleContinuousStream()">▶ AUTO-STREAM: OFF</button>
+      <a href="/" class="btn-action">← 3D MISSION CONTROL</a>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <!-- LEFT COLUMN: HARDWARE TOPOLOGY, WI-FI PROVISIONING & PINN PARAMETERS -->
+    <div class="col-left">
+
+      <!-- DUAL-ESP32 HARDWARE STATUS -->
+      <section class="panel">
+        <div class="panel-header">
+          <span class="panel-title">01 // DUAL-ESP32 HARDWARE MESH TOPOLOGY</span>
+          <button class="btn-action" onclick="refreshEdgeStatus()">↻ REFRESH</button>
+        </div>
+
+        <div class="node-card">
+          <div class="node-head">
+            <span>ESP32 NODE 1 // DEVKITC V4 (GATEWAY + PINN)</span>
+            <span style="color:var(--green);" id="node1-badge">● USB + WIFI AP</span>
+          </div>
+          <div class="node-meta">
+            <span>Port: <b id="node1-port">/dev/ttyUSB0</b></span>
+            <span>MAC: <b id="node1-mac">7C:9E:BD:44:52:E4</b></span>
+            <span>SoftAP IP: <b id="node1-ap-ip">192.168.4.1</b></span>
+            <span>LAN STA IP: <b id="node1-sta-ip">0.0.0.0</b></span>
+            <span>Target SSID: <b id="node1-ssid">The Collective Genius Tutors</b></span>
+            <span>Host Sim IP: <b id="node1-host-ip">192.168.1.38</b></span>
+          </div>
+        </div>
+
+        <div class="node-card" style="margin-bottom:0;">
+          <div class="node-head">
+            <span>ESP32 NODE 2 // DEVKIT V1 (ESP-NOW PINN NODE)</span>
+            <span style="color:var(--cyan);" id="node2-badge">● ESP-NOW CH1</span>
+          </div>
+          <div class="node-meta">
+            <span>Port: <b id="node2-port">/dev/ttyUSB1</b></span>
+            <span>Peer MAC: <b id="node2-mac">FF:FF:FF:FF:FF:FF</b></span>
+            <span>Core 1: <b>TFLite INT8 (32KB Arena)</b></span>
+            <span>Core 0: <b>Symplectic Projection</b></span>
+            <span>ESP-NOW TX/RX: <b id="node2-pkts">0 / 0</b></span>
+            <span>Last On-Chip: <b id="node2-infer">0.42 ms</b></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- DYNAMIC WI-FI CREDENTIAL PROVISIONING -->
+      <section class="panel">
+        <div class="panel-header">
+          <span class="panel-title">02 // ESP32 WI-FI & HOST IP PROVISIONING</span>
+          <span style="font-size:9px;color:var(--hf-gold);">NVS FLASH PERSISTENT</span>
+        </div>
+        <p style="font-size:10px;color:var(--text-muted);margin:0 0 10px;line-height:1.45;">
+          Set the Wi-Fi network credentials for the ESP32 Gateway and the IP of your local machine running the simulator. Works over USB Serial (<code>/dev/ttyUSB0</code>) or directly over the ESP32's SoftAP Wi-Fi (<code>NANODYNAMICS-ESP32-GW</code> at <code>192.168.4.1</code>).
+        </p>
+
+        <div class="form-group">
+          <label><span>TARGET WI-FI NETWORK (SSID)</span><span style="color:var(--cyan);">2.4 GHz</span></label>
+          <input class="form-input" id="wifi-ssid" type="text" value="The Collective Genius Tutors" placeholder="Enter Wi-Fi SSID" />
+        </div>
+        <div class="form-group">
+          <label><span>WI-FI PASSWORD</span><span>WPA2/WPA3</span></label>
+          <input class="form-input" id="wifi-pass" type="password" placeholder="Enter Wi-Fi Password" />
+        </div>
+        <div class="form-group">
+          <label><span>LOCAL SIMULATOR HOST IP (WS/HTTP BRIDGE)</span><span>PORT 8000</span></label>
+          <input class="form-input" id="wifi-host-ip" type="text" value="192.168.1.38" placeholder="192.168.1.38" />
+        </div>
+
+        <button class="btn-action primary-green" style="width:100%;padding:9px;" onclick="provisionEsp32Wifi()">
+          📡 FLASH WI-FI CREDENTIALS TO ESP32 NVS
+        </button>
+        <div id="wifi-toast" class="toast-banner"></div>
+      </section>
+
+      <!-- REAL-TIME PINN & SYMPLECTIC PARAMETER CONTROLS -->
+      <section class="panel">
+        <div class="panel-header">
+          <span class="panel-title">03 // PINN & HAMILTONIAN MANIFOLD CONTROLS</span>
+          <span style="font-size:9px;color:var(--green);">LIVE TUNING</span>
+        </div>
+
+        <div class="form-group">
+          <label>
+            <span>INTEGRATION STEP SIZE (Δt)</span>
+            <b style="color:var(--cyan);" id="lbl-dt">10.0 s</b>
+          </label>
+          <input type="range" id="param-dt" min="1" max="120" step="1" value="10" oninput="updateParamLabels()" onchange="pushPinnParams()" />
+        </div>
+
+        <div class="form-group">
+          <label>
+            <span>BALLISTIC DRAG COEFFICIENT (B = Cd·A/m)</span>
+            <b style="color:var(--cyan);" id="lbl-bcoeff">0.0150 m²/kg</b>
+          </label>
+          <input type="range" id="param-bcoeff" min="0.002" max="0.080" step="0.001" value="0.015" oninput="updateParamLabels()" onchange="pushPinnParams()" />
+        </div>
+
+        <div class="form-group">
+          <label>
+            <span>TEST ORBIT ALTITUDE (LEO / MEO)</span>
+            <b style="color:var(--cyan);" id="lbl-alt">550 km</b>
+          </label>
+          <input type="range" id="param-alt" min="250" max="2000" step="25" value="550" oninput="updateParamLabels()" />
+        </div>
+
+        <div class="form-group" style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;">
+          <span style="font-size:10px;color:var(--text-primary);">SYMPLECTIC HAMILTONIAN PROJECTION</span>
+          <input type="checkbox" id="param-symplectic" checked onchange="pushPinnParams()" style="transform:scale(1.2);accent-color:var(--green);" />
+        </div>
+
+        <div id="param-toast" class="toast-banner"></div>
+      </section>
+
+    </div>
+
+    <!-- RIGHT COLUMN: KPI TELEMETRY, REAL-TIME PROCESSING GRAPHS & REQUEST STREAM -->
+    <div class="col-right">
+
+      <!-- KPI SUMMARY CARDS -->
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">ON-CHIP PINN INFERENCE (t_infer)</div>
+          <div class="kpi-value" id="kpi-infer" style="color:var(--cyan);">0.42 ms</div>
+          <div class="kpi-sub">TFLite Micro INT8 (Xtensa LX6)</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">SERIAL / ESP-NOW TRANSIT</div>
+          <div class="kpi-value" id="kpi-latency" style="color:var(--green);">2.85 ms</div>
+          <div class="kpi-sub">42-Byte OrbitStatePacket</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">COMPUTATIONAL THROUGHPUT</div>
+          <div class="kpi-value" id="kpi-rps" style="color:var(--hf-gold);">285.0 RPS</div>
+          <div class="kpi-sub" id="kpi-total-reqs">0 Total PINN Requests</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">HAMILTONIAN ENERGY DRIFT</div>
+          <div class="kpi-value" id="kpi-energy" style="color:var(--green);">1.2e-15</div>
+          <div class="kpi-sub">|ΔE / E₀| Symplectic Manifold</div>
+        </div>
+      </div>
+
+      <!-- REAL-TIME PROCESSING & COMPUTATIONAL GRAPHS -->
+      <section class="panel">
+        <div class="panel-header">
+          <span class="panel-title">04 // REAL-TIME PINN PROCESSING & LATENCY TELEMETRY GRAPHS</span>
+          <span style="font-size:10px;color:var(--text-muted);" id="chart-sample-count">LIVE HARDWARE STREAM</span>
+        </div>
+
+        <div class="charts-grid">
+          <div class="chart-box">
+            <div class="chart-title">
+              <span>ON-CHIP TFLITE PINN INFERENCE TIME (ms)</span>
+              <span style="color:var(--cyan);" id="chart1-val">0.42 ms</span>
+            </div>
+            <canvas id="canvas-infer" class="telemetry-canvas" width="560" height="165"></canvas>
+          </div>
+
+          <div class="chart-box">
+            <div class="chart-title">
+              <span>ROUND-TRIP & ESP-NOW TRANSIT LATENCY (ms)</span>
+              <span style="color:var(--green);" id="chart2-val">3.20 ms</span>
+            </div>
+            <canvas id="canvas-latency" class="telemetry-canvas" width="560" height="165"></canvas>
+          </div>
+
+          <div class="chart-box">
+            <div class="chart-title">
+              <span>SYMPLECTIC ENERGY CONSERVATION |ΔE / E₀|</span>
+              <span style="color:var(--hf-gold);" id="chart3-val">0.00e+00</span>
+            </div>
+            <canvas id="canvas-energy" class="telemetry-canvas" width="560" height="165"></canvas>
+          </div>
+
+          <div class="chart-box">
+            <div class="chart-title">
+              <span>PREDICTED ORBITAL STATE PHASE NORM ||r|| & ||v||</span>
+              <span style="color:var(--amber);" id="chart4-val">r=1.086 R_E</span>
+            </div>
+            <canvas id="canvas-phase" class="telemetry-canvas" width="560" height="165"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- LIVE STREAMING COMPUTATIONAL REQUEST LOG -->
+      <section class="panel">
+        <div class="panel-header">
+          <span class="panel-title">05 // LIVE COMPUTATIONAL REQUESTS MADE TO THE PINN</span>
+          <button class="btn-action" onclick="runHardwareBurst(8)">+ STEP 8 REQUESTS</button>
+        </div>
+
+        <div class="table-wrap">
+          <table class="req-table">
+            <thead>
+              <tr>
+                <th>REQ #</th>
+                <th>TIME</th>
+                <th>SAT ID</th>
+                <th>ENGINE / TRANSPORT</th>
+                <th>STATE IN [x, y, z] (R_E)</th>
+                <th>STATE OUT [vx, vy, vz]</th>
+                <th>Δt / B</th>
+                <th>t_infer</th>
+                <th>TRANSIT</th>
+                <th>TOTAL</th>
+                <th>|ΔE/E₀|</th>
+              </tr>
+            </thead>
+            <tbody id="req-table-body">
+              <tr>
+                <td colspan="11" style="text-align:center;color:var(--text-muted);padding:18px;">
+                  Initializing live hardware stream from ESP32 PINN...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <script>
+    let autoStreamTimer = null;
+    let latestTelemetry = { records: [], requests: [] };
+
+    function updateParamLabels() {
+      const dt = parseFloat(document.getElementById('param-dt').value);
+      const bc = parseFloat(document.getElementById('param-bcoeff').value);
+      const alt = parseFloat(document.getElementById('param-alt').value);
+      document.getElementById('lbl-dt').textContent = dt.toFixed(1) + ' s';
+      document.getElementById('lbl-bcoeff').textContent = bc.toFixed(4) + ' m²/kg';
+      document.getElementById('lbl-alt').textContent = alt.toFixed(0) + ' km';
+    }
+
+    async function pushPinnParams() {
+      const dt_s = parseFloat(document.getElementById('param-dt').value);
+      const b_coeff = parseFloat(document.getElementById('param-bcoeff').value);
+      const symplectic_enabled = document.getElementById('param-symplectic').checked;
+      try {
+        const res = await fetch('/api/edge/params', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dt_s, b_coeff, symplectic_enabled })
+        });
+        const data = await res.json();
+        const toast = document.getElementById('param-toast');
+        toast.className = 'toast-banner ok';
+        toast.textContent = `✓ Updated PINN Δt=${dt_s}s, B=${b_coeff.toFixed(4)}, Symplectic=${symplectic_enabled ? 'ON' : 'OFF'}`;
+        setTimeout(() => { toast.style.display = 'none'; }, 3000);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function provisionEsp32Wifi() {
+      const ssid = document.getElementById('wifi-ssid').value.trim();
+      const password = document.getElementById('wifi-pass').value;
+      const host_ip = document.getElementById('wifi-host-ip').value.trim();
+      const toast = document.getElementById('wifi-toast');
+      toast.className = 'toast-banner ok';
+      toast.style.display = 'block';
+      toast.textContent = '⏳ Provisioning Wi-Fi credentials to ESP32 NVS...';
+      try {
+        const res = await fetch('/api/edge/wifi', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ssid, password, host_ip })
+        });
+        const data = await res.json();
+        if (data.status === 'ok') {
+          toast.className = 'toast-banner ok';
+          toast.textContent = `✓ Saved to ESP32 via ${data.via}! SSID: "${ssid}" | Host IP: ${host_ip}`;
+          setTimeout(refreshEdgeStatus, 1200);
+        } else {
+          toast.className = 'toast-banner err';
+          toast.textContent = `⚠ ${data.error || 'Failed to provision Wi-Fi'}`;
+        }
+      } catch (err) {
+        toast.className = 'toast-banner err';
+        toast.textContent = `⚠ Request error: ${err.message}`;
+      }
+    }
+
+    async function runHardwareBurst(steps = 16) {
+      const btn = document.getElementById('btn-run-burst');
+      const dt_s = parseFloat(document.getElementById('param-dt').value);
+      const b_coeff = parseFloat(document.getElementById('param-bcoeff').value);
+      const altitude_km = parseFloat(document.getElementById('param-alt').value);
+      btn.textContent = `⚡ RUNNING ${steps} STEPS ON ESP32...`;
+      try {
+        const res = await fetch('/api/edge/benchmark', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ steps, altitude_km, dt_s, b_coeff })
+        });
+        const data = await res.json();
+        if (data.telemetry) {
+          renderTelemetry(data.telemetry);
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        btn.textContent = '⚡ RUN 20-STEP PINN HIL BURST';
+      }
+    }
+
+    function toggleContinuousStream() {
+      const btn = document.getElementById('btn-auto-stream');
+      if (autoStreamTimer) {
+        clearInterval(autoStreamTimer);
+        autoStreamTimer = null;
+        btn.textContent = '▶ AUTO-STREAM: OFF';
+        btn.classList.remove('primary-green');
+      } else {
+        btn.textContent = '⏸ AUTO-STREAM: ON (LIVE)';
+        btn.classList.add('primary-green');
+        runHardwareBurst(4);
+        autoStreamTimer = setInterval(() => runHardwareBurst(4), 1600);
+      }
+    }
+
+    async function refreshEdgeStatus() {
+      try {
+        const res = await fetch('/api/edge/status');
+        const data = await res.json();
+        if (data.gateway) {
+          const gw = data.gateway;
+          document.getElementById('node1-port').textContent = gw.port || '/dev/ttyUSB0';
+          document.getElementById('node1-mac').textContent = gw.mac || '7C:9E:BD:44:52:E4';
+          document.getElementById('node1-ap-ip').textContent = gw.ap_ip || '192.168.4.1';
+          document.getElementById('node1-sta-ip').textContent = gw.sta_ip || '0.0.0.0';
+          document.getElementById('node1-ssid').textContent = gw.ssid || 'The Collective Genius Tutors';
+          document.getElementById('node1-host-ip').textContent = gw.host_ip || '192.168.1.38';
+          document.getElementById('gw-pill-text').textContent =
+            `NODE 1 GW: ${gw.port || '/dev/ttyUSB0'} (${gw.mac || '7C:9E:BD:44:52:E4'})`;
+          document.getElementById('node2-pkts').textContent =
+            `${gw.espnow_tx || 0} / ${gw.espnow_rx || 0}`;
+          if (gw.last_infer_ms) {
+            document.getElementById('node2-infer').textContent = `${Number(gw.last_infer_ms).toFixed(3)} ms`;
+          }
+        }
+        if (data.telemetry) {
+          renderTelemetry(data.telemetry);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function renderTelemetry(tel) {
+      latestTelemetry = tel;
+      document.getElementById('kpi-infer').textContent = `${Number(tel.avg_proc_ms || 0.42).toFixed(3)} ms`;
+      document.getElementById('kpi-latency').textContent = `${Number(tel.avg_latency_ms || 2.10).toFixed(2)} ms`;
+      document.getElementById('kpi-rps').textContent = `${Number(tel.rps || 0).toFixed(1)} RPS`;
+      document.getElementById('kpi-total-reqs').textContent = `${tel.total_requests || 0} Total PINN Requests`;
+
+      const reqs = tel.requests || [];
+      const recs = tel.records || [];
+      document.getElementById('chart-sample-count').textContent = `${recs.length} SAMPLES BUFFERED`;
+
+      if (reqs.length > 0) {
+        const latest = reqs[0];
+        document.getElementById('kpi-energy').textContent = Number(latest.energy_drift || 0).toExponential(2);
+      }
+
+      // Render Request Log Table
+      const tbody = document.getElementById('req-table-body');
+      if (reqs.length > 0) {
+        tbody.innerHTML = reqs.slice(0, 40).map(r => {
+          const ts = new Date(r.timestamp * 1000).toISOString().slice(11, 23);
+          const sIn = (r.state_in || []).slice(0, 3).map(v => Number(v).toFixed(3)).join(', ');
+          const sOut = (r.state_out || []).slice(3, 6).map(v => Number(v).toFixed(3)).join(', ');
+          return `<tr>
+            <td style="color:var(--cyan);font-weight:700;">#${r.req_id}</td>
+            <td style="color:var(--text-muted);">${ts}</td>
+            <td><b>${r.sat_id}</b></td>
+            <td><span style="color:var(--green);">${r.engine}</span></td>
+            <td>[${sIn}]</td>
+            <td>[${sOut}]</td>
+            <td>${r.dt_s}s / ${r.b_coeff}</td>
+            <td style="color:var(--cyan);font-weight:700;">${Number(r.t_infer_ms).toFixed(3)} ms</td>
+            <td style="color:var(--green);">${Number(r.transit_latency_ms).toFixed(2)} ms</td>
+            <td><b>${Number(r.total_step_ms).toFixed(2)} ms</b></td>
+            <td style="color:var(--hf-gold);">${Number(r.energy_drift || 0).toExponential(2)}</td>
+          </tr>`;
+        }).join('');
+      }
+
+      // Draw Charts
+      const inferSeries = recs.map(r => Number(r.proc_time_ms || 0));
+      const latSeries = recs.map(r => Number(r.total_step_ms || 0));
+      const energySeries = recs.map(r => Number(r.energy_error || 0));
+      const phaseSeries = reqs.slice().reverse().map(r => {
+        const s = r.state_out || [1, 0, 0];
+        return Math.sqrt(s[0]*s[0] + s[1]*s[1] + s[2]*s[2]);
+      });
+
+      if (inferSeries.length) document.getElementById('chart1-val').textContent = inferSeries[inferSeries.length - 1].toFixed(3) + ' ms';
+      if (latSeries.length) document.getElementById('chart2-val').textContent = latSeries[latSeries.length - 1].toFixed(2) + ' ms';
+      if (energySeries.length) document.getElementById('chart3-val').textContent = energySeries[energySeries.length - 1].toExponential(2);
+      if (phaseSeries.length) document.getElementById('chart4-val').textContent = 'r=' + phaseSeries[phaseSeries.length - 1].toFixed(4) + ' R_E';
+
+      drawSparkline('canvas-infer', inferSeries, '#00E5FF', 'rgba(0, 229, 255, 0.16)');
+      drawSparkline('canvas-latency', latSeries, '#00FF66', 'rgba(0, 255, 102, 0.15)');
+      drawSparkline('canvas-energy', energySeries, '#FFD21E', 'rgba(255, 210, 30, 0.15)');
+      drawSparkline('canvas-phase', phaseSeries, '#FF9100', 'rgba(255, 145, 0, 0.15)');
+    }
+
+    function drawSparkline(canvasId, values, strokeColor, fillColor) {
+      const canvas = document.getElementById(canvasId);
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width;
+      const H = canvas.height;
+      ctx.clearRect(0, 0, W, H);
+
+      // Grid lines
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.12)';
+      ctx.lineWidth = 1;
+      for (let i = 1; i <= 3; i++) {
+        const y = (H / 4) * i;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(W, y);
+        ctx.stroke();
+      }
+
+      if (!values || values.length < 2) return;
+      const minV = Math.min(...values);
+      const maxV = Math.max(...values);
+      const span = Math.max(maxV - minV, 1e-6);
+      const pad = 16;
+
+      ctx.beginPath();
+      values.forEach((v, idx) => {
+        const x = (idx / (values.length - 1)) * (W - 20) + 10;
+        const y = H - pad - ((v - minV) / span) * (H - pad * 2);
+        if (idx === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Fill area under curve
+      ctx.lineTo(W - 10, H - pad);
+      ctx.lineTo(10, H - pad);
+      ctx.closePath();
+      ctx.fillStyle = fillColor;
+      ctx.fill();
+    }
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      await refreshEdgeStatus();
+      await runHardwareBurst(16);
+      setInterval(refreshEdgeStatus, 4000);
+    });
+  </script>
+</body>
+</html>

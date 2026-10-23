@@ -89,10 +89,26 @@ class ExperimentResult:
     trajectories: list[dict[str, Any]] | None = None
 
 
+class NanodynamicsFunctionalAtmosphere(BaseAtmosphere):
+    """Aerodynamics atmosphere model powered by nanodynamics.modules.space_weather_atmos."""
+
+    def __init__(self, f107: float = 150.0, ap: float = 15.0) -> None:
+        self.f107 = float(f107)
+        self.ap = float(ap)
+
+    def get_density(self, r_m: float) -> float:
+        alt_km = max(0.0, (float(r_m) - R_EARTH) / 1000.0)
+        from nanodynamics.modules.space_weather_atmos.functions import compute_atmospheric_drag_density
+        res = compute_atmospheric_drag_density(alt_km=alt_km, f107=self.f107, ap=self.ap)
+        return float(res["density_kg_m3"])
+
+
 def get_atmosphere_by_name(name: str = "piecewise", density_scale: float = 1.0) -> BaseAtmosphere:
     """Factory creating atmospheric models based on configuration name."""
     name_lower = name.lower()
-    if "piecewise" in name_lower or "us_standard" in name_lower:
+    if "nanodynamics" in name_lower or "aero" in name_lower or "functional" in name_lower:
+        base = NanodynamicsFunctionalAtmosphere()
+    elif "piecewise" in name_lower or "us_standard" in name_lower:
         base = PiecewiseExponentialAtmosphere()
     elif "high_solar" in name_lower:
         base = ExponentialAtmosphere(h0=400_000.0, rho0=5.0e-12, scale_height=65_000.0)

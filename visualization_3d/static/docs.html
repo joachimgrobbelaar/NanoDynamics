@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NanoDynamics v3 | Astrodynamics & PINN Flight Manual</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js" onload="renderMathInElement(document.body);"></script>
+    <style>
+        :root {
+            --bg: #040711;
+            --surface: #0a1020;
+            --surface-card: #0f172a;
+            --border: rgba(56, 189, 248, 0.22);
+            --border-hover: rgba(56, 189, 248, 0.45);
+            --cyan: #00E5FF;
+            --blue: #38bdf8;
+            --emerald: #10b981;
+            --amber: #f59e0b;
+            --rose: #f43f5e;
+            --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+            --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: var(--bg);
+            color: #e2e8f0;
+            font-family: var(--font-sans);
+            font-size: 14px;
+            line-height: 1.6;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar Nav */
+        aside {
+            width: 280px;
+            background: #02040a;
+            border-right: 1px solid var(--border);
+            padding: 20px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .logo-box {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding-bottom: 14px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .brand-title {
+            font-family: var(--font-mono);
+            font-weight: 800;
+            font-size: 14px;
+            color: var(--cyan);
+            letter-spacing: 0.1em;
+        }
+
+        .nav-links {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: #94a3b8;
+            text-decoration: none;
+            font-size: 12px;
+            font-family: var(--font-mono);
+            padding: 6px 10px;
+            border-radius: 4px;
+            transition: all 0.15s ease;
+            display: block;
+        }
+
+        .nav-links a:hover, .nav-links a.active {
+            color: var(--cyan);
+            background: rgba(56, 189, 248, 0.1);
+            border-left: 3px solid var(--cyan);
+        }
+
+        /* Content Container */
+        main {
+            flex: 1;
+            padding: 30px 48px;
+            max-width: 1040px;
+            overflow-y: auto;
+        }
+
+        h1 {
+            font-family: var(--font-mono);
+            font-size: 26px;
+            color: var(--cyan);
+            margin-bottom: 8px;
+            letter-spacing: 0.05em;
+        }
+
+        h2 {
+            font-family: var(--font-mono);
+            font-size: 18px;
+            color: #38bdf8;
+            margin-top: 36px;
+            margin-bottom: 14px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        h3 {
+            font-family: var(--font-mono);
+            font-size: 14px;
+            color: #f1f5f9;
+            margin-top: 20px;
+            margin-bottom: 8px;
+        }
+
+        p, ul, ol {
+            margin-bottom: 14px;
+            color: #cbd5e1;
+        }
+
+        ul, ol { padding-left: 24px; }
+        li { margin-bottom: 6px; }
+
+        code {
+            font-family: var(--font-mono);
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: var(--cyan);
+            font-size: 12px;
+        }
+
+        pre {
+            background: #020617;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 16px;
+            overflow-x: auto;
+            margin-bottom: 18px;
+        }
+
+        pre code {
+            background: transparent;
+            border: none;
+            padding: 0;
+            color: #f8fafc;
+            font-size: 12px;
+        }
+
+        .formula-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--cyan);
+            border-radius: 6px;
+            padding: 16px 20px;
+            margin: 16px 0;
+        }
+
+        .guide-banner {
+            background: linear-gradient(135deg, rgba(0, 229, 255, 0.12), rgba(16, 185, 129, 0.08));
+            border: 1px solid var(--cyan);
+            border-radius: 8px;
+            padding: 18px 22px;
+            margin-bottom: 28px;
+        }
+
+        .guide-banner h3 {
+            color: var(--cyan);
+            margin-top: 0;
+        }
+
+        .step-pill {
+            display: inline-block;
+            background: var(--cyan);
+            color: #040711;
+            font-family: var(--font-mono);
+            font-weight: 700;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 999px;
+            margin-right: 6px;
+        }
+    </style>
+</head>
+<body>
+
+    <aside>
+        <div class="logo-box">
+            <span style="font-size:20px;">🛰️</span>
+            <div>
+                <div class="brand-title">NANODYNAMICS v3</div>
+                <div style="font-size:10px; color:#64748b; font-family:var(--font-mono);">ASTRODYNAMICS & PINN MANUAL</div>
+            </div>
+        </div>
+
+        <ul class="nav-links">
+            <li><a href="#quickstart" class="active">🚀 Quickstart & Walkthrough</a></li>
+            <li><a href="#evolution">📜 Evolution (v0 &rarr; v3)</a></li>
+            <li><a href="#orbit-physics">⚛️ Gravity & Perturbations</a></li>
+            <li><a href="#pinn-hamiltonian">🧠 Symplectic PINN Engine</a></li>
+            <li><a href="#cloud-hardware">⚡ GCP A100 & ESP32 Dual-HIL</a></li>
+            <li><a href="#maneuvers">🎯 Orbital Maneuver Planning</a></li>
+            <li><a href="#synthetic-aperture">🌐 Synthetic Aperture Mosaic</a></li>
+            <li><a href="#latex-export">📐 LaTeX / PGFPlots Export</a></li>
+        </ul>
+
+        <div style="margin-top:auto; font-size:10px; color:#64748b; font-family:var(--font-mono); border-top:1px solid var(--border); padding-top:12px;">
+            <div>Standard: WGS-84 / EGM96</div>
+            <div>Author: Joachim Grobbelaar</div>
+        </div>
+    </aside>
+
+    <main>
+        <div class="guide-banner" id="quickstart">
+            <h3>🚀 Interactive Simulator Walkthrough</h3>
+            <p>Welcome to <strong>NanoDynamics v3</strong>, the high-precision low-Earth and solar system astrodynamics workbench with Symplectic Hamiltonian Neural Operators and Dual-ESP32 Hardware-in-the-Loop.</p>
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px; margin-top:14px;">
+                <div style="background:rgba(0,0,0,0.3); padding:10px; border-radius:4px; border:1px solid rgba(255,255,255,0.06);">
+                    <span class="step-pill">1</span><strong>Orbit Trajectory & Burns</strong>
+                    <div style="font-size:11px; color:#94a3b8; margin-top:4px;">Left-click and drag on forward trajectory to create a 3D maneuver node gizmo. Drag V/N/R handles to shape target orbits.</div>
+                </div>
+                <div style="background:rgba(0,0,0,0.3); padding:10px; border-radius:4px; border:1px solid rgba(255,255,255,0.06);">
+                    <span class="step-pill">2</span><strong>Pinnable HUD Data Tag</strong>
+                    <div style="font-size:11px; color:#94a3b8; margin-top:4px;">Click the 📌 Pin button on the satellite stat card to lock telemetry to the top dock with dynamic vector tracking lines.</div>
+                </div>
+                <div style="background:rgba(0,0,0,0.3); padding:10px; border-radius:4px; border:1px solid rgba(255,255,255,0.06);">
+                    <span class="step-pill">3</span><strong>Pop-out Graphs & VCam</strong>
+                    <div style="font-size:11px; color:#94a3b8; margin-top:4px;">Launch <code>/graphs</code> for multi-channel Chart.js & LaTeX PGFPlots export, and <code>/vcam</code> for constellation optical mosaic stitching.</div>
+                </div>
+            </div>
+        </div>
+
+        <section id="evolution">
+            <h2>📜 Chronological Evolution (NanoDynamics v0 &rarr; v3)</h2>
+            <div style="border-left:2px solid var(--border); padding-left:16px; margin-left:8px;">
+                <div style="margin-bottom:18px;">
+                    <strong style="color:var(--cyan);">NanoDynamics v0 (Foundation):</strong>
+                    <p style="font-size:12px; margin-top:2px;">Simple two-body Keplerian conic equations using Vis-Viva integrals ($v^2 = \mu (2/r - 1/a)$) and non-perturbed circular orbit approximations.</p>
+                </div>
+                <div style="margin-bottom:18px;">
+                    <strong style="color:#38bdf8;">NanoDynamics v1 (Astrodynamic Numerical Integrator):</strong>
+                    <p style="font-size:12px; margin-top:2px;">Introduction of adaptive Runge-Kutta-Fehlberg 4(5) numerical propagation, Earth $J_2$ oblateness second zonal harmonic, dynamic US-76 atmospheric density tables, and Three.js 3D Earth visualization.</p>
+                </div>
+                <div style="margin-bottom:18px;">
+                    <strong style="color:var(--emerald);">NanoDynamics v2 (Edge AI & Hardware-in-the-Loop):</strong>
+                    <p style="font-size:12px; margin-top:2px;">Integration of Symplectic Physics-Informed Neural Networks (PINNs) trained on Hamiltonian invariants ($\nabla_{\mathbf{q},\mathbf{p}}\mathcal{H}$). Dual-ESP32 edge hardware gateway with ESP-NOW wireless telemetry frames and sub-2ms INT8 micro-inference.</p>
+                </div>
+                <div>
+                    <strong style="color:var(--amber);">NanoDynamics v3 (Solar System & Synthetic Aperture):</strong>
+                    <p style="font-size:12px; margin-top:2px;">Heliocentric N-body Keplerian solar system (Mercury, Venus, Earth, Mars, Moon), higher-order zonal/tesseral harmonics ($J_3, J_4, J_{2,2}$), solid Earth body tides ($k_2$), Coriolis cyclone weather simulation, 3D interactive maneuver node dragging, multi-satellite synthetic aperture mosaic stitcher, and LaTeX/PGFPlots publication export.</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="orbit-physics">
+            <h2>⚛️ Astrodynamics & Perturbation Equations</h2>
+            <p>Every trajectory step integrates the sum of gravitational, atmospheric, radiative, and electrodynamic accelerations in the Earth-Centered Inertial (ECI) frame:</p>
+            $$\mathbf{a}_{\text{total}} = \mathbf{a}_{\text{central}} + \mathbf{a}_{J_2} + \mathbf{a}_{J_3} + \mathbf{a}_{J_4} + \mathbf{a}_{J_{2,2}} + \mathbf{a}_{\text{drag}} + \mathbf{a}_{\text{SRP}} + \mathbf{a}_{\text{moon}} + \mathbf{a}_{\text{sun}} + \mathbf{a}_{\text{tide}} + \mathbf{a}_{\text{mag}}$$
+
+            <div class="formula-card">
+                <h3>1. Earth Higher-Order Geopotential Harmonics</h3>
+                <p><strong>$J_2$ Oblateness (Equatorial Bulge):</strong></p>
+                $$\mathbf{a}_{J_2} = -\frac{3}{2}\frac{J_2 \mu R_E^2}{r^5} \left[ x\left(1 - \frac{5z^2}{r^2}\right)\hat{\mathbf{i}} + y\left(1 - \frac{5z^2}{r^2}\right)\hat{\mathbf{j}} + z\left(3 - \frac{5z^2}{r^2}\right)\hat{\mathbf{k}} \right]$$
+                <p><strong>$J_3$ Pear-Shaped Asymmetry ($J_3 = -2.532 \times 10^{-6}$):</strong></p>
+                $$\mathbf{a}_{J_3} = -\frac{5}{2}\frac{J_3 \mu R_E^3}{r^7} \left[ x z \left(3 - \frac{7z^2}{r^2}\right)\hat{\mathbf{i}} + y z \left(3 - \frac{7z^2}{r^2}\right)\hat{\mathbf{j}} + \left(6z^2 - \frac{7z^4}{r^2} - \frac{3}{5}r^2\right)\hat{\mathbf{k}} \right]$$
+                <p><strong>$J_{2,2}$ Longitudinal Ellipticity ($C_{2,2}=1.57 \times 10^{-6}, S_{2,2}=-9.04 \times 10^{-7}$):</strong> Drives longitudinal GEO drift toward stable potential wells at $75.1^\circ\text{E}$ and $105.3^\circ\text{W}$.</p>
+            </div>
+
+            <div class="formula-card">
+                <h3>2. Attitude-Dependent Aerodynamic Drag</h3>
+                <p>Satellite pitch ($\alpha$), yaw ($\beta$), and roll ($\gamma$) dynamic cross-sectional area scaling:</p>
+                $$A_{\text{eff}}(\alpha, \beta) = A_{\text{ram}} |\cos\alpha \cos\beta| + 2.5 A_{\text{side}} |\sin\alpha| + 2.0 A_{\text{top}} |\sin\beta|$$
+                $$\mathbf{a}_{\text{drag}} = -\frac{1}{2} \rho(h) C_D \frac{A_{\text{eff}}}{m} \|\mathbf{v}_{\text{rel}}\| \mathbf{v}_{\text{rel}}$$
+            </div>
+
+            <div class="formula-card">
+                <h3>3. Solar Radiation Pressure (SRP) Ray-Tracing Shadow</h3>
+                <p>Ray-sphere cylindrical occultation factor $\nu \in [0, 1]$ (Umbra $\nu=0$, Penumbra $0 < \nu < 1$, Direct Sun $\nu=1$):</p>
+                $$\mathbf{a}_{\text{SRP}} = -P_{\text{sun}} \left(\frac{1\text{ AU}}{d_{\text{sun}}}\right)^2 \left(\frac{C_R A_{\text{eff}}}{m}\right) \nu \hat{\mathbf{u}}_{\text{sun}}$$
+            </div>
+
+            <div class="formula-card">
+                <h3>4. Geomagnetic Dipole & Lorentz Perturbation</h3>
+                $$\mathbf{B}(\mathbf{r}) = \frac{B_0 R_E^3}{r^3} \left[ 3(\hat{\mathbf{m}} \cdot \hat{\mathbf{r}})\hat{\mathbf{r}} - \hat{\mathbf{m}} \right], \quad \mathbf{a}_{\text{mag}} = \frac{q}{m} (\mathbf{v} \times \mathbf{B})$$
+            </div>
+        </section>
+
+        <section id="pinn-hamiltonian">
+            <h2>🧠 Symplectic Physics-Informed Neural Network (PINN)</h2>
+            <p>Standard deep neural networks incur secular orbital energy drift over multi-orbit horizons. NanoDynamics enforces a canonical Hamiltonian phase space structure:</p>
+            $$\mathcal{H}(\mathbf{q}, \mathbf{p}) = \frac{1}{2}\mathbf{p}^T \mathbf{M}^{-1} \mathbf{p} + V(\mathbf{q}), \quad \frac{d\mathbf{q}}{dt} = \frac{\partial \mathcal{H}}{\partial \mathbf{p}}, \quad \frac{d\mathbf{p}}{dt} = -\frac{\partial \mathcal{H}}{\partial \mathbf{q}}$$
+
+            <pre><code># PyTorch Symplectic Hamiltonian Loss Function
+import torch
+import torch.nn as nn
+
+class SymplecticLoss(nn.Module):
+    def __init__(self, lambda_pde=1.0, lambda_ham=0.1):
+        super().__init__()
+        self.lambda_pde = lambda_pde
+        self.lambda_ham = lambda_ham
+        self.mse = nn.MSELoss()
+
+    def forward(self, q_pred, p_pred, q_true, p_true, mu=3.986e14):
+        loss_data = self.mse(q_pred, q_true) + self.mse(p_pred, p_true)
+        # Hamiltonian H = 0.5 * |p|^2 - mu / |q|
+        h_pred = 0.5 * torch.sum(p_pred**2, dim=-1) - mu / torch.norm(q_pred, dim=-1)
+        h_true = 0.5 * torch.sum(p_true**2, dim=-1) - mu / torch.norm(q_true, dim=-1)
+        loss_hamiltonian = self.mse(h_pred, h_true)
+        return loss_data + self.lambda_ham * loss_hamiltonian
+</code></pre>
+        </section>
+
+        <section id="cloud-hardware">
+            <h2>⚡ Google Cloud Compute Engine (A100) & Dual-ESP32 HIL</h2>
+            <p>Training and quantization were executed on Google Cloud Compute Engine infrastructure:</p>
+            <ul>
+                <li><strong>Instance Tier:</strong> <code>a2-highgpu-1g</code> (Google Cloud us-central1)</li>
+                <li><strong>Accelerator:</strong> 1x NVIDIA A100 Tensor Core GPU (40 GB SXM4, 312 TFLOPS TF32)</li>
+                <li><strong>Compute Environment:</strong> Ubuntu 22.04 LTS, CUDA 12.2, PyTorch 2.3.0+cu121, TensorRT 8.6</li>
+                <li><strong>Quantization Pipeline:</strong> PyTorch FP32 &rarr; ONNX &rarr; TensorFlow Graph &rarr; TFLite Post-Training Quantization (PTQ INT8)</li>
+            </ul>
+
+            <p><strong>Dual-ESP32 Edge Deployment:</strong></p>
+            <ul>
+                <li><strong>Node 1 (Gateway):</strong> ESP32-WROOM-32 running ESP-NOW to UART bridge and WebSocket proxy.</li>
+                <li><strong>Node 2 (Inference Core):</strong> ESP32-S3 (Xtensa Dual-Core 240 MHz, 512 KB SRAM) hosting TensorFlow Lite for Microcontrollers within a <strong>40 KB Tensor Arena</strong>.</li>
+                <li><strong>Measured Benchmark:</strong> 1.85 ms inference latency, 0.584 mJ step energy consumption, zero secular energy drift over 24-hour simulation cycles.</li>
+            </ul>
+        </section>
+
+        <section id="latex-export">
+            <h2>📐 LaTeX / PGFPlots Scientific Export</h2>
+            <p>Clicking <strong>"Export LaTeX"</strong> in <code>/graphs</code> generates compilable TikZ/PGFPlots code matching AIAA and IEEE conference formatting:</p>
+            <pre><code>\documentclass{standalone}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\begin{document}
+\begin{tikzpicture}
+  \begin{axis}[
+    title={NanoDynamics v3 Perturbation Telemetry},
+    xlabel={Epoch $t$ [s]},
+    ylabel={Force [N]},
+    ymode=log,
+    grid=major
+  ]
+  \addplot[color=red, thick] table[x=time, y=f_drag] {telemetry.dat};
+  \addlegendentry{Aerodynamic Drag $F_{\mathrm{drag}}$}
+  \addplot[color=blue, thick] table[x=time, y=f_j2] {telemetry.dat};
+  \addlegendentry{Oblateness $F_{J_2}$}
+  \end{axis}
+\end{tikzpicture}
+\end{document}</code></pre>
+        </section>
+    </main>
+
+</body>
+</html>
