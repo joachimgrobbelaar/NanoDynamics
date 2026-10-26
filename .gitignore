@@ -34,6 +34,9 @@ firestore-debug.log
 .agents/
 trajectory_*.json
 output/
+visualization_3d/static/cache_maps/
+visualization_3d/static/models/cities/
+visualization_3d/static/models/launch/
 
 # IDE
 .vscode/

@@ -177,8 +177,8 @@ def test_simulate_bounds_validation():
     res = client.post("/simulate", json=p)
     assert res.status_code in (400, 422)
 
-    # Altitude too high (> 2000 km)
-    p = {**base_valid, "altitude_km": 2500.0}
+    # Altitude too high (> 400000 km)
+    p = {**base_valid, "altitude_km": 450000.0}
     res = client.post("/simulate", json=p)
     assert res.status_code in (400, 422)
 

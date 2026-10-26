@@ -153,7 +153,7 @@ BODIES = {
         "omega": 7.2921150e-5,
         "has_atmosphere": True,
         "min_alt_km": 100.0,
-        "max_alt_km": 2000.0,
+        "max_alt_km": 400000.0,
         "default_alt_km": 400.0,
         "default_ecc": 0.001,
         "default_inc": 51.6,
@@ -2437,5 +2437,27 @@ def api_edge_benchmark(req: EdgeBenchmarkRequest):
         "hardware_active": hw_used,
         "telemetry": device_manager.get_telemetry_summary(limit=80),
     }
+
+
+@app.get("/api/catalog/objects")
+async def get_hf_orbital_catalog(category: str | None = None, q: str | None = None, limit: int = 800):
+    """Serves real Hugging Face asteroid (juliensimon/asterank-asteroid-mining) and NORAD space debris/satellite (juliensimon/space-track-satcat) catalog."""
+    catalog_path = os.path.join(os.path.dirname(__file__), "static", "data", "hf_orbital_catalog.json")
+    if not os.path.exists(catalog_path):
+        return {"source_datasets": [], "counts": {}, "asteroids": [], "space_debris": [], "active_satellites": []}
+    with open(catalog_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    if category or q:
+        q_low = (q or "").strip().lower()
+        cat_up = (category or "").strip().upper()
+        for key in ("asteroids", "space_debris", "active_satellites"):
+            items = data.get(key, [])
+            if cat_up and cat_up != "ALL":
+                items = [x for x in items if cat_up in str(x.get("category", "")).upper() or cat_up in key.upper()]
+            if q_low:
+                items = [x for x in items if q_low in str(x.get("name", "")).lower() or q_low in str(x.get("id", "")).lower() or q_low in str(x.get("full_name", "")).lower()]
+            data[key] = items[:limit]
+    return data
+
 
 

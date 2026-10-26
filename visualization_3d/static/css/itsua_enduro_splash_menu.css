@@ -1,0 +1,1448 @@
+/* ============================================================================
+ * ITSUA ENGINEERING STUDIO × ENDUROSAT SPACE MISSION DESIGN CONFIGURATOR
+ * Splash Screen (#splash-screen) & Top Menu Bar (#top-nav) Design System
+ * Sources:
+ *   - /home/m/Downloads/portfolioITSUA - A full-stack engineering studio_files/Base.BNWdyHj2_B-su.css
+ *   - /home/m/Downloads/portfolioITSUA - A full-stack engineering studio_files/ReviewCard.DZefoKtB_B-su.css
+ *   - /home/m/Downloads/nanodynamics-Space Mission Design - Configurator by EnduroSat_files/index-BCrnJubc_R_x6.css
+ * ============================================================================ */
+
+:root {
+    /* ITSUA Engineering Studio Tokens */
+    --itsua-font-mono: "Berkeley Mono", "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
+    --itsua-font-body: "Space Grotesk", "Söhne", "GT America", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --itsua-accent: #2f4cff;
+    --itsua-green: #047857;
+    --itsua-green-bright: #34d399;
+    --itsua-orange: #f59e0b;
+    --itsua-magenta: #a21caf;
+    --itsua-ink: #0e1012;
+    --itsua-line: rgba(217, 218, 221, 0.14);
+    --itsua-line-strong: rgba(217, 218, 221, 0.26);
+
+    /* EnduroSat Space Mission Configurator Tokens */
+    --enduro-blue: #00a1ff;
+    --enduro-surface: #090d12;
+    --enduro-card: #0f1115;
+    --enduro-hover: #13171d;
+    --enduro-pill: #212328;
+    --enduro-border: #2c2e38;
+    --enduro-divider: #1a1d23;
+    --enduro-muted: #6f767d;
+    --enduro-secondary: #8b939b;
+    --enduro-text: #c2c9cf;
+    --enduro-sweep: rgba(218, 242, 255, 0.12);
+    --enduro-ease: cubic-bezier(0.32, 0.94, 0.6, 1);
+    --enduro-accordion-ease: cubic-bezier(0.48, 0.04, 0.52, 0.96);
+}
+
+/* ── ITSUA Keyframe Animations ── */
+@keyframes heroLineDrop {
+    0% { transform: scaleY(0); }
+    100% { transform: scaleY(1); }
+}
+
+@keyframes stackBlink {
+    0%, 100% { opacity: 1; }
+    40%, 60% { opacity: 0.18; }
+}
+
+/* ── ITSUA Diagonal Hatch Pattern (.hatch-tight) ── */
+.itsua-hatch-strip {
+    height: 6px;
+    width: 100%;
+    background-image: repeating-linear-gradient(
+        135deg,
+        rgba(0, 161, 255, 0.28) 0 1px,
+        transparent 1px 6px
+    );
+    border-bottom: 1px solid var(--enduro-border);
+}
+
+/* ── Splash Screen Root (#splash-screen) ── */
+#splash-screen {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    padding: 24px 40px !important;
+    box-sizing: border-box !important;
+    z-index: 500 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    background:
+        radial-gradient(95% 100% at 0% 50%, rgba(9, 13, 18, 0.90) 0%, rgba(9, 13, 18, 0.72) 28%, rgba(5, 7, 11, 0.18) 52%, rgba(0, 0, 0, 0.0) 100%) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    color: #ffffff !important;
+    font-family: var(--itsua-font-body) !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+}
+
+#splash-screen.hidden {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
+/* ITSUA 12-Column Architectural Vertical Drop Grid (#splash-hero-lines) */
+#splash-hero-lines {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+}
+
+#splash-hero-lines .hero-line {
+    border-left: 1px dashed rgba(255, 255, 255, 0.06);
+    transform-origin: top;
+    animation: heroLineDrop 2.2s cubic-bezier(0.33, 1, 0.68, 1) forwards;
+    animation-delay: var(--drop-delay, 0ms);
+}
+
+#splash-hero-lines .hero-line:first-child {
+    border-left: none;
+}
+
+/* Splash Card Container (.splash-header) — ITSUA Studio Spec + EnduroSat Sidebar Panel */
+#splash-screen .splash-header {
+    position: relative !important;
+    z-index: 2 !important;
+    max-width: 610px !important;
+    width: 100% !important;
+    background:
+        radial-gradient(130% 130% at 100% 0%, rgba(0, 161, 255, 0.10), rgba(0, 161, 255, 0.03) 45%, rgba(0, 161, 255, 0) 78%),
+        rgba(9, 13, 18, 0.92) !important;
+    border: 1px solid var(--enduro-border) !important;
+    border-radius: 0px !important;
+    padding: 0 !important;
+    box-shadow: 0 28px 70px rgba(0, 0, 0, 0.78), 0 0 0 1px rgba(0, 161, 255, 0.12) !important;
+    overflow: hidden !important;
+}
+
+/* ITSUA Top Specification Meta Bar inside Splash Card */
+.itsua-spec-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--enduro-border);
+    background: #0f1115;
+    font-family: var(--itsua-font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--enduro-secondary);
+}
+
+.itsua-spec-topbar .spec-cell {
+    padding: 8px 14px;
+    border-right: 1px solid var(--enduro-border);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.itsua-spec-topbar .spec-cell:last-child {
+    border-right: none;
+    margin-left: auto;
+    color: var(--itsua-green-bright);
+    font-weight: 600;
+}
+
+.itsua-live-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--itsua-green-bright);
+    box-shadow: 0 0 8px var(--itsua-green-bright);
+    animation: stackBlink 2.4s ease-in-out infinite;
+}
+
+.splash-body-inner {
+    padding: 20px 26px 22px 26px;
+}
+
+/* EnduroSat Domain Eyebrow + ITSUA Studio Heading */
+#splash-screen .splash-badge {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    background: rgba(0, 161, 255, 0.08) !important;
+    border: 1px solid rgba(0, 161, 255, 0.35) !important;
+    border-left: 3px solid var(--enduro-blue) !important;
+    border-radius: 0px !important;
+    color: var(--enduro-blue) !important;
+    font-family: var(--itsua-font-mono) !important;
+    font-size: 10.5px !important;
+    font-weight: 600 !important;
+    padding: 4px 10px !important;
+    letter-spacing: 0.14em !important;
+    text-transform: uppercase !important;
+}
+
+#splash-screen .splash-subtitle {
+    font-family: var(--itsua-font-mono) !important;
+    font-size: 11.5px !important;
+    color: var(--enduro-text) !important;
+    letter-spacing: 0.02em !important;
+    margin: 8px 0 12px 0 !important;
+    line-height: 1.5 !important;
+    border-left: 2px solid var(--itsua-accent) !important;
+    padding-left: 10px !important;
+}
+
+/* ITSUA 5-Column Architectural KPI Strip */
+.itsua-kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border: 1px solid var(--enduro-border);
+    background: #0b0e14;
+    margin-bottom: 12px;
+}
+
+.itsua-kpi-cell {
+    padding: 6px 10px;
+    border-right: 1px solid var(--enduro-border);
+    text-align: left;
+}
+
+.itsua-kpi-cell:last-child {
+    border-right: none;
+}
+
+.itsua-kpi-label {
+    display: block;
+    font-family: var(--itsua-font-mono);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--enduro-secondary);
+}
+
+.itsua-kpi-val {
+    display: block;
+    font-family: var(--itsua-font-body);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+    margin-top: 1px;
+    font-variant-numeric: tabular-nums;
+}
+
+.itsua-kpi-val.accent-blue { color: var(--enduro-blue); }
+.itsua-kpi-val.accent-green { color: var(--itsua-green-bright); }
+.itsua-kpi-val.accent-orange { color: var(--itsua-orange); }
+
+/* ITSUA ReviewCard 3D Perspective Deck Styling on #splash-cubesat-card */
+#splash-cubesat-card {
+    position: relative !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 142px !important;
+    margin: 10px 0 14px 0 !important;
+    background:
+        radial-gradient(120% 100% at 50% 50%, rgba(0, 161, 255, 0.16) 0%, rgba(15, 17, 21, 0.92) 72%),
+        repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.03) 0 1px, transparent 1px 24px) !important;
+    border: 1px solid var(--enduro-border) !important;
+    border-radius: 0px !important;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.65) !important;
+    perspective: 1500px !important;
+    transform-style: preserve-3d !important;
+    transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) !important;
+    transition: transform 0.25s cubic-bezier(0.25, 0.8, 0.25, 1), border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+#splash-cubesat-card:hover {
+    border-color: var(--enduro-blue) !important;
+    box-shadow: 0 18px 40px rgba(0, 161, 255, 0.18) !important;
+}
+
+.itsua-deck-head {
+    position: absolute;
+    top: 6px;
+    left: 10px;
+    right: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: var(--itsua-font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.08em;
+    color: var(--enduro-secondary);
+    pointer-events: none;
+    z-index: 3;
+}
+
+.itsua-deck-head .deck-brand {
+    color: var(--enduro-blue);
+    font-weight: 700;
+}
+
+/* ITSUA Door-Table + EnduroSat CTA Sweep Splash Menu (.splash-menu & .splash-btn) */
+#splash-screen .splash-menu {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0px !important;
+    width: 100% !important;
+    margin-top: 10px !important;
+    border: 1px solid var(--enduro-border) !important;
+    background: #090d12 !important;
+}
+
+#splash-screen .splash-btn {
+    position: relative !important;
+    overflow: hidden !important;
+    background:
+        radial-gradient(130% 130% at 100% 0%, rgba(0, 161, 255, 0.05), rgba(0, 161, 255, 0.01) 45%, transparent 78%),
+        #090d12 !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-bottom: 1px solid var(--enduro-divider) !important;
+    border-radius: 0px !important;
+    padding: 10px 14px !important;
+    cursor: pointer !important;
+    text-align: left !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    transition: background-color 0.2s linear, color 0.2s linear, padding-left 0.22s var(--enduro-ease) !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+#splash-screen .splash-btn:last-child {
+    border-bottom: none !important;
+}
+
+/* EnduroSat .cta:before & ITSUA .door-wash Horizontal Sweep Animation */
+#splash-screen .splash-btn::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        rgba(0, 161, 255, 0.16) 0%,
+        rgba(47, 76, 255, 0.12) 65%,
+        rgba(0, 161, 255, 0.24) 100%
+    );
+    transform: translate3d(-102%, 0, 0);
+    transition: transform 0.48s var(--enduro-ease);
+    pointer-events: none;
+    z-index: 0;
+}
+
+#splash-screen .splash-btn:hover::before {
+    transform: translate3d(0, 0, 0);
+}
+
+#splash-screen .splash-btn:hover {
+    background-color: var(--enduro-hover) !important;
+    padding-left: 18px !important;
+    transform: none !important;
+}
+
+/* Primary Action Button ("Start New Mission") — EnduroSat .cta.blue + ITSUA Accent Block */
+#splash-screen .splash-btn.primary {
+    background:
+        linear-gradient(90deg, #00a1ff 0%, #0077cc 68%, #2f4cff 100%) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.22) !important;
+}
+
+#splash-screen .splash-btn.primary::before {
+    background: rgba(218, 242, 255, 0.16);
+}
+
+#splash-screen .splash-btn > * {
+    position: relative;
+    z-index: 1;
+}
+
+.itsua-step-index {
+    font-family: var(--itsua-font-mono);
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--enduro-blue);
+    letter-spacing: 0.04em;
+    min-width: 38px;
+    padding-right: 8px;
+    border-right: 1px solid var(--enduro-border);
+    margin-right: 4px;
+}
+
+#splash-screen .splash-btn.primary .itsua-step-index {
+    color: #ffffff;
+    border-right-color: rgba(255, 255, 255, 0.35);
+}
+
+#splash-screen .splash-btn-title {
+    font-family: var(--itsua-font-body) !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.01em !important;
+    color: #ffffff !important;
+}
+
+#splash-screen .splash-btn-desc {
+    font-family: var(--itsua-font-mono) !important;
+    font-size: 10px !important;
+    color: var(--enduro-secondary) !important;
+    letter-spacing: 0.02em !important;
+}
+
+#splash-screen .splash-btn.primary .splash-btn-desc {
+    color: rgba(255, 255, 255, 0.88) !important;
+}
+
+#splash-screen .splash-btn-icon {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 28px !important;
+    height: 28px !important;
+    background: var(--enduro-pill) !important;
+    border: 1px solid var(--enduro-border) !important;
+    font-family: var(--itsua-font-mono) !important;
+    font-size: 13px !important;
+    color: var(--enduro-text) !important;
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease !important;
+}
+
+#splash-screen .splash-btn:hover .splash-btn-icon {
+    background: var(--itsua-accent) !important;
+    border-color: var(--enduro-blue) !important;
+    color: #ffffff !important;
+    transform: translateX(2px) !important;
+}
+
+#splash-screen .splash-btn.primary .splash-btn-icon {
+    background: var(--itsua-ink) !important;
+    border-color: rgba(255, 255, 255, 0.35) !important;
+    color: #ffffff !important;
+}
+
+/* Splash Footer Bar (.splash-footer) — ITSUA Studio Specification Footer + EnduroSat CTA */
+#splash-screen .splash-footer {
+    position: relative !important;
+    z-index: 2 !important;
+    font-family: var(--itsua-font-mono) !important;
+    font-size: 11px !important;
+    color: var(--enduro-secondary) !important;
+    background: rgba(9, 13, 18, 0.92) !important;
+    border: 1px solid var(--enduro-border) !important;
+    border-radius: 0px !important;
+    padding: 10px 18px !important;
+}
+
+#splash-screen .splash-footer button {
+    position: relative !important;
+    overflow: hidden !important;
+    background: var(--enduro-blue) !important;
+    color: #ffffff !important;
+    font-family: var(--itsua-font-mono) !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.06em !important;
+    text-transform: uppercase !important;
+    padding: 7px 14px !important;
+    border-radius: 0px !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+    transition: background-color 0.2s ease, transform 0.15s ease !important;
+}
+
+#splash-screen .splash-footer button:hover {
+    background: var(--itsua-accent) !important;
+}
+
+/* ============================================================================
+ * TOP MENU BAR (#top-nav) — ENDUROSAT NAV + ITSUA ARCHITECTURAL HEADER
+ * ============================================================================ */
+#top-nav {
+    height: 38px !important;
+    min-height: 38px !important;
+    max-height: 38px !important;
+    padding: 0 10px 0 0 !important;
+    background: #090d12 !important;
+    border-bottom: 1px solid var(--enduro-border) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.65) !important;
+    font-family: var(--itsua-font-mono) !important;
+}
+
+#top-nav .win-menu-group {
+    display: flex !important;
+    align-items: stretch !important;
+    height: 100% !important;
+    gap: 0px !important;
+}
+
+/* Brand Mark Cell (EnduroSat Logo + ITSUA Bordered Header Cell) */
+#top-nav #sx-mission-brand {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    height: 100% !important;
+    padding: 0 14px !important;
+    margin-right: 0 !important;
+    border-right: 1px solid var(--enduro-border) !important;
+    background: #0f1115 !important;
+    color: #ffffff !important;
+    font-family: var(--itsua-font-mono) !important;
+    font-size: 11.5px !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.14em !important;
+    transition: background-color 0.15s ease, color 0.15s ease !important;
+}
+
+#top-nav #sx-mission-brand:hover {
+    background: var(--enduro-hover) !important;
+    color: var(--enduro-blue) !important;
+}
+
+/* Top Menu Items — ITSUA [ 00 ] Monospace Cells + EnduroSat Pill Hover */
+#top-nav .win-menu-item {
+    position: relative !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    height: 100% !important;
+    padding: 0 12px !important;
+    border-radius: 0px !important;
+    border-right: 1px solid var(--enduro-border) !important;
+    background: transparent !important;
+    color: var(--enduro-text) !important;
+    font-family: var(--itsua-font-mono) !important;
+    font-size: 11px !important;
+    font-weight: 500 !important;
+    letter-spacing: 0.03em !important;
+    text-transform: uppercase !important;
+    transition: background-color 0.18s linear, color 0.18s linear, box-shadow 0.18s linear !important;
+}
+
+#top-nav .win-menu-item .menu-idx {
+    color: var(--enduro-muted);
+    font-size: 9.5px;
+    font-weight: 600;
+    transition: color 0.18s linear;
+}
+
+#top-nav .win-menu-item:hover,
+#top-nav .win-menu-item.open {
+    background: var(--enduro-blue) !important;
+    color: #ffffff !important;
+    box-shadow: inset 0 -2px 0 #ffffff !important;
+}
+
+#top-nav .win-menu-item:hover .menu-idx,
+#top-nav .win-menu-item.open .menu-idx {
+    color: rgba(255, 255, 255, 0.85) !important;
+}
+
+/* Dropdown Panel (.win-dropdown) — EnduroSat .sidebar-tab Radial Gradient + ITSUA Grid */
+#top-nav .win-dropdown {
+    min-width: 270px !important;
+    background:
+        radial-gradient(130% 130% at 100% 0%, rgba(0, 161, 255, 0.10), rgba(0, 161, 255, 0.03) 45%, transparent 78%),
+        #090d12 !important;
+    border: 1px solid var(--enduro-border) !important;
+    border-top: 2px solid var(--enduro-blue) !important;
+    border-radius: 0px !important;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.92) !important;
+    padding: 0 !important;
+}
+
+/* Dropdown Items (.win-dropdown-item) — EnduroSat .cta Sweep + ITSUA Left Accent Bar */
+#top-nav .win-dropdown-item {
+    position: relative !important;
+    overflow: hidden !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    padding: 8px 14px !important;
+    color: var(--enduro-text) !important;
+    font-family: var(--itsua-font-mono) !important;
+    font-size: 11px !important;
+    letter-spacing: 0.02em !important;
+    text-transform: none !important;
+    border-bottom: 1px solid var(--enduro-divider) !important;
+    border-left: 2px solid transparent !important;
+    background: transparent !important;
+    transition: color 0.15s ease, border-left-color 0.15s ease, background-color 0.15s ease !important;
+}
+
+#top-nav .win-dropdown-item:last-child {
+    border-bottom: none !important;
+}
+
+#top-nav .win-dropdown-item::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, rgba(0, 161, 255, 0.18) 0%, rgba(47, 76, 255, 0.08) 100%);
+    transform: translate3d(-102%, 0, 0);
+    transition: transform 0.35s var(--enduro-ease);
+    pointer-events: none;
+    z-index: 0;
+}
+
+#top-nav .win-dropdown-item:hover::before {
+    transform: translate3d(0, 0, 0);
+}
+
+#top-nav .win-dropdown-item:hover {
+    background: #13171d !important;
+    color: #ffffff !important;
+    border-left-color: var(--enduro-blue) !important;
+}
+
+#top-nav .win-dropdown-item > * {
+    position: relative;
+    z-index: 1;
+}
+
+#top-nav .win-dropdown-item .item-shortcut {
+    margin-left: auto !important;
+    color: var(--enduro-muted) !important;
+    font-family: var(--itsua-font-mono) !important;
+    font-size: 9.5px !important;
+    background: #0f1115 !important;
+    border: 1px solid var(--enduro-border) !important;
+    padding: 1px 5px !important;
+}
+
+#top-nav .win-dropdown-item:hover .item-shortcut {
+    color: var(--enduro-blue) !important;
+    border-color: var(--enduro-blue) !important;
+}
+
+#top-nav .win-dropdown-sep {
+    height: 4px !important;
+    margin: 0 !important;
+    background-image: repeating-linear-gradient(
+        135deg,
+        var(--enduro-border) 0 1px,
+        #0f1115 1px 5px
+    ) !important;
+    border-bottom: 1px solid var(--enduro-border) !important;
+}
+
+/* Right-Side Telemetry Controls inside #top-nav (EnduroSat Pill & Readout Style) */
+#top-nav #met-clock-badge {
+    background: #0f1115 !important;
+    border: 1px solid var(--enduro-border) !important;
+    border-left: 2px solid var(--enduro-blue) !important;
+    border-radius: 0px !important;
+    color: #ffffff !important;
+    font-family: var(--itsua-font-mono) !important;
+    font-variant-numeric: tabular-nums !important;
+    padding: 3px 8px !important;
+}
+
+#top-nav #time-speed-ctrl {
+    background: #0f1115 !important;
+    border: 1px solid var(--enduro-border) !important;
+    border-radius: 0px !important;
+    padding: 2px 6px !important;
+}
+
+#top-nav #time-speed-ctrl button {
+    background: var(--enduro-pill) !important;
+    color: var(--enduro-text) !important;
+    border: 1px solid var(--enduro-border) !important;
+    border-radius: 2px !important;
+    font-family: var(--itsua-font-mono) !important;
+    transition: background-color 0.15s ease, color 0.15s ease !important;
+}
+
+#top-nav #time-speed-ctrl button:hover {
+    background: var(--enduro-blue) !important;
+    color: #ffffff !important;
+    border-color: var(--enduro-blue) !important;
+}
+
+#top-nav .sx-status-pill {
+    background: #0f1115 !important;
+    border: 1px solid var(--enduro-border) !important;
+    border-radius: 0px !important;
+    font-family: var(--itsua-font-mono) !important;
+}
+
+#top-nav #cmd-guide-btn {
+    background: var(--enduro-blue) !important;
+    border: 1px solid var(--enduro-blue) !important;
+    border-radius: 0px !important;
+    color: #ffffff !important;
+    font-family: var(--itsua-font-mono) !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.06em !important;
+}
+
+#top-nav #cmd-guide-btn:hover {
+    background: var(--itsua-accent) !important;
+    border-color: var(--itsua-accent) !important;
+}
+
+
+/* ============================================================================
+ * ENDUROSAT × ITSUA SELECTION BLOCKS (MISSION LOADER & SETTINGS MODALS)
+ * ============================================================================ */
+
+/* 1. Mission Loading Overlay (#mission-loading-overlay) — Architectural Step Block */
+#mission-loading-overlay {
+    background:
+        radial-gradient(90% 80% at 50% 20%, rgba(0, 161, 255, 0.14), rgba(47, 76, 255, 0.05) 55%, rgba(9, 13, 18, 0.96) 100%),
+        #090d12 !important;
+    font-family: var(--itsua-font-mono) !important;
+}
+
+.loader-selection-panel {
+    width: 620px;
+    max-width: 92vw;
+    background:
+        radial-gradient(120% 120% at 100% 0%, rgba(0, 161, 255, 0.09), rgba(0, 161, 255, 0.03) 42%, transparent 75%),
+        #0f1115;
+    border: 1px solid var(--enduro-border);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.92), 0 0 0 1px rgba(0, 161, 255, 0.12);
+    padding: 0;
+    color: var(--enduro-text);
+}
+
+.loader-step-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    padding: 16px 20px;
+}
+
+.loader-step-block {
+    background: #13171d;
+    border: 1px solid var(--enduro-border);
+    border-left: 3px solid var(--enduro-blue);
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    position: relative;
+}
+
+.loader-step-block .step-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: var(--itsua-font-mono);
+    font-size: 10px;
+    color: var(--enduro-blue);
+    letter-spacing: 0.1em;
+    font-weight: 700;
+}
+
+.loader-step-block .step-title {
+    font-family: var(--itsua-font-sans);
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #ffffff;
+}
+
+.loader-step-block .step-meta {
+    font-family: var(--itsua-font-mono);
+    font-size: 10px;
+    color: var(--enduro-secondary);
+}
+
+/* 2. Selection Block Modal Container (#presets-scenarios-modal, #settings-modal-overlay, #presets-modal-overlay) */
+#presets-scenarios-modal .modal-content,
+#settings-modal-overlay .modal-content,
+#presets-modal-overlay .modal-content {
+    background:
+        radial-gradient(120% 120% at 100% 0%, rgba(0, 161, 255, 0.08), rgba(0, 161, 255, 0.03) 40%, transparent 75%),
+        #0f1115 !important;
+    border: 1px solid var(--enduro-border) !important;
+    border-radius: 0px !important;
+    box-shadow: 0 32px 90px rgba(0, 0, 0, 0.92), 0 0 0 1px rgba(0, 161, 255, 0.10) !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    color: var(--enduro-text) !important;
+}
+
+.sb-modal-header {
+    display: flex;
+    align-items: stretch;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--enduro-border);
+    background: #090d12;
+    font-family: var(--itsua-font-mono);
+}
+
+.sb-modal-header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 18px;
+}
+
+.sb-modal-index {
+    color: var(--enduro-blue);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    background: rgba(0, 161, 255, 0.1);
+    border: 1px solid rgba(0, 161, 255, 0.3);
+    padding: 2px 7px;
+}
+
+.sb-modal-title {
+    font-family: var(--itsua-font-sans);
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #ffffff;
+    margin: 0;
+}
+
+.sb-modal-close {
+    background: transparent;
+    border: none;
+    border-left: 1px solid var(--enduro-border);
+    color: var(--enduro-secondary);
+    width: 46px;
+    font-family: var(--itsua-font-mono);
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.sb-modal-close:hover {
+    background: #ef4444;
+    color: #ffffff;
+}
+
+.sb-modal-body {
+    padding: 16px 20px;
+    max-height: 78vh;
+    overflow-y: auto;
+}
+
+.sb-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 14px 0 8px 0;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--enduro-border);
+    font-family: var(--itsua-font-mono);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--enduro-blue);
+}
+
+.sb-section-header:first-child {
+    margin-top: 0;
+}
+
+/* 3. Selection Block Grid & Cards (.selection-block-grid & .selection-block-card) */
+.selection-block-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+
+@media (max-width: 640px) {
+    .selection-block-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.selection-block-card {
+    position: relative;
+    overflow: hidden;
+    background:
+        radial-gradient(120% 120% at 100% 0%, rgba(0, 161, 255, 0.06), transparent 70%),
+        #13171d;
+    border: 1px solid var(--enduro-border);
+    padding: 12px 14px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 8px;
+    transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.18s ease, box-shadow 0.2s ease;
+    user-select: none;
+}
+
+.selection-block-card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: transparent;
+    transition: background-color 0.2s ease;
+}
+
+.selection-block-card:hover {
+    background: #171c24;
+    border-color: rgba(0, 161, 255, 0.55);
+    transform: translateY(-1px);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55);
+}
+
+.selection-block-card.selected,
+.selection-block-card.active {
+    background:
+        radial-gradient(130% 130% at 100% 0%, rgba(0, 161, 255, 0.18), rgba(47, 76, 255, 0.06) 55%, #141a23 100%);
+    border-color: var(--enduro-blue);
+    box-shadow: 0 0 20px rgba(0, 161, 255, 0.18), inset 0 0 0 1px rgba(0, 161, 255, 0.25);
+}
+
+.selection-block-card.selected::before,
+.selection-block-card.active::before {
+    background: linear-gradient(90deg, var(--enduro-blue), var(--itsua-accent), var(--itsua-green));
+}
+
+.sb-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.sb-card-idx {
+    font-family: var(--itsua-font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--enduro-muted);
+    background: #090d12;
+    border: 1px solid var(--enduro-border);
+    padding: 2px 6px;
+}
+
+.selection-block-card.selected .sb-card-idx,
+.selection-block-card.active .sb-card-idx {
+    color: var(--enduro-blue);
+    border-color: rgba(0, 161, 255, 0.45);
+    background: rgba(0, 161, 255, 0.1);
+}
+
+.sb-card-badge {
+    font-family: var(--itsua-font-mono);
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--enduro-blue);
+    background: rgba(0, 161, 255, 0.12);
+    border: 1px solid rgba(0, 161, 255, 0.3);
+    padding: 2px 6px;
+}
+
+.sb-card-title {
+    font-family: var(--itsua-font-sans);
+    font-size: 13px;
+    font-weight: 700;
+    color: #ffffff;
+    line-height: 1.25;
+}
+
+.sb-card-desc {
+    font-family: var(--itsua-font-mono);
+    font-size: 10.5px;
+    color: var(--enduro-secondary);
+    line-height: 1.4;
+}
+
+.sb-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding-top: 6px;
+    border-top: 1px solid var(--enduro-divider);
+    font-family: var(--itsua-font-mono);
+    font-size: 10px;
+    color: var(--enduro-muted);
+}
+
+/* 4. EnduroSat Pill Toggle Switch (.enduro-switch) */
+.enduro-switch {
+    position: relative;
+    width: 38px;
+    height: 20px;
+    background: #323943;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    transition: background-color 0.22s ease, border-color 0.22s ease;
+    flex-shrink: 0;
+}
+
+.enduro-switch::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #9aa0a6;
+    transition: transform 0.22s var(--enduro-ease), background-color 0.22s ease;
+}
+
+.selection-block-card.active .enduro-switch,
+input:checked + .enduro-switch {
+    background: rgba(0, 161, 255, 0.25);
+    border-color: var(--enduro-blue);
+}
+
+.selection-block-card.active .enduro-switch::after,
+input:checked + .enduro-switch::after {
+    transform: translateX(18px);
+    background: var(--enduro-blue);
+    box-shadow: 0 0 8px rgba(0, 161, 255, 0.8);
+}
+
+/* 5. EnduroSat Slider Selection Block (.enduro-slider-block) */
+.enduro-slider-block {
+    background: #13171d;
+    border: 1px solid var(--enduro-border);
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.enduro-slider-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: var(--itsua-font-mono);
+    font-size: 11px;
+}
+
+.enduro-slider-label {
+    color: #ffffff;
+    font-weight: 600;
+}
+
+.enduro-slider-val {
+    color: var(--enduro-blue);
+    font-weight: 700;
+    background: #090d12;
+    border: 1px solid var(--enduro-border);
+    padding: 1px 6px;
+    font-size: 10px;
+}
+
+.enduro-range {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    background: #23272c;
+    border: 1px solid #35383d;
+    outline: none;
+    cursor: pointer;
+}
+
+.enduro-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    background: var(--enduro-blue);
+    border: 2px solid #ffffff;
+    cursor: pointer;
+    box-shadow: 0 0 8px rgba(0, 161, 255, 0.75);
+}
+
+/* 6. EnduroSat CTA Action Bar (.sb-action-bar & .sb-cta-btn) */
+.sb-action-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 12px 20px;
+    background: #090d12;
+    border-top: 1px solid var(--enduro-border);
+    font-family: var(--itsua-font-mono);
+}
+
+.sb-cta-btn {
+    position: relative;
+    overflow: hidden;
+    background: #1c222b;
+    color: #ffffff;
+    border: 1px solid var(--enduro-border);
+    padding: 9px 16px;
+    font-family: var(--itsua-font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+}
+
+.sb-cta-btn.primary {
+    background: linear-gradient(90deg, var(--itsua-accent) 0%, var(--enduro-blue) 100%);
+    border-color: var(--enduro-blue);
+    color: #ffffff;
+}
+
+.sb-cta-btn:hover {
+    border-color: var(--enduro-blue);
+    background: var(--enduro-blue);
+    color: #ffffff;
+}
+
+/* ============================================================================
+ * 7. IN-MISSION UI PANELS (#sidebar, #analytics-panel, #telemetry-panel, etc.)
+ *    ENDUROSAT CONFIGURATOR × ITSUA × CEDANOTECH ARCHITECTURAL GRID SYSTEM
+ * ============================================================================ */
+
+/* Left Sidebar & Right Analytics Panel — Sharp EnduroSat Configurator Shells */
+#sidebar {
+    background:
+        radial-gradient(125% 120% at 100% 0%, rgba(0, 161, 255, 0.08), rgba(0, 161, 255, 0.02) 42%, transparent 78%),
+        linear-gradient(to right, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+        #0b0e13 !important;
+    background-size: 100% 100%, 28px 28px, 28px 28px, 100% 100% !important;
+    border-right: 1px solid var(--enduro-border) !important;
+    border-radius: 0px !important;
+    box-shadow: 12px 0 40px rgba(0, 0, 0, 0.85) !important;
+    padding: 14px 14px 20px 14px !important;
+    font-family: var(--itsua-font-mono) !important;
+}
+
+#analytics-panel {
+    background:
+        radial-gradient(125% 120% at 0% 0%, rgba(0, 161, 255, 0.08), rgba(0, 161, 255, 0.02) 42%, transparent 78%),
+        linear-gradient(to right, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+        #0b0e13 !important;
+    background-size: 100% 100%, 28px 28px, 28px 28px, 100% 100% !important;
+    border-left: 1px solid var(--enduro-border) !important;
+    border-radius: 0px !important;
+    box-shadow: -12px 0 40px rgba(0, 0, 0, 0.85) !important;
+    font-family: var(--itsua-font-mono) !important;
+}
+
+/* Sidebar Brand Header */
+#sidebar h1 {
+    font-family: var(--itsua-font-sans) !important;
+    font-size: 15px !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.14em !important;
+    text-transform: uppercase !important;
+    color: #ffffff !important;
+    padding-bottom: 8px !important;
+    border-bottom: 1px solid var(--enduro-border) !important;
+    margin-bottom: 10px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+}
+
+#sidebar h1::after {
+    content: "[ SYS // 01 ]";
+    font-family: var(--itsua-font-mono);
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--enduro-blue);
+    letter-spacing: 0.08em;
+    background: rgba(0, 161, 255, 0.1);
+    border: 1px solid rgba(0, 161, 255, 0.35);
+    padding: 2px 6px;
+}
+
+/* Section Headers (.sx-telemetry-header) — ITSUA Monospace Index + CedanoTech Hairline */
+.sx-telemetry-header {
+    font-family: var(--itsua-font-mono) !important;
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.12em !important;
+    text-transform: uppercase !important;
+    color: var(--enduro-blue) !important;
+    background: #090d12 !important;
+    border: 1px solid var(--enduro-border) !important;
+    border-left: 3px solid var(--enduro-blue) !important;
+    padding: 6px 10px !important;
+    margin: 10px 0 8px 0 !important;
+}
+
+/* All Sidebar & Panel Sub-Cards — Zero Border Radius, Architectural Borders */
+#sidebar > div,
+#spacecraft-fleet-selector,
+#isl-routing-panel,
+#telemetry-panel,
+#hardware-benchmark-panel,
+#hf-object-tracker-panel,
+.chart-container {
+    border-radius: 0px !important;
+    border-color: var(--enduro-border) !important;
+}
+
+#spacecraft-fleet-selector,
+#isl-routing-panel,
+#telemetry-panel,
+#hardware-benchmark-panel,
+#hf-object-tracker-panel {
+    background:
+        radial-gradient(120% 120% at 100% 0%, rgba(0, 161, 255, 0.06), transparent 72%),
+        #11151c !important;
+    border: 1px solid var(--enduro-border) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+}
+
+/* Telemetry Rows */
+.telemetry-row {
+    font-family: var(--itsua-font-mono) !important;
+    font-size: 10.5px !important;
+    padding: 5px 0 !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+.telemetry-label {
+    color: var(--enduro-secondary) !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    font-size: 9.5px !important;
+}
+
+.telemetry-val {
+    color: #ffffff !important;
+    font-family: var(--itsua-font-mono) !important;
+    font-weight: 700 !important;
+    font-variant-numeric: tabular-nums !important;
+}
+
+/* Active Fleet Satellite Items (#sat-list li) */
+#sat-list li,
+.sat-item {
+    background: #13171d !important;
+    border: 1px solid var(--enduro-border) !important;
+    border-left: 3px solid var(--enduro-muted) !important;
+    border-radius: 0px !important;
+    padding: 8px 10px !important;
+    margin-bottom: 6px !important;
+    font-family: var(--itsua-font-mono) !important;
+    transition: border-color 0.15s ease, background-color 0.15s ease !important;
+}
+
+#sat-list li:hover,
+.sat-item:hover {
+    background: #171d26 !important;
+    border-color: rgba(0, 161, 255, 0.5) !important;
+    border-left-color: var(--enduro-blue) !important;
+}
+
+#sat-list li.active,
+.sat-item.active {
+    background:
+        radial-gradient(120% 120% at 100% 0%, rgba(0, 161, 255, 0.16), transparent 75%),
+        #141a24 !important;
+    border-color: var(--enduro-blue) !important;
+    border-left: 3px solid var(--enduro-blue) !important;
+    box-shadow: 0 0 16px rgba(0, 161, 255, 0.15) !important;
+}
+
+/* Global In-Mission Buttons — Sharp Architectural EnduroSat Pill / Block Buttons */
+#sidebar button,
+#analytics-panel button,
+.btn-primary,
+.btn-secondary {
+    border-radius: 0px !important;
+    font-family: var(--itsua-font-mono) !important;
+    letter-spacing: 0.05em !important;
+    text-transform: uppercase !important;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+}
+
+.btn-primary {
+    background: linear-gradient(90deg, var(--itsua-accent) 0%, var(--enduro-blue) 100%) !important;
+    border: 1px solid var(--enduro-blue) !important;
+    color: #ffffff !important;
+    font-weight: 700 !important;
+}
+
+.btn-primary:hover {
+    background: var(--enduro-blue) !important;
+    box-shadow: 0 0 14px rgba(0, 161, 255, 0.45) !important;
+}
+
+.btn-secondary {
+    background: #161b22 !important;
+    border: 1px solid var(--enduro-border) !important;
+    color: var(--enduro-text) !important;
+}
+
+.btn-secondary:hover {
+    background: var(--enduro-blue) !important;
+    border-color: var(--enduro-blue) !important;
+    color: #ffffff !important;
+}
+
+/* Global Range Sliders (<input type="range">) — EnduroSat Square Thumb & Track */
+#sidebar input[type="range"],
+#analytics-panel input[type="range"],
+.modal-content input[type="range"] {
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    height: 5px !important;
+    background: #1c222b !important;
+    border: 1px solid var(--enduro-border) !important;
+    border-radius: 0px !important;
+    outline: none !important;
+    cursor: pointer !important;
+}
+
+#sidebar input[type="range"]::-webkit-slider-thumb,
+#analytics-panel input[type="range"]::-webkit-slider-thumb,
+.modal-content input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    width: 12px !important;
+    height: 12px !important;
+    background: var(--enduro-blue) !important;
+    border: 2px solid #ffffff !important;
+    border-radius: 0px !important;
+    cursor: pointer !important;
+    box-shadow: 0 0 8px rgba(0, 161, 255, 0.8) !important;
+}
+
+/* Global Inputs & Selects */
+#sidebar input[type="text"],
+#sidebar input[type="number"],
+#sidebar select,
+.modal-content input[type="text"],
+.modal-content input[type="number"],
+.modal-content select {
+    background: #090d12 !important;
+    border: 1px solid var(--enduro-border) !important;
+    border-radius: 0px !important;
+    color: #ffffff !important;
+    font-family: var(--itsua-font-mono) !important;
+    font-size: 11px !important;
+}
+
+#sidebar input:focus,
+#sidebar select:focus,
+.modal-content input:focus,
+.modal-content select:focus {
+    border-color: var(--enduro-blue) !important;
+    outline: none !important;
+    box-shadow: 0 0 0 1px rgba(0, 161, 255, 0.35) !important;
+}
+
+/* 3D Floating Stat Box & HUD Overlays — Sharp Architectural Readout */
+#floating-stat-box {
+    background: rgba(9, 13, 18, 0.92) !important;
+    border: 1px solid var(--enduro-blue) !important;
+    border-left: 3px solid var(--enduro-blue) !important;
+    border-radius: 0px !important;
+    font-family: var(--itsua-font-mono) !important;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.85) !important;
+}
+
+/* Title-Screen Live 3D Camera Snap Strip (#splash-snap-strip) */
+.splash-snap-btn {
+    background: #090d12;
+    color: #94a3b8;
+    border: 1px solid var(--enduro-border);
+    border-radius: 0px;
+    padding: 5px 6px;
+    font-family: var(--itsua-font-mono);
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+}
+
+.splash-snap-btn:hover {
+    background: var(--enduro-hover);
+    color: #ffffff;
+    border-color: var(--enduro-blue);
+}
+
+.splash-snap-btn.active {
+    background: linear-gradient(90deg, rgba(0, 161, 255, 0.28), rgba(47, 76, 255, 0.24));
+    color: #00e5ff;
+    border-color: #00e5ff;
+    box-shadow: inset 0 0 8px rgba(0, 229, 255, 0.25);
+}
+
+/* In-Mission Bottom Floating Quick-Snap Camera Bar (#mission-snap-dock) */
+body.in-splash #mission-snap-dock {
+    display: none !important;
+}
+
+#mission-snap-dock {
+    position: fixed;
+    bottom: 64px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    background: rgba(9, 13, 18, 0.92);
+    border: 1px solid var(--enduro-border);
+    border-top: 2px solid var(--enduro-blue);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.78);
+    backdrop-filter: blur(10px);
+}
+
+.snap-dock-label {
+    font-family: var(--itsua-font-mono);
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--enduro-blue);
+    letter-spacing: 0.08em;
+    padding: 0 6px 0 2px;
+    border-right: 1px solid var(--enduro-border);
+}
+
+.snap-dock-btn {
+    background: #111722;
+    color: #cbd5e1;
+    border: 1px solid #263142;
+    border-radius: 0px;
+    padding: 4px 8px;
+    font-family: var(--itsua-font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    white-space: nowrap;
+}
+
+.snap-dock-btn:hover {
+    background: var(--enduro-hover);
+    color: #ffffff;
+    border-color: var(--enduro-blue);
+    transform: translateY(-1px);
+}
+
+.snap-dock-btn.primary {
+    background: linear-gradient(90deg, rgba(0, 229, 255, 0.22), rgba(47, 76, 255, 0.28));
+    color: #00e5ff;
+    border-color: #00e5ff;
+}
+
+
