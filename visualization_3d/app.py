@@ -523,9 +523,61 @@ def _format_chunk(res, prop: OrbitPropagator, radius_m: float, include_forces: b
 @app.get("/")
 def read_root():
     return FileResponse(
+        os.path.join(BASE_DIR, "static", "landing.html"),
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache", "Expires": "0"}
+    )
+
+
+@app.get("/simulator")
+@app.get("/sim")
+def read_simulator():
+    return FileResponse(
         os.path.join(BASE_DIR, "static", "index.html"),
         headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache", "Expires": "0"}
     )
+
+
+@app.get("/about")
+def read_about():
+    return FileResponse(
+        os.path.join(BASE_DIR, "static", "about.html"),
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache", "Expires": "0"}
+    )
+
+
+@app.get("/download")
+@app.get("/downloads")
+def read_download():
+    return FileResponse(
+        os.path.join(BASE_DIR, "static", "download.html"),
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache", "Expires": "0"}
+    )
+
+
+class NewsletterPayload(BaseModel):
+    email: str
+    source: str | None = "nanodynamics"
+
+
+@app.post("/api/newsletter/subscribe")
+def subscribe_newsletter(payload: NewsletterPayload):
+    email = payload.email.strip().lower()
+    if "@" not in email:
+        raise HTTPException(status_code=400, detail="Invalid email address")
+    sub_file = os.path.join(BASE_DIR, "saved_sims", "newsletter_subscribers.json")
+    os.makedirs(os.path.dirname(sub_file), exist_ok=True)
+    subs = []
+    if os.path.exists(sub_file):
+        try:
+            with open(sub_file, "r", encoding="utf-8") as f:
+                subs = json.load(f)
+        except Exception:
+            subs = []
+    if not any(s.get("email") == email for s in subs):
+        subs.append({"email": email, "source": payload.source or "nanodynamics"})
+        with open(sub_file, "w", encoding="utf-8") as f:
+            json.dump(subs, f, indent=2)
+    return {"status": "ok", "email": email, "message": f"Subscribed {email} to NanoDynamics Ephemeris Dispatch."}
 
 
 @app.get("/graphs")

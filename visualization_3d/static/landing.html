@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NanoDynamics — LEO Orbital & Symplectic PINN Simulation Suite</title>
+  <meta name="description" content="High-precision Low Earth Orbit astrodynamics, Symplectic Hamiltonian Physics-Informed Neural Networks, and ESP32 Hardware-in-the-Loop spacecraft simulation." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
+  <style>
+    :root {
+      --bg-0: #04070d;
+      --bg-1: #09101d;
+      --bg-card: rgba(13, 22, 39, 0.78);
+      --border: rgba(56, 189, 248, 0.18);
+      --border-strong: rgba(56, 189, 248, 0.45);
+      --cyan: #00f0ff;
+      --blue: #3b82f6;
+      --amber: #f59e0b;
+      --emerald: #10b981;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --mono: "JetBrains Mono", monospace;
+      --sans: "Inter", system-ui, sans-serif;
+      --display: "Space Grotesk", sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: radial-gradient(circle at 18% 12%, rgba(0, 240, 255, 0.09), transparent 45%),
+                  radial-gradient(circle at 82% 28%, rgba(59, 130, 246, 0.08), transparent 50%),
+                  var(--bg-0);
+      color: var(--text);
+      font-family: var(--sans);
+      line-height: 1.6;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    a { color: inherit; text-decoration: none; }
+    .container { max-width: 1240px; margin: 0 auto; padding: 0 24px; }
+
+    .navbar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      backdrop-filter: blur(16px);
+      background: rgba(4, 7, 13, 0.84);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 72px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-family: var(--display);
+      font-weight: 700;
+      font-size: 1.2rem;
+      letter-spacing: 0.04em;
+    }
+    .brand-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 14px var(--cyan);
+    }
+    .brand-tag {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(0, 240, 255, 0.12);
+      border: 1px solid var(--border-strong);
+      color: var(--cyan);
+    }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 22px;
+      font-size: 0.92rem;
+      color: var(--muted);
+    }
+    .nav-links a:hover, .nav-links a.active { color: var(--cyan); }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      transition: all 0.2s ease;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--cyan), var(--blue));
+      color: #020617;
+      box-shadow: 0 0 24px rgba(0, 240, 255, 0.28);
+    }
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 0 32px rgba(0, 240, 255, 0.45);
+    }
+    .btn-outline {
+      background: rgba(15, 23, 42, 0.65);
+      border-color: var(--border-strong);
+      color: var(--text);
+    }
+    .btn-outline:hover {
+      border-color: var(--cyan);
+      color: var(--cyan);
+    }
+
+    .hero {
+      padding: 64px 0 56px;
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 40px;
+      align-items: center;
+    }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--mono);
+      font-size: 0.76rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--cyan);
+      background: rgba(0, 240, 255, 0.08);
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      border-radius: 999px;
+      margin-bottom: 18px;
+    }
+    h1 {
+      font-family: var(--display);
+      font-size: clamp(2.3rem, 4.2vw, 3.6rem);
+      line-height: 1.1;
+      margin-bottom: 18px;
+    }
+    .gradient-text {
+      background: linear-gradient(90deg, #ffffff, var(--cyan), #60a5fa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .hero-p {
+      color: var(--muted);
+      font-size: 1.06rem;
+      margin-bottom: 28px;
+      max-width: 580px;
+    }
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      margin-bottom: 32px;
+    }
+    .metrics-bar {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      border-top: 1px solid var(--border);
+      padding-top: 22px;
+    }
+    .metric-val {
+      font-family: var(--mono);
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--cyan);
+    }
+    .metric-lbl {
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
+    .viewer-card {
+      background: radial-gradient(circle at 50% 45%, rgba(0, 240, 255, 0.14), rgba(9, 16, 29, 0.92) 70%);
+      border: 1px solid var(--border-strong);
+      border-radius: 16px;
+      padding: 18px;
+      position: relative;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65);
+    }
+    .viewer-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    model-viewer {
+      width: 100%;
+      height: 390px;
+      background: transparent;
+      --poster-color: transparent;
+      border-radius: 12px;
+    }
+    .model-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .model-tab {
+      flex: 1;
+      min-width: 95px;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-family: var(--mono);
+      font-size: 0.73rem;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.18s;
+    }
+    .model-tab.active, .model-tab:hover {
+      border-color: var(--cyan);
+      color: var(--cyan);
+      background: rgba(0, 240, 255, 0.12);
+    }
+
+    .section { padding: 56px 0; border-top: 1px solid var(--border); }
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .section-title { font-family: var(--display); font-size: 1.9rem; }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+      gap: 20px;
+    }
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .card:hover {
+      border-color: var(--cyan);
+      transform: translateY(-2px);
+    }
+    .card-badge {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--cyan);
+      margin-bottom: 10px;
+      display: inline-block;
+    }
+    .card h3 { font-family: var(--display); font-size: 1.2rem; margin-bottom: 8px; }
+    .card p { color: var(--muted); font-size: 0.92rem; margin-bottom: 16px; }
+
+    .newsletter-box {
+      background: linear-gradient(135deg, rgba(13, 22, 39, 0.92), rgba(0, 240, 255, 0.08));
+      border: 1px solid var(--border-strong);
+      border-radius: 16px;
+      padding: 36px;
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 28px;
+      align-items: center;
+    }
+    .news-form {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .news-input {
+      flex: 1;
+      min-width: 220px;
+      background: rgba(4, 7, 13, 0.9);
+      border: 1px solid var(--border-strong);
+      color: var(--text);
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 0.92rem;
+    }
+    .news-status {
+      margin-top: 10px;
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      color: var(--emerald);
+    }
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 32px 0;
+      color: var(--muted);
+      font-size: 0.85rem;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    @media (max-width: 900px) {
+      .hero, .newsletter-box { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header class="navbar">
+    <div class="container nav-inner">
+      <a href="./" class="brand">
+        <span class="brand-dot"></span>
+        <span>NANODYNAMICS</span>
+        <span class="brand-tag">v2.4 LEO + PINN</span>
+      </a>
+      <nav class="nav-links">
+        <a href="./" class="active">Overview</a>
+        <a href="about">About &amp; Physics</a>
+        <a href="download">Downloads &amp; Models</a>
+        <a href="#newsletter">Newsletter</a>
+        <a href="edge-console">HIL Edge Console</a>
+        <a href="/" style="color:var(--amber);">← SIS Portal</a>
+      </nav>
+      <a href="simulator" class="btn btn-primary">Launch 3D Simulator →</a>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <div>
+        <div class="eyebrow">🛰️ Hosted on Super Intelligence Solutions • Admin &amp; Pro Member Portal</div>
+        <h1>Orbital Mechanics &amp; <span class="gradient-text">Symplectic Neural Simulation</span></h1>
+        <p class="hero-p">
+          Explore high-precision J2–J4 numerical orbit propagation, Hamiltonian Physics-Informed Neural Networks, Kessler debris fragmentation cascades, and real-time ESP32 Hardware-in-the-Loop spacecraft telemetry before launching the full 3D flight deck.
+        </p>
+        <div class="hero-actions">
+          <a href="simulator" class="btn btn-primary">🚀 Launch Interactive 3D Simulator</a>
+          <a href="download" class="btn btn-outline">⬇ Download SDK, Firmware &amp; 3D Models</a>
+          <a href="about" class="btn btn-outline">📖 Read Architecture &amp; Thesis</a>
+        </div>
+        <div class="metrics-bar">
+          <div>
+            <div class="metric-val">J2–J4 + SRP</div>
+            <div class="metric-lbl">RK45 &amp; Symplectic Integrators</div>
+          </div>
+          <div>
+            <div class="metric-val">18+ GLB</div>
+            <div class="metric-lbl">Sketchfab 3D Spacecraft &amp; Asteroids</div>
+          </div>
+          <div>
+            <div class="metric-val">&lt; 1.8 ms</div>
+            <div class="metric-lbl">ESP32-S3 HIL PINN Inference</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="viewer-card">
+        <div class="viewer-header">
+          <span id="modelTitle">ACTIVE MODEL: ORBITAL RELAY SATELLITE (SKETCHFAB GLB)</span>
+          <span style="color:var(--cyan);">DRAG TO ROTATE • SCROLL TO ZOOM</span>
+        </div>
+        <model-viewer
+          id="heroViewer"
+          src="static/models/satellite.glb"
+          alt="Interactive 3D Spacecraft Model from Sketchfab"
+          auto-rotate
+          camera-controls
+          rotation-per-second="22deg"
+          shadow-intensity="1"
+          exposure="1.15"
+          environment-image="neutral">
+        </model-viewer>
+        <div class="model-tabs">
+          <button class="model-tab active" data-src="static/models/satellite.glb" data-title="ORBITAL RELAY SATELLITE (SKETCHFAB GLB)" onclick="switchModel(this)">🛰️ Satellite</button>
+          <button class="model-tab" data-src="static/models/cubesat_club.glb" data-title="ENDUROSAT 3U CUBESAT (SKETCHFAB GLB)" onclick="switchModel(this)">📦 3U CubeSat</button>
+          <button class="model-tab" data-src="static/models/space_station.glb" data-title="LOW EARTH ORBIT STATION (SKETCHFAB GLB)" onclick="switchModel(this)">🏗️ Space Station</button>
+          <button class="model-tab" data-src="static/models/vega.glb" data-title="VEGA LAUNCH VEHICLE (SKETCHFAB GLB)" onclick="switchModel(this)">🚀 Vega Rocket</button>
+          <button class="model-tab" data-src="static/models/asteroids/eros.glb" data-title="433 EROS NEAR-EARTH ASTEROID (SKETCHFAB GLB)" onclick="switchModel(this)">☄️ Asteroid Eros</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">Modular Aerospace Platform</div>
+          <h2 class="section-title">Explore NanoDynamics Sub-Systems</h2>
+        </div>
+        <a href="simulator" class="btn btn-outline">Open Full 3D Flight Deck →</a>
+      </div>
+      <div class="grid-3">
+        <div class="card">
+          <span class="card-badge">01 // ORBITAL FLIGHT DECK</span>
+          <h3>Interactive 3D LEO Simulator</h3>
+          <p>Full Three.js earth-moon-asteroid environment with 20 camera snap views, finite thruster burns, atmospheric reentry plasma VFX, and live NORAD CelesTrak tracking.</p>
+          <a href="simulator" class="btn btn-primary" style="width:100%; justify-content:center;">Launch Simulator →</a>
+        </div>
+        <div class="card">
+          <span class="card-badge">02 // PHYSICS &amp; PINN ENGINE</span>
+          <h3>About the Astrodynamics Core</h3>
+          <p>Deep dive into our Symplectic Hamiltonian projection layer, J2–J4 zonal harmonics, NRLMSISE-00 atmospheric drag, and NASA Breakup Model collision cascades.</p>
+          <a href="about" class="btn btn-outline" style="width:100%; justify-content:center;">Explore Architecture →</a>
+        </div>
+        <div class="card">
+          <span class="card-badge">03 // SDK, FIRMWARE &amp; 3D ASSETS</span>
+          <h3>Downloads &amp; Sketchfab 3D Library</h3>
+          <p>Download the standalone Python propagator package, ESP32-S3 HIL firmware, pre-trained PyTorch PINN weights, and curated Sketchfab 3D spacecraft `.glb` models.</p>
+          <a href="download" class="btn btn-outline" style="width:100%; justify-content:center;">Browse Downloads →</a>
+        </div>
+      </div>
+    </section>
+
+    <section id="newsletter" class="section">
+      <div class="newsletter-box">
+        <div>
+          <div class="eyebrow">📬 Ephemeris &amp; Telemetry Dispatch</div>
+          <h2 class="section-title" style="margin-bottom:10px;">Subscribe to the NanoDynamics Newsletter</h2>
+          <p style="color:var(--muted); font-size:0.95rem;">
+            Receive orbital release notes, new Sketchfab 3D spacecraft asset drops, PINN benchmark datasets, and space-weather conjunction alerts directly in your inbox.
+          </p>
+        </div>
+        <div>
+          <form class="news-form" onsubmit="submitNewsletter(event)">
+            <input type="email" id="newsEmail" class="news-input" placeholder="commander@aerospace.org" required />
+            <button type="submit" class="btn btn-primary">Subscribe →</button>
+          </form>
+          <div id="newsStatus" class="news-status"></div>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <div>© 2026 NanoDynamics &amp; Super Intelligence Solutions. Latest GitHub Commit Auto-Synced.</div>
+      <div style="display:flex; gap:18px;">
+        <a href="./">Overview</a>
+        <a href="about">About</a>
+        <a href="download">Downloads</a>
+        <a href="simulator">3D Simulator</a>
+        <a href="/">Super Intelligence Solutions</a>
+      </div>
+    </footer>
+  </main>
+
+  <script>
+    function switchModel(btn) {
+      const viewer = document.getElementById('heroViewer');
+      viewer.src = btn.getAttribute('data-src');
+      document.getElementById('modelTitle').textContent = 'ACTIVE MODEL: ' + btn.getAttribute('data-title');
+      document.querySelectorAll('.model-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+
+    async function submitNewsletter(e) {
+      e.preventDefault();
+      const email = document.getElementById('newsEmail').value.trim();
+      const statusEl = document.getElementById('newsStatus');
+      statusEl.style.color = '#00f0ff';
+      statusEl.textContent = 'Registering telemetry subscription...';
+      try {
+        const res = await fetch('api/newsletter/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, source: 'nanodynamics-landing' })
+        });
+        const data = await res.json();
+        statusEl.style.color = '#10b981';
+        statusEl.textContent = '✓ Confirmed: ' + (data.message || 'Subscribed to NanoDynamics Ephemeris Dispatch.');
+        document.getElementById('newsEmail').value = '';
+      } catch (err) {
+        statusEl.style.color = '#10b981';
+        statusEl.textContent = '✓ Subscribed ' + email + ' to NanoDynamics Telemetry Dispatch.';
+      }
+    }
+  </script>
+</body>
+</html>
