@@ -554,6 +554,15 @@ def read_download():
     )
 
 
+@app.get("/orbitguard")
+@app.get("/copilot")
+def read_orbitguard():
+    return FileResponse(
+        os.path.join(BASE_DIR, "static", "orbitguard.html"),
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache", "Expires": "0"}
+    )
+
+
 class NewsletterPayload(BaseModel):
     email: str
     source: str | None = "nanodynamics"
@@ -2510,6 +2519,25 @@ async def get_hf_orbital_catalog(category: str | None = None, q: str | None = No
                 items = [x for x in items if q_low in str(x.get("name", "")).lower() or q_low in str(x.get("id", "")).lower() or q_low in str(x.get("full_name", "")).lower()]
             data[key] = items[:limit]
     return data
+
+
+# Mount OrbitGuard AI Autonomous Conjunction & CAM Copilot Routers
+try:
+    from orbitguard.api.routers import simulation as og_simulation
+    from orbitguard.api.routers import conjunctions as og_conjunctions
+    from orbitguard.api.routers import satellites as og_satellites
+    from orbitguard.api.routers import maneuvers as og_maneuvers
+    from orbitguard.api.routers import alerts as og_alerts
+
+    app.include_router(og_simulation.router, prefix="/api/v1/orbitguard")
+    app.include_router(og_conjunctions.router, prefix="/api/v1/orbitguard")
+    app.include_router(og_satellites.router, prefix="/api/v1/orbitguard")
+    app.include_router(og_maneuvers.router, prefix="/api/v1/orbitguard")
+    app.include_router(og_alerts.router, prefix="/api/v1/orbitguard")
+    print("[OrbitGuard AI] Mounted autonomous copilot endpoints under /api/v1/orbitguard")
+except Exception as e:
+    print(f"[OrbitGuard AI Mount Warning] {e}")
+
 
 
 

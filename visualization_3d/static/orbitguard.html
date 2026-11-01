@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OrbitGuard AI — Autonomous Conjunction & Maneuver Copilot | Super Intelligence Solutions</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <style>
+    :root {
+      --bg: #030712;
+      --surface: #0b1329;
+      --surface-card: rgba(15, 23, 42, 0.85);
+      --border: rgba(56, 189, 248, 0.25);
+      --border-glow: rgba(0, 229, 255, 0.4);
+      --cyan: #00E5FF;
+      --blue: #38bdf8;
+      --emerald: #10b981;
+      --amber: #f59e0b;
+      --rose: #f43f5e;
+      --purple: #a855f7;
+      --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: #e2e8f0;
+      font-family: var(--font-sans);
+      font-size: 13px;
+      line-height: 1.5;
+      overflow: hidden;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Top Nav Bar */
+    header {
+      height: 56px;
+      background: rgba(3, 7, 18, 0.95);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      z-index: 100;
+      backdrop-filter: blur(10px);
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand-title {
+      font-family: var(--font-mono);
+      font-weight: 800;
+      font-size: 15px;
+      color: var(--cyan);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    .badge-sub {
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid var(--border);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      color: #93c5fd;
+      font-family: var(--font-mono);
+    }
+    .live-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--emerald);
+    }
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--emerald);
+      box-shadow: 0 0 10px var(--emerald);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    /* Layout */
+    .app-container {
+      display: flex;
+      flex: 1;
+      height: calc(100vh - 56px);
+      position: relative;
+    }
+
+    /* 3D Viewport */
+    #viewport3d {
+      flex: 1;
+      position: relative;
+      background: radial-gradient(circle at center, #071126 0%, #02050e 100%);
+    }
+    #three-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Overlay HUD */
+    .viewport-hud {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      z-index: 10;
+      display: flex;
+      gap: 12px;
+      pointer-events: none;
+    }
+    .metric-card {
+      background: var(--surface-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 14px;
+      min-width: 150px;
+      backdrop-filter: blur(8px);
+      pointer-events: auto;
+    }
+    .metric-title {
+      font-size: 10px;
+      color: #94a3b8;
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .metric-val {
+      font-size: 18px;
+      font-weight: 700;
+      color: #f8fafc;
+      font-family: var(--font-mono);
+      margin-top: 2px;
+    }
+    .badge-critical { color: var(--rose); }
+    .badge-cleared { color: var(--emerald); }
+
+    /* Action Toolbar at Bottom of Viewport */
+    .viewport-controls {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      display: flex;
+      gap: 10px;
+      background: rgba(10, 16, 32, 0.85);
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      border-radius: 8px;
+      backdrop-filter: blur(10px);
+    }
+    .btn {
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid var(--border);
+      color: var(--cyan);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 8px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+    .btn:hover {
+      background: rgba(0, 229, 255, 0.25);
+      border-color: var(--cyan);
+      box-shadow: 0 0 12px rgba(0, 229, 255, 0.3);
+    }
+    .btn-warn {
+      background: rgba(244, 63, 94, 0.15);
+      border-color: rgba(244, 63, 94, 0.4);
+      color: var(--rose);
+    }
+    .btn-warn:hover {
+      background: rgba(244, 63, 94, 0.3);
+      border-color: var(--rose);
+      box-shadow: 0 0 12px rgba(244, 63, 94, 0.4);
+    }
+    .btn-success {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: rgba(16, 185, 129, 0.4);
+      color: var(--emerald);
+    }
+    .btn-success:hover {
+      background: rgba(16, 185, 129, 0.3);
+      border-color: var(--emerald);
+      box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+    }
+
+    /* Right Sidebar Panel */
+    aside {
+      width: 440px;
+      background: #060b18;
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow-y: auto;
+      z-index: 50;
+    }
+    .panel-section {
+      padding: 16px 20px;
+      border-bottom: 1px solid rgba(56, 189, 248, 0.15);
+    }
+    .section-title {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--cyan);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .data-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .data-item {
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 4px;
+      padding: 8px 10px;
+    }
+    .data-key {
+      font-size: 10px;
+      color: #94a3b8;
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+    }
+    .data-val {
+      font-size: 13px;
+      font-family: var(--font-mono);
+      font-weight: 600;
+      color: #f1f5f9;
+      margin-top: 2px;
+    }
+    .log-terminal {
+      background: #02040a;
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      border-radius: 4px;
+      padding: 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: #94a3b8;
+      height: 180px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .log-line { display: flex; gap: 8px; }
+    .log-time { color: #64748b; }
+    .log-info { color: var(--blue); }
+    .log-alert { color: var(--rose); }
+    .log-success { color: var(--emerald); }
+
+    /* Modal */
+    .modal-backdrop {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(0, 0, 0, 0.75);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(5px);
+    }
+    .modal-content {
+      width: 780px;
+      max-height: 85vh;
+      background: #090e1f;
+      border: 1px solid var(--border-glow);
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 0 30px rgba(0, 229, 255, 0.2);
+    }
+    .modal-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      color: var(--cyan);
+    }
+    .modal-body {
+      padding: 20px;
+      overflow-y: auto;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.6;
+      color: #cbd5e1;
+      white-space: pre-wrap;
+    }
+    .close-btn {
+      background: none;
+      border: none;
+      color: #94a3b8;
+      font-size: 18px;
+      cursor: pointer;
+    }
+    .close-btn:hover { color: #fff; }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation -->
+  <header>
+    <div class="brand">
+      <div class="brand-title">🛡️ OrbitGuard AI</div>
+      <div class="badge-sub">Mission Control Copilot • SIS &amp; NanoDynamics</div>
+    </div>
+    <div class="live-status">
+      <div class="pulse-dot"></div>
+      <span>AUTONOMOUS ENGINE: 24/7 ONLINE</span>
+    </div>
+  </header>
+
+  <!-- Main View -->
+  <div class="app-container">
+    
+    <!-- 3D Viewport -->
+    <div id="viewport3d">
+      <div class="viewport-hud">
+        <div class="metric-card">
+          <div class="metric-title">Nominal Miss Distance</div>
+          <div class="metric-val badge-critical" id="hud-miss">0.850 km</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-title">Encounter TCA (UTC)</div>
+          <div class="metric-val" id="hud-tca">T-18.0h</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-title">Collision Prob (Pc)</div>
+          <div class="metric-val badge-critical" id="hud-pc">4.53e-07</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-title">Cleared Miss (Post-CAM)</div>
+          <div class="metric-val badge-cleared" id="hud-post-miss">2,774.2 km</div>
+        </div>
+      </div>
+
+      <div class="viewport-controls">
+        <button class="btn btn-warn" onclick="runSimulateThreat()">
+          <span>⚠️ Simulate Critical Encounter</span>
+        </button>
+        <button class="btn" onclick="runScreeningSweep()">
+          <span>🔍 Run 72h Screening</span>
+        </button>
+        <button class="btn" onclick="openBriefingModal()">
+          <span>📜 Flight Briefing</span>
+        </button>
+        <button class="btn btn-success" onclick="approveManeuver()">
+          <span>🚀 1-Click Authorize CAM</span>
+        </button>
+      </div>
+
+      <canvas id="three-canvas"></canvas>
+    </div>
+
+    <!-- Telemetry & Advisory Sidebar -->
+    <aside>
+      
+      <!-- Protected Asset -->
+      <div class="panel-section">
+        <div class="section-title">🛰️ Monitored Spacecraft</div>
+        <div class="data-grid">
+          <div class="data-item">
+            <div class="data-key">Asset Name</div>
+            <div class="data-val">AeroCube-3U</div>
+          </div>
+          <div class="data-item">
+            <div class="data-key">NORAD Cat ID</div>
+            <div class="data-val">43015</div>
+          </div>
+          <div class="data-item">
+            <div class="data-key">Dry / Fuel Mass</div>
+            <div class="data-val">4.0kg / 0.5kg</div>
+          </div>
+          <div class="data-item">
+            <div class="data-key">Thruster (Isp)</div>
+            <div class="data-val">Cold Gas (70s)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Encounter Geometry -->
+      <div class="panel-section">
+        <div class="section-title">🎯 Conjunction Geometry (RTN)</div>
+        <div class="data-grid">
+          <div class="data-item">
+            <div class="data-key">Chaser Threat</div>
+            <div class="data-val" id="telemetry-threat">COSMOS-2251 DEBRIS</div>
+          </div>
+          <div class="data-item">
+            <div class="data-key">Relative Speed</div>
+            <div class="data-val" id="telemetry-speed">10.42 km/s</div>
+          </div>
+          <div class="data-item">
+            <div class="data-key">Radial Miss (ΔR)</div>
+            <div class="data-val" id="telemetry-dr">+0.765 km</div>
+          </div>
+          <div class="data-item">
+            <div class="data-key">In-Track Miss (ΔT)</div>
+            <div class="data-val" id="telemetry-dt">+0.255 km</div>
+          </div>
+          <div class="data-item">
+            <div class="data-key">Risk Tier</div>
+            <div class="data-val badge-critical" id="telemetry-tier">CRITICAL</div>
+          </div>
+          <div class="data-item">
+            <div class="data-key">Action Required</div>
+            <div class="data-val" id="telemetry-action" style="color:var(--amber);">CAM REQUIRED</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Autonomous CAM Recommendation -->
+      <div class="panel-section">
+        <div class="section-title">🚀 Autonomous CAM Solution</div>
+        <div class="data-grid">
+          <div class="data-item">
+            <div class="data-key">Optimal Strategy</div>
+            <div class="data-val" id="cam-strat" style="color:var(--cyan);">retrograde_phasing</div>
+          </div>
+          <div class="data-item">
+            <div class="data-key">Lead Time</div>
+            <div class="data-val" id="cam-lead">12.0h prior to TCA</div>
+          </div>
+          <div class="data-item">
+            <div class="data-key">Delta-V (VNC)</div>
+            <div class="data-val" id="cam-dv">[-0.15, 0.0, 0.0] m/s</div>
+          </div>
+          <div class="data-item">
+            <div class="data-key">Burn Duration</div>
+            <div class="data-val" id="cam-burn">13.5 seconds</div>
+          </div>
+          <div class="data-item">
+            <div class="data-key">Propellant Cost</div>
+            <div class="data-val" id="cam-fuel">0.98 grams</div>
+          </div>
+          <div class="data-item">
+            <div class="data-key">Post Miss Buffer</div>
+            <div class="data-val badge-cleared" id="cam-post-miss">2,774.2 km</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Agent Stream Log -->
+      <div class="panel-section" style="flex:1;">
+        <div class="section-title">📡 Autonomous Mission Control Stream</div>
+        <div class="log-terminal" id="agent-log">
+          <div class="log-line">
+            <span class="log-time">[00:00:01]</span>
+            <span class="log-info">OrbitGuard AI Engine online. Subscribed to CelesTrak feeds.</span>
+          </div>
+          <div class="log-line">
+            <span class="log-time">[00:00:02]</span>
+            <span class="log-info">Loaded NanoDynamics J2+Drag Cowell numerical propagator.</span>
+          </div>
+        </div>
+      </div>
+
+    </aside>
+
+  </div>
+
+  <!-- Modal for Briefing -->
+  <div class="modal-backdrop" id="briefing-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span>📜 Flight Director Conjunction Assessment Briefing</span>
+        <button class="close-btn" onclick="closeBriefingModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="modal-brief-content">
+        Loading executive briefing...
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // -------------------------------------------------------------
+    // Three.js 3D Orbital Trajectory Visualization
+    // -------------------------------------------------------------
+    let scene, camera, renderer, controls;
+    let earthMesh, primaryOrbitLine, debrisOrbitLine, postManeuverLine, tcaMarker;
+
+    function init3D() {
+      const container = document.getElementById('viewport3d');
+      scene = new THREE.Scene();
+
+      camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+      camera.position.set(0, 35, 65);
+
+      renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('three-canvas'), antialias: true, alpha: true });
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      renderer.setPixelRatio(window.devicePixelRatio);
+
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+
+      // Lights
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+      scene.add(ambientLight);
+      const sunLight = new THREE.DirectionalLight(0xffffff, 1.2);
+      sunLight.position.set(100, 50, 80);
+      scene.add(sunLight);
+
+      // Earth Globe
+      const earthGeo = new THREE.SphereGeometry(15, 64, 64);
+      const earthMat = new THREE.MeshPhongMaterial({
+        color: 0x0f2042,
+        emissive: 0x051025,
+        wireframe: false,
+        shininess: 25,
+      });
+      earthMesh = new THREE.Mesh(earthGeo, earthMat);
+      scene.add(earthMesh);
+
+      // Earth Glow Wireframe
+      const wireGeo = new THREE.SphereGeometry(15.1, 32, 32);
+      const wireMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff, wireframe: true, transparent: true, opacity: 0.15 });
+      scene.add(new THREE.Mesh(wireGeo, wireMat));
+
+      // Draw Orbit Paths
+      drawOrbits();
+
+      window.addEventListener('resize', onWindowResize);
+      animate();
+    }
+
+    function drawOrbits() {
+      // Primary CubeSat Orbit (Cyan)
+      const primaryPoints = [];
+      const r_orbit = 22;
+      for (let i = 0; i <= 100; i++) {
+        const theta = (i / 100) * Math.PI * 2;
+        primaryPoints.push(new THREE.Vector3(
+          r_orbit * Math.cos(theta),
+          r_orbit * Math.sin(theta) * Math.sin(0.9),
+          r_orbit * Math.sin(theta) * Math.cos(0.9)
+        ));
+      }
+      const primaryGeo = new THREE.BufferGeometry().setFromPoints(primaryPoints);
+      const primaryMat = new THREE.LineBasicMaterial({ color: 0x00e5ff, linewidth: 2 });
+      primaryOrbitLine = new THREE.Line(primaryGeo, primaryMat);
+      scene.add(primaryOrbitLine);
+
+      // Debris Crossing Orbit (Crimson)
+      const debrisPoints = [];
+      for (let i = 0; i <= 100; i++) {
+        const theta = (i / 100) * Math.PI * 2;
+        debrisPoints.push(new THREE.Vector3(
+          (r_orbit + 0.1) * Math.cos(theta),
+          (r_orbit + 0.1) * Math.sin(theta) * Math.sin(-0.7),
+          (r_orbit + 0.1) * Math.sin(theta) * Math.cos(-0.7)
+        ));
+      }
+      const debrisGeo = new THREE.BufferGeometry().setFromPoints(debrisPoints);
+      const debrisMat = new THREE.LineBasicMaterial({ color: 0xf43f5e, linewidth: 2 });
+      debrisOrbitLine = new THREE.Line(debrisGeo, debrisMat);
+      scene.add(debrisOrbitLine);
+
+      // TCA Intersection Marker
+      const tcaGeo = new THREE.SphereGeometry(0.6, 16, 16);
+      const tcaMat = new THREE.MeshBasicMaterial({ color: 0xfbbf24 });
+      tcaMarker = new THREE.Mesh(tcaGeo, tcaMat);
+      tcaMarker.position.set(r_orbit, 0, 0);
+      scene.add(tcaMarker);
+
+      // Post-Maneuver Divergence Path (Emerald)
+      const postPoints = [];
+      for (let i = 0; i <= 100; i++) {
+        const theta = (i / 100) * Math.PI * 2;
+        postPoints.push(new THREE.Vector3(
+          (r_orbit - 0.8) * Math.cos(theta),
+          (r_orbit - 0.8) * Math.sin(theta) * Math.sin(0.9),
+          (r_orbit - 0.8) * Math.sin(theta) * Math.cos(0.9)
+        ));
+      }
+      const postGeo = new THREE.BufferGeometry().setFromPoints(postPoints);
+      const postMat = new THREE.LineDashedMaterial({ color: 0x10b981, dashSize: 1, gapSize: 0.5 });
+      postManeuverLine = new THREE.Line(postGeo, postMat);
+      postManeuverLine.computeLineDistances();
+      scene.add(postManeuverLine);
+    }
+
+    function onWindowResize() {
+      const container = document.getElementById('viewport3d');
+      camera.aspect = container.clientWidth / container.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      earthMesh.rotation.y += 0.001;
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    // -------------------------------------------------------------
+    // Mission Control API Orchestration
+    // -------------------------------------------------------------
+    let currentBriefingMarkdown = "";
+
+    function logEvent(msg, type = "info") {
+      const logContainer = document.getElementById('agent-log');
+      const now = new Date().toTimeString().split(' ')[0];
+      const div = document.createElement('div');
+      div.className = "log-line";
+      div.innerHTML = `<span class="log-time">[${now}]</span> <span class="log-${type}">${msg}</span>`;
+      logContainer.appendChild(div);
+      logContainer.scrollTop = logContainer.scrollHeight;
+    }
+
+    async function runSimulateThreat() {
+      logEvent("Injecting realistic high-risk debris conjunction encounter...", "alert");
+      try {
+        const res = await fetch('/api/v1/orbitguard/demo/simulate-threat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            satellite_name: "AeroCube-3U",
+            threat_debris_name: "COSMOS-2251 DEBRIS [CAT# 34123]",
+            miss_distance_target_km: 0.85,
+            tca_lead_hours: 18.0
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          const rep = data.simulation_report;
+          document.getElementById('hud-miss').innerText = `${rep.nominal_encounter.miss_distance_km.toFixed(3)} km`;
+          document.getElementById('hud-pc').innerText = rep.nominal_encounter.collision_probability.toExponential(2);
+          document.getElementById('hud-post-miss').innerText = `${rep.autonomous_resolution.post_maneuver_miss_distance_km.toFixed(1)} km`;
+
+          document.getElementById('telemetry-threat').innerText = rep.chaser_debris;
+          document.getElementById('telemetry-speed').innerText = `${rep.nominal_encounter.relative_speed_km_s.toFixed(2)} km/s`;
+          document.getElementById('cam-strat').innerText = rep.autonomous_resolution.selected_strategy;
+          document.getElementById('cam-burn').innerText = `${rep.autonomous_resolution.burn_duration_seconds.toFixed(1)} seconds`;
+          document.getElementById('cam-fuel').innerText = `${rep.autonomous_resolution.propellant_consumed_grams.toFixed(2)} grams`;
+          document.getElementById('cam-post-miss').innerText = `${rep.autonomous_resolution.post_maneuver_miss_distance_km.toFixed(2)} km`;
+
+          currentBriefingMarkdown = rep.executive_brief_preview;
+          logEvent(`Critical close approach detected: d_min=${rep.nominal_encounter.miss_distance_km} km.`, "alert");
+          logEvent(`Autonomous CAM synthesized: dv=${rep.autonomous_resolution.delta_v_magnitude_m_s} m/s, fuel=${rep.autonomous_resolution.propellant_consumed_grams}g.`, "success");
+          logEvent(`Safety clearance verified: expanded miss distance to ${rep.autonomous_resolution.post_maneuver_miss_distance_km} km (${rep.autonomous_resolution.clearance_multiplier}x expansion).`, "success");
+        }
+      } catch (err) {
+        logEvent("Simulation trigger error: " + err, "alert");
+      }
+    }
+
+    async function runScreeningSweep() {
+      logEvent("Running 72h physics-informed conjunction screening sweep across active orbits...", "info");
+      try {
+        const res = await fetch('/api/v1/orbitguard/conjunctions/screen', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ horizon_hours: 72.0 })
+        });
+        const events = await res.json();
+        logEvent(`Screening sweep completed. Evaluated ${events.length} encounter(s).`, "success");
+      } catch (err) {
+        logEvent("Screening sweep error: " + err, "alert");
+      }
+    }
+
+    function openBriefingModal() {
+      const modal = document.getElementById('briefing-modal');
+      const body = document.getElementById('modal-brief-content');
+      body.innerText = currentBriefingMarkdown || "No active threat loaded. Click 'Simulate Critical Encounter' first.";
+      modal.style.display = "flex";
+    }
+
+    function closeBriefingModal() {
+      document.getElementById('briefing-modal').style.display = "none";
+    }
+
+    function approveManeuver() {
+      logEvent("Flight Director 1-Click CAM Authorization uplinked to spacecraft telemetry bus.", "success");
+      alert("✅ Collision Avoidance Maneuver sequence armed and uplinked to AeroCube-3U!");
+    }
+
+    window.onload = () => {
+      init3D();
+      runSimulateThreat();
+    };
+  </script>
+</body>
+</html>
