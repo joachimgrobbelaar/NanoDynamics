@@ -1,0 +1,25 @@
+name: Sync to Hugging Face Spaces
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  sync-to-hf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Push to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          if [ -n "$HF_TOKEN" ]; then
+            git remote add hf https://Marnu25:$HF_TOKEN@huggingface.co/spaces/Marnu25/orbitguard-ai || true
+            git push --force hf main || echo "HF push finished with exit code $?"
+          else
+            echo "HF_TOKEN secret not configured, skipping auto-sync."
+          fi

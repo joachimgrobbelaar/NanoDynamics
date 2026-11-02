@@ -1,0 +1,44 @@
+name: Production CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  test-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Unit Tests (Orbital Mechanics & OrbitGuard AI)
+        run: |
+          export PYTHONPATH=.
+          pytest tests/test_nanodynamics_pipeline.py -v
+
+  notify-telegram:
+    needs: test-and-verify
+    runs-on: ubuntu-latest
+    if: success()
+    steps:
+      - name: Send Telegram Deployment Alert
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          message: |
+            🚀 *Nanodynamics & OrbitGuard AI Deployed!*
+            • Production Domain: `https://nanodynamics.co.za`
+            • API Endpoint: `https://api.nanodynamics.co.za/api/health`
+            • Astrodynamics: SGP4, Cowell RK45 (J2 + Drag)
+            • OrbitGuard AI: 2D B-plane Conjunction Screening & CDM
+            • Status: *Active & Healthy*

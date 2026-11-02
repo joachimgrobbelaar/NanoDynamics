@@ -1,4 +1,6 @@
 import time
+import pytest
+pytest.importorskip("playwright", reason="playwright not installed; skipping browser UI tests")
 from playwright.sync_api import sync_playwright
 
 def run_browser_audit():

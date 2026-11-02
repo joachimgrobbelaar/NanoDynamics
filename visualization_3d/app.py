@@ -68,6 +68,16 @@ from leo_simulator.orbit.finite_burn import (
 
 app = FastAPI(docs_url="/api/docs", redoc_url="/api/redoc")
 
+try:
+    from api.routers.health import router as health_router
+    from api.routers.simulation import router as simulation_router
+    from api.routers.conjunction import router as conjunction_router
+    app.include_router(health_router)
+    app.include_router(simulation_router)
+    app.include_router(conjunction_router)
+except Exception as _router_err:
+    print(f"Warning: could not mount modular api routers: {_router_err}")
+
 from hardware_in_the_loop.esp32_manager import ESP32DeviceManager
 
 device_manager = ESP32DeviceManager.get_instance()

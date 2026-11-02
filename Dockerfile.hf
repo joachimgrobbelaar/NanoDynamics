@@ -1,0 +1,44 @@
+# ==============================================================================
+# Hugging Face Space Dockerfile: Nanodynamics & OrbitGuard AI Interactive Portal
+# Port 7860 standard for Hugging Face Spaces
+# ==============================================================================
+
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app \
+    PORT=7860 \
+    ENVIRONMENT=huggingface
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libgomp1 \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install PyTorch CPU-only
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+
+# Install application dependencies using CPU wheels
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
+
+# Create standard Hugging Face non-root user (uid 1000)
+RUN useradd -m -u 1000 user
+USER user
+ENV HOME=/home/user \
+    PATH=/home/user/.local/bin:$PATH
+
+WORKDIR /app
+COPY --chown=user:user . /app
+
+EXPOSE 7860
+
+# Launch Uvicorn on port 7860
+CMD exec uvicorn api.main:app --host 0.0.0.0 --port 7860

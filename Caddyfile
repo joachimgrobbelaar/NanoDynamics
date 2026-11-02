@@ -1,0 +1,38 @@
+# ==============================================================================
+# Nanodynamics Platform & OrbitGuard AI Production Caddy Reverse Proxy
+# Automatic TLS/SSL Management for nanodynamics.co.za & api.nanodynamics.co.za
+# ==============================================================================
+
+nanodynamics.co.za, www.nanodynamics.co.za {
+    # Reverse proxy main landing or static frontend
+    reverse_proxy 127.0.0.1:7860 {
+        header_up Host {upstream_hostport}
+        header_up X-Real-IP {remote_host}
+    }
+
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options SAMEORIGIN
+        Referrer-Policy strict-origin-when-cross-origin
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    }
+}
+
+api.nanodynamics.co.za {
+    # Reverse proxy to backend API service
+    reverse_proxy 127.0.0.1:8000 {
+        header_up Host {upstream_hostport}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+
+    # Security headers & CORS
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy strict-origin-when-cross-origin
+        Access-Control-Allow-Origin *
+        Access-Control-Allow-Methods "GET, POST, OPTIONS, PUT, DELETE"
+        Access-Control-Allow-Headers "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+    }
+}

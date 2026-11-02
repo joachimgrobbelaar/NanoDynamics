@@ -1,12 +1,17 @@
 services:
   - type: web
-    name: nanodynamics-simulator
+    name: nanodynamics-backend
     env: docker
-    plan: free
-    region: oregon
-    dockerfilePath: ./Dockerfile
+    region: frankfurt
+    plan: starter
+    branch: main
     autoDeploy: true
-    healthCheckPath: /
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
     envVars:
+      - key: PYTHON_UNBUFFERED
+        value: "1"
+      - key: ENVIRONMENT
+        value: "production"
       - key: PORT
-        value: 8000
+        value: "8000"
