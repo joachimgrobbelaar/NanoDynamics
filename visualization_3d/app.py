@@ -66,6 +66,16 @@ from leo_simulator.orbit.finite_burn import (
 )
 
 
+def _pinn(*args, **kwargs):
+    """Construct the PINN propagator when PyTorch imported successfully."""
+    if PINNPropagator is None:
+        raise HTTPException(
+            status_code=503,
+            detail="The PyTorch PINN propagator is not available in this process. Numerical propagation is unchanged.",
+        )
+    return PINNPropagator(*args, **kwargs)
+
+
 app = FastAPI(docs_url="/api/docs", redoc_url="/api/redoc")
 
 try:
@@ -1004,7 +1014,7 @@ async def simulate_satellite(params: SatelliteParams):
         pinn_submode = "pinn_local" if mode_str == "pinn" else mode_str
 
         if is_pinn:
-            prop = PINNPropagator(
+            prop = _pinn(
                 satellite=Satellite(
                     name=params.name,
                     mass=params.mass,
@@ -1082,7 +1092,7 @@ async def stream_chunk(req: StreamRequest):
         pinn_submode = "pinn_local" if mode_str == "pinn" else mode_str
 
         if is_pinn:
-            prop = PINNPropagator(
+            prop = _pinn(
                 satellite=Satellite(
                     name=req.params.name,
                     mass=req.params.mass,
@@ -1260,7 +1270,7 @@ async def execute_burn(req: BurnRequest):
 
         is_pinn = getattr(req.params, "propagation_mode", "rk45").lower().startswith("pinn")
         if is_pinn:
-            prop = PINNPropagator(
+            prop = _pinn(
                 satellite=Satellite(name=req.params.name, mass=req.params.mass, drag_area=req.params.drag_area, cd=req.params.cd),
                 mu=body["mu"], r_earth=body["radius_m"], omega_earth=body["omega"], min_altitude_reentry=50_000.0,
             )
@@ -1390,7 +1400,7 @@ async def resolve_collision(req: CollisionRequest):
         is_pinn2 = getattr(req.sat2_params, "propagation_mode", "rk45").lower() == "pinn"
 
         if is_pinn1:
-            prop1 = PINNPropagator(
+            prop1 = _pinn(
                 satellite=Satellite(name=new_params1.name, mass=new_params1.mass, drag_area=new_params1.drag_area, cd=new_params1.cd),
                 mu=body1["mu"], r_earth=body1["radius_m"], omega_earth=body1["omega"], min_altitude_reentry=50_000.0,
             )
@@ -1401,7 +1411,7 @@ async def resolve_collision(req: CollisionRequest):
             prop1 = _build_propagator(new_params1)
 
         if is_pinn2:
-            prop2 = PINNPropagator(
+            prop2 = _pinn(
                 satellite=Satellite(name=new_params2.name, mass=new_params2.mass, drag_area=new_params2.drag_area, cd=new_params2.cd),
                 mu=body2["mu"], r_earth=body2["radius_m"], omega_earth=body2["omega"], min_altitude_reentry=50_000.0,
             )
@@ -1561,7 +1571,7 @@ async def export_analytical_data(req: AnalyticalExportRequest):
         body = BODIES.get(req.params.parent_body, BODIES["Earth"])
         is_pinn = getattr(req.params, "propagation_mode", "rk45").lower().startswith("pinn")
         if is_pinn:
-            prop = PINNPropagator(
+            prop = _pinn(
                 satellite=Satellite(name=req.params.name, mass=req.params.mass, drag_area=req.params.drag_area, cd=req.params.cd),
                 mu=body["mu"], r_earth=body["radius_m"], omega_earth=body["omega"], min_altitude_reentry=50_000.0,
             )
@@ -2429,7 +2439,7 @@ def api_edge_benchmark(req: EdgeBenchmarkRequest):
     e0 = 0.5 * float(np.dot(curr_v, curr_v)) - (mu_earth / r_mag)
 
     agent = ESP32HardwareAgent.get_shared(port=gw_port)
-    prop = PINNPropagator(mode="pinn_local")
+    prop = _pinn(mode="pinn_local")
 
     results = []
     for step_idx in range(req.steps):
@@ -2531,22 +2541,16 @@ async def get_hf_orbital_catalog(category: str | None = None, q: str | None = No
     return data
 
 
-# Mount OrbitGuard AI Autonomous Conjunction & CAM Copilot Routers
+# OrbitGuard monitoring workspace. Catalog states use SGP4; the numerical
+# engine is reused only for explicitly osculating simulation states.
+# Collision probability is not computed here.
 try:
-    from orbitguard.api.routers import simulation as og_simulation
-    from orbitguard.api.routers import conjunctions as og_conjunctions
-    from orbitguard.api.routers import satellites as og_satellites
-    from orbitguard.api.routers import maneuvers as og_maneuvers
-    from orbitguard.api.routers import alerts as og_alerts
+    from orbitguard.monitor.api import router as orbitguard_monitor_router
 
-    app.include_router(og_simulation.router, prefix="/api/v1/orbitguard")
-    app.include_router(og_conjunctions.router, prefix="/api/v1/orbitguard")
-    app.include_router(og_satellites.router, prefix="/api/v1/orbitguard")
-    app.include_router(og_maneuvers.router, prefix="/api/v1/orbitguard")
-    app.include_router(og_alerts.router, prefix="/api/v1/orbitguard")
-    print("[OrbitGuard AI] Mounted autonomous copilot endpoints under /api/v1/orbitguard")
+    app.include_router(orbitguard_monitor_router)
+    print("[OrbitGuard] Mounted LEO monitoring API under /api/orbitguard")
 except Exception as e:
-    print(f"[OrbitGuard AI Mount Warning] {e}")
+    print(f"[OrbitGuard Mount Warning] {e}")
 
 
 

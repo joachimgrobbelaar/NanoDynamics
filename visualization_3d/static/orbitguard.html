@@ -2,714 +2,598 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OrbitGuard AI — Autonomous Conjunction & Maneuver Copilot | Super Intelligence Solutions</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OrbitGuard — LEO monitoring</title>
   <style>
     :root {
-      --bg: #030712;
-      --surface: #0b1329;
-      --surface-card: rgba(15, 23, 42, 0.85);
-      --border: rgba(56, 189, 248, 0.25);
-      --border-glow: rgba(0, 229, 255, 0.4);
-      --cyan: #00E5FF;
-      --blue: #38bdf8;
-      --emerald: #10b981;
-      --amber: #f59e0b;
-      --rose: #f43f5e;
-      --purple: #a855f7;
-      --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
-      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      --bg: #071018;
+      --panel: #102033;
+      --panel-2: #0c1a2b;
+      --text: #e8eef6;
+      --muted: #c5d4e4;
+      --line: #3d5c78;
+      --accent: #9be7d0;
+      --accent-ink: #04241c;
+      --warn: #f3d48a;
+      --sample: #e4c6f8;
+      --danger: #f3b4b4;
+      --focus: #f6e7a2;
     }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; max-width: 100%; overflow-x: hidden; }
     body {
-      background-color: var(--bg);
-      color: #e2e8f0;
-      font-family: var(--font-sans);
-      font-size: 13px;
-      line-height: 1.5;
-      overflow: hidden;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.5 "Segoe UI", "Helvetica Neue", sans-serif;
     }
-
-    /* Top Nav Bar */
-    header {
-      height: 56px;
-      background: rgba(3, 7, 18, 0.95);
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 24px;
-      z-index: 100;
-      backdrop-filter: blur(10px);
+    a { color: var(--accent); }
+    a:hover { color: #ffffff; }
+    :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+    .skip {
+      position: absolute; left: 8px; top: -40px; background: var(--focus); color: #1a1400;
+      padding: 6px 10px; z-index: 5;
     }
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 12px;
+    .skip:focus { top: 8px; }
+    header, main { width: min(1440px, 100%); margin: 0 auto; padding: 12px 16px; }
+    header { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; justify-content: space-between; }
+    .brand { display: flex; flex-direction: column; gap: 2px; }
+    .brand strong { letter-spacing: 0.08em; font-size: 15px; }
+    .brand span { color: var(--muted); font-size: 14px; }
+    nav { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+    nav a { text-decoration: none; color: var(--text); }
+    h1 { font-size: 28px; line-height: 1.2; margin: 4px 0 8px; }
+    .banner, .panel { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+    .banner { padding: 12px 14px; margin-bottom: 12px; }
+    .banner.sample { border-color: #b48ad4; background: #241833; }
+    .banner.public { border-color: #2f8f78; }
+    .banner.awaiting { border-color: #a7843d; }
+    .banner p { margin: 4px 0 0; color: var(--muted); }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 0; }
+    button, select {
+      font: inherit; color: var(--text); background: #163049; border: 1px solid var(--line);
+      border-radius: 8px; padding: 8px 12px; cursor: pointer;
     }
-    .brand-title {
-      font-family: var(--font-mono);
-      font-weight: 800;
-      font-size: 15px;
-      color: var(--cyan);
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-    }
-    .badge-sub {
-      background: rgba(56, 189, 248, 0.15);
-      border: 1px solid var(--border);
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-size: 11px;
-      color: #93c5fd;
-      font-family: var(--font-mono);
-    }
-    .live-status {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-family: var(--font-mono);
-      font-size: 12px;
-      color: var(--emerald);
-    }
-    .pulse-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--emerald);
-      box-shadow: 0 0 10px var(--emerald);
-      animation: pulse 2s infinite;
-    }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.4; transform: scale(0.85); }
-    }
-
-    /* Layout */
-    .app-container {
-      display: flex;
-      flex: 1;
-      height: calc(100vh - 56px);
-      position: relative;
-    }
-
-    /* 3D Viewport */
-    #viewport3d {
-      flex: 1;
-      position: relative;
-      background: radial-gradient(circle at center, #071126 0%, #02050e 100%);
-    }
-    #three-canvas {
-      width: 100%;
-      height: 100%;
-      display: block;
-    }
-
-    /* Overlay HUD */
-    .viewport-hud {
-      position: absolute;
-      top: 16px;
-      left: 16px;
-      z-index: 10;
-      display: flex;
-      gap: 12px;
-      pointer-events: none;
-    }
-    .metric-card {
-      background: var(--surface-card);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 10px 14px;
-      min-width: 150px;
-      backdrop-filter: blur(8px);
-      pointer-events: auto;
-    }
-    .metric-title {
-      font-size: 10px;
-      color: #94a3b8;
-      font-family: var(--font-mono);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-    .metric-val {
-      font-size: 18px;
-      font-weight: 700;
-      color: #f8fafc;
-      font-family: var(--font-mono);
-      margin-top: 2px;
-    }
-    .badge-critical { color: var(--rose); }
-    .badge-cleared { color: var(--emerald); }
-
-    /* Action Toolbar at Bottom of Viewport */
-    .viewport-controls {
-      position: absolute;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 10;
-      display: flex;
-      gap: 10px;
-      background: rgba(10, 16, 32, 0.85);
-      border: 1px solid var(--border);
-      padding: 8px 12px;
-      border-radius: 8px;
-      backdrop-filter: blur(10px);
-    }
-    .btn {
-      background: rgba(56, 189, 248, 0.12);
-      border: 1px solid var(--border);
-      color: var(--cyan);
-      font-family: var(--font-mono);
-      font-size: 12px;
-      font-weight: 600;
-      padding: 8px 14px;
-      border-radius: 4px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      transition: all 0.2s ease;
-    }
-    .btn:hover {
-      background: rgba(0, 229, 255, 0.25);
-      border-color: var(--cyan);
-      box-shadow: 0 0 12px rgba(0, 229, 255, 0.3);
-    }
-    .btn-warn {
-      background: rgba(244, 63, 94, 0.15);
-      border-color: rgba(244, 63, 94, 0.4);
-      color: var(--rose);
-    }
-    .btn-warn:hover {
-      background: rgba(244, 63, 94, 0.3);
-      border-color: var(--rose);
-      box-shadow: 0 0 12px rgba(244, 63, 94, 0.4);
-    }
-    .btn-success {
-      background: rgba(16, 185, 129, 0.15);
-      border-color: rgba(16, 185, 129, 0.4);
-      color: var(--emerald);
-    }
-    .btn-success:hover {
-      background: rgba(16, 185, 129, 0.3);
-      border-color: var(--emerald);
-      box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
-    }
-
-    /* Right Sidebar Panel */
-    aside {
-      width: 440px;
-      background: #060b18;
-      border-left: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-      overflow-y: auto;
-      z-index: 50;
-    }
-    .panel-section {
-      padding: 16px 20px;
-      border-bottom: 1px solid rgba(56, 189, 248, 0.15);
-    }
-    .section-title {
-      font-family: var(--font-mono);
-      font-size: 12px;
-      font-weight: 700;
-      color: var(--cyan);
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      margin-bottom: 12px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .data-grid {
+    button.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 650; }
+    button[aria-selected="true"] { background: #1e4d63; border-color: var(--accent); }
+    button:disabled { opacity: 0.55; cursor: not-allowed; }
+    .workspace {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
+      grid-template-columns: minmax(220px, 280px) minmax(0, 1fr) minmax(260px, 380px);
+      gap: 12px; align-items: start;
     }
-    .data-item {
-      background: rgba(15, 23, 42, 0.5);
-      border: 1px solid rgba(255, 255, 255, 0.05);
-      border-radius: 4px;
-      padding: 8px 10px;
+    .panel { padding: 12px; min-width: 0; }
+    .panel h2 { font-size: 16px; margin: 0 0 8px; }
+    .objects { display: flex; flex-direction: column; gap: 6px; max-height: 640px; overflow: auto; }
+    .objects button { text-align: left; width: 100%; }
+    .objects small, .meta { display: block; color: var(--muted); font-size: 13px; }
+    .globe-wrap { position: relative; height: 560px; background: #071422; border-radius: 10px; overflow: hidden; }
+    canvas { width: 100%; height: 100%; display: block; }
+    .globe-caption { margin: 8px 0 0; color: var(--muted); font-size: 14px; }
+    .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+    .tab-panel h3 { font-size: 15px; margin: 12px 0 6px; }
+    dl { margin: 0; }
+    .row { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 4px 10px; padding: 7px 0; border-bottom: 1px solid #2a455d; }
+    .row dt { color: var(--muted); }
+    .row dd { margin: 0; overflow-wrap: anywhere; }
+    .stack { display: flex; flex-direction: column; gap: 8px; }
+    .note { color: var(--muted); font-size: 14px; }
+    .warn { color: var(--warn); }
+    ul { margin: 6px 0 0; padding-left: 18px; }
+    pre.notes {
+      white-space: pre-wrap; overflow-wrap: anywhere; font: 13px/1.45 ui-monospace, "SFMono-Regular", Consolas, monospace;
+      background: var(--panel-2); border-radius: 8px; padding: 10px; max-height: 420px; overflow: auto; color: var(--text);
     }
-    .data-key {
-      font-size: 10px;
-      color: #94a3b8;
-      font-family: var(--font-mono);
-      text-transform: uppercase;
+    @media (max-width: 980px) {
+      h1 { font-size: 24px; }
+      .workspace { grid-template-columns: 1fr; }
+      .globe-wrap { height: 320px; }
+      .objects { max-height: 240px; }
+      .row { grid-template-columns: 1fr; }
     }
-    .data-val {
-      font-size: 13px;
-      font-family: var(--font-mono);
-      font-weight: 600;
-      color: #f1f5f9;
-      margin-top: 2px;
-    }
-    .log-terminal {
-      background: #02040a;
-      border: 1px solid rgba(56, 189, 248, 0.2);
-      border-radius: 4px;
-      padding: 12px;
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: #94a3b8;
-      height: 180px;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .log-line { display: flex; gap: 8px; }
-    .log-time { color: #64748b; }
-    .log-info { color: var(--blue); }
-    .log-alert { color: var(--rose); }
-    .log-success { color: var(--emerald); }
-
-    /* Modal */
-    .modal-backdrop {
-      position: fixed;
-      top: 0; left: 0; width: 100vw; height: 100vh;
-      background: rgba(0, 0, 0, 0.75);
-      z-index: 1000;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      backdrop-filter: blur(5px);
-    }
-    .modal-content {
-      width: 780px;
-      max-height: 85vh;
-      background: #090e1f;
-      border: 1px solid var(--border-glow);
-      border-radius: 8px;
-      display: flex;
-      flex-direction: column;
-      box-shadow: 0 0 30px rgba(0, 229, 255, 0.2);
-    }
-    .modal-header {
-      padding: 16px 20px;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-family: var(--font-mono);
-      font-weight: 700;
-      color: var(--cyan);
-    }
-    .modal-body {
-      padding: 20px;
-      overflow-y: auto;
-      font-family: var(--font-mono);
-      font-size: 12px;
-      line-height: 1.6;
-      color: #cbd5e1;
-      white-space: pre-wrap;
-    }
-    .close-btn {
-      background: none;
-      border: none;
-      color: #94a3b8;
-      font-size: 18px;
-      cursor: pointer;
-    }
-    .close-btn:hover { color: #fff; }
+    @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
   </style>
 </head>
 <body>
-
-  <!-- Top Navigation -->
+  <a class="skip" href="#workspace">Skip to workspace</a>
   <header>
     <div class="brand">
-      <div class="brand-title">🛡️ OrbitGuard AI</div>
-      <div class="badge-sub">Mission Control Copilot • SIS &amp; NanoDynamics</div>
+      <strong>ORBITGUARD</strong>
+      <span>LEO monitoring beside NanoDynamics</span>
     </div>
-    <div class="live-status">
-      <div class="pulse-dot"></div>
-      <span>AUTONOMOUS ENGINE: 24/7 ONLINE</span>
-    </div>
+    <nav aria-label="Product">
+      <a href="./">NanoDynamics</a>
+      <a href="simulator">Numerical simulator</a>
+      <a href="docs">Simulator manual</a>
+    </nav>
   </header>
-
-  <!-- Main View -->
-  <div class="app-container">
-    
-    <!-- 3D Viewport -->
-    <div id="viewport3d">
-      <div class="viewport-hud">
-        <div class="metric-card">
-          <div class="metric-title">Nominal Miss Distance</div>
-          <div class="metric-val badge-critical" id="hud-miss">0.850 km</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-title">Encounter TCA (UTC)</div>
-          <div class="metric-val" id="hud-tca">T-18.0h</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-title">Collision Prob (Pc)</div>
-          <div class="metric-val badge-critical" id="hud-pc">4.53e-07</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-title">Cleared Miss (Post-CAM)</div>
-          <div class="metric-val badge-cleared" id="hud-post-miss">2,774.2 km</div>
-        </div>
+  <main id="workspace">
+    <h1>Monitor catalog states, conditions, and geometry</h1>
+    <section id="banner" class="banner awaiting" aria-live="polite">
+      <strong id="banner-title">Awaiting a catalog</strong>
+      <p id="banner-copy">No positions are loaded. Public GP is a separate retrieval. Simulation sample is labelled and is not a live feed.</p>
+      <div class="toolbar">
+        <button type="button" class="primary" id="load-public">Retrieve stations GP</button>
+        <button type="button" id="load-sample">Simulation sample</button>
+        <button type="button" id="clear-catalog">Show empty state</button>
       </div>
-
-      <div class="viewport-controls">
-        <button class="btn btn-warn" onclick="runSimulateThreat()">
-          <span>⚠️ Simulate Critical Encounter</span>
-        </button>
-        <button class="btn" onclick="runScreeningSweep()">
-          <span>🔍 Run 72h Screening</span>
-        </button>
-        <button class="btn" onclick="openBriefingModal()">
-          <span>📜 Flight Briefing</span>
-        </button>
-        <button class="btn btn-success" onclick="approveManeuver()">
-          <span>🚀 1-Click Authorize CAM</span>
-        </button>
-      </div>
-
-      <canvas id="three-canvas"></canvas>
+    </section>
+    <div class="workspace">
+      <section class="panel" aria-labelledby="objects-heading">
+        <h2 id="objects-heading">Objects</h2>
+        <div id="object-list" class="objects"></div>
+      </section>
+      <section class="panel">
+        <h2>Ground track</h2>
+        <div class="globe-wrap">
+          <canvas id="globe" aria-label="Earth display of derived ground tracks. Select objects from the list."></canvas>
+        </div>
+        <p id="globe-caption" class="globe-caption">No track. The globe is only a display of latitudes and longitudes the API returns.</p>
+      </section>
+      <section class="panel">
+        <div class="tabs" role="tablist" aria-label="Object detail">
+          <button type="button" role="tab" id="tab-state" aria-controls="panel-state" aria-selected="true">State</button>
+          <button type="button" role="tab" id="tab-prov" aria-controls="panel-prov" aria-selected="false">Provenance</button>
+          <button type="button" role="tab" id="tab-env" aria-controls="panel-env" aria-selected="false">Conditions</button>
+          <button type="button" role="tab" id="tab-risk" aria-controls="panel-risk" aria-selected="false">Geometry</button>
+          <button type="button" role="tab" id="tab-sense" aria-controls="panel-sense" aria-selected="false">Sensors</button>
+          <button type="button" role="tab" id="tab-plan" aria-controls="panel-plan" aria-selected="false">Plan</button>
+        </div>
+        <div id="panel-state" role="tabpanel" aria-labelledby="tab-state"></div>
+        <div id="panel-prov" role="tabpanel" aria-labelledby="tab-prov" hidden></div>
+        <div id="panel-env" role="tabpanel" aria-labelledby="tab-env" hidden></div>
+        <div id="panel-risk" role="tabpanel" aria-labelledby="tab-risk" hidden></div>
+        <div id="panel-sense" role="tabpanel" aria-labelledby="tab-sense" hidden></div>
+        <div id="panel-plan" role="tabpanel" aria-labelledby="tab-plan" hidden></div>
+      </section>
     </div>
-
-    <!-- Telemetry & Advisory Sidebar -->
-    <aside>
-      
-      <!-- Protected Asset -->
-      <div class="panel-section">
-        <div class="section-title">🛰️ Monitored Spacecraft</div>
-        <div class="data-grid">
-          <div class="data-item">
-            <div class="data-key">Asset Name</div>
-            <div class="data-val">AeroCube-3U</div>
-          </div>
-          <div class="data-item">
-            <div class="data-key">NORAD Cat ID</div>
-            <div class="data-val">43015</div>
-          </div>
-          <div class="data-item">
-            <div class="data-key">Dry / Fuel Mass</div>
-            <div class="data-val">4.0kg / 0.5kg</div>
-          </div>
-          <div class="data-item">
-            <div class="data-key">Thruster (Isp)</div>
-            <div class="data-val">Cold Gas (70s)</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Encounter Geometry -->
-      <div class="panel-section">
-        <div class="section-title">🎯 Conjunction Geometry (RTN)</div>
-        <div class="data-grid">
-          <div class="data-item">
-            <div class="data-key">Chaser Threat</div>
-            <div class="data-val" id="telemetry-threat">COSMOS-2251 DEBRIS</div>
-          </div>
-          <div class="data-item">
-            <div class="data-key">Relative Speed</div>
-            <div class="data-val" id="telemetry-speed">10.42 km/s</div>
-          </div>
-          <div class="data-item">
-            <div class="data-key">Radial Miss (ΔR)</div>
-            <div class="data-val" id="telemetry-dr">+0.765 km</div>
-          </div>
-          <div class="data-item">
-            <div class="data-key">In-Track Miss (ΔT)</div>
-            <div class="data-val" id="telemetry-dt">+0.255 km</div>
-          </div>
-          <div class="data-item">
-            <div class="data-key">Risk Tier</div>
-            <div class="data-val badge-critical" id="telemetry-tier">CRITICAL</div>
-          </div>
-          <div class="data-item">
-            <div class="data-key">Action Required</div>
-            <div class="data-val" id="telemetry-action" style="color:var(--amber);">CAM REQUIRED</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Autonomous CAM Recommendation -->
-      <div class="panel-section">
-        <div class="section-title">🚀 Autonomous CAM Solution</div>
-        <div class="data-grid">
-          <div class="data-item">
-            <div class="data-key">Optimal Strategy</div>
-            <div class="data-val" id="cam-strat" style="color:var(--cyan);">retrograde_phasing</div>
-          </div>
-          <div class="data-item">
-            <div class="data-key">Lead Time</div>
-            <div class="data-val" id="cam-lead">12.0h prior to TCA</div>
-          </div>
-          <div class="data-item">
-            <div class="data-key">Delta-V (VNC)</div>
-            <div class="data-val" id="cam-dv">[-0.15, 0.0, 0.0] m/s</div>
-          </div>
-          <div class="data-item">
-            <div class="data-key">Burn Duration</div>
-            <div class="data-val" id="cam-burn">13.5 seconds</div>
-          </div>
-          <div class="data-item">
-            <div class="data-key">Propellant Cost</div>
-            <div class="data-val" id="cam-fuel">0.98 grams</div>
-          </div>
-          <div class="data-item">
-            <div class="data-key">Post Miss Buffer</div>
-            <div class="data-val badge-cleared" id="cam-post-miss">2,774.2 km</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Live Agent Stream Log -->
-      <div class="panel-section" style="flex:1;">
-        <div class="section-title">📡 Autonomous Mission Control Stream</div>
-        <div class="log-terminal" id="agent-log">
-          <div class="log-line">
-            <span class="log-time">[00:00:01]</span>
-            <span class="log-info">OrbitGuard AI Engine online. Subscribed to CelesTrak feeds.</span>
-          </div>
-          <div class="log-line">
-            <span class="log-time">[00:00:02]</span>
-            <span class="log-info">Loaded NanoDynamics J2+Drag Cowell numerical propagator.</span>
-          </div>
-        </div>
-      </div>
-
-    </aside>
-
-  </div>
-
-  <!-- Modal for Briefing -->
-  <div class="modal-backdrop" id="briefing-modal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <span>📜 Flight Director Conjunction Assessment Briefing</span>
-        <button class="close-btn" onclick="closeBriefingModal()">&times;</button>
-      </div>
-      <div class="modal-body" id="modal-brief-content">
-        Loading executive briefing...
-      </div>
-    </div>
-  </div>
-
+  </main>
   <script>
-    // -------------------------------------------------------------
-    // Three.js 3D Orbital Trajectory Visualization
-    // -------------------------------------------------------------
-    let scene, camera, renderer, controls;
-    let earthMesh, primaryOrbitLine, debrisOrbitLine, postManeuverLine, tcaMarker;
+    const state = { workspace: null, selected: null, environment: null, sensors: null, roadmap: null, notes: "", screen: null };
+    const colors = ["#9be7d0", "#f3d48a", "#9ec7f5", "#e4c6f8", "#f3b4b4", "#d5e7a3"];
 
-    function init3D() {
-      const container = document.getElementById('viewport3d');
-      scene = new THREE.Scene();
-
-      camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
-      camera.position.set(0, 35, 65);
-
-      renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('three-canvas'), antialias: true, alpha: true });
-      renderer.setSize(container.clientWidth, container.clientHeight);
-      renderer.setPixelRatio(window.devicePixelRatio);
-
-      controls = new THREE.OrbitControls(camera, renderer.domElement);
-      controls.enableDamping = true;
-      controls.dampingFactor = 0.05;
-
-      // Lights
-      const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
-      scene.add(ambientLight);
-      const sunLight = new THREE.DirectionalLight(0xffffff, 1.2);
-      sunLight.position.set(100, 50, 80);
-      scene.add(sunLight);
-
-      // Earth Globe
-      const earthGeo = new THREE.SphereGeometry(15, 64, 64);
-      const earthMat = new THREE.MeshPhongMaterial({
-        color: 0x0f2042,
-        emissive: 0x051025,
-        wireframe: false,
-        shininess: 25,
+    function esc(value) {
+      return String(value == null ? "" : value).replace(/[&<>"']/g, (ch) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[ch]));
+    }
+    function ageText(seconds) {
+      if (seconds == null) return "unknown";
+      const ahead = seconds < 0;
+      const hours = Math.abs(seconds) / 3600;
+      const body = hours < 48 ? hours.toFixed(1) + " h" : (hours / 24).toFixed(1) + " d";
+      return (ahead ? "ahead of the clock by " : "") + body;
+    }
+    function freshnessText(label) {
+      if (label === "within_display_setting") return "inside the display setting";
+      if (label === "older_than_display_setting") return "older than the display setting";
+      if (label === "ahead_of_reference_clock") return "timestamp is ahead of the reference clock";
+      return "unknown";
+    }
+    async function getJson(url, options) {
+      const response = await fetch(url, options);
+      const payload = await response.json();
+      if (!response.ok) {
+        const detail = payload.detail || response.statusText;
+        throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+      }
+      return payload;
+    }
+    function setBanner(workspace) {
+      const banner = document.getElementById("banner");
+      banner.className = "banner " + (workspace.mode === "simulation_sample" ? "sample" : workspace.mode === "public_gp" ? "public" : "awaiting");
+      document.getElementById("banner-title").textContent = workspace.mode_label;
+      const settings = workspace.display_settings;
+      const extra = settings
+        ? " Epoch display setting " + (settings.epoch_stale_s / 3600) + " h. Retrieval display setting " + (settings.retrieval_stale_s / 3600) + " h. " + settings.note
+        : "";
+      let copy = "Positions stay empty until you retrieve the stations group or turn the sample on.";
+      if (workspace.mode === "public_gp") {
+        copy = "Source " + (workspace.source_url || "CelesTrak GP JSON") + ". Retrieved " + (workspace.retrieved_at || "unknown") + ".";
+      } else if (workspace.mode === "simulation_sample") {
+        copy = "Synthetic mean elements, propagated with SGP4 and shown at the element epoch. Not a live catalog.";
+      }
+      document.getElementById("banner-copy").textContent = copy + extra;
+    }
+    function renderObjects() {
+      const list = document.getElementById("object-list");
+      list.replaceChildren();
+      const objects = (state.workspace && state.workspace.objects) || [];
+      if (!objects.length) {
+        const empty = document.createElement("p");
+        empty.className = "note";
+        empty.textContent = "No objects. Nothing has been invented to fill this list.";
+        list.append(empty);
+        return;
+      }
+      objects.forEach((object, index) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.setAttribute("aria-pressed", String(object.id === state.selected));
+        const title = document.createElement("strong");
+        title.textContent = object.name;
+        const meta = document.createElement("small");
+        const altitude = object.state ? object.state.altitude_km.toFixed(1) + " km derived" : "position unavailable";
+        meta.textContent = object.mode_label + " · " + altitude;
+        button.append(title, meta);
+        button.addEventListener("click", () => { state.selected = object.id; renderObjects(); renderDetail(); draw(); });
+        button.style.borderColor = colors[index % colors.length];
+        list.append(button);
       });
-      earthMesh = new THREE.Mesh(earthGeo, earthMat);
-      scene.add(earthMesh);
-
-      // Earth Glow Wireframe
-      const wireGeo = new THREE.SphereGeometry(15.1, 32, 32);
-      const wireMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff, wireframe: true, transparent: true, opacity: 0.15 });
-      scene.add(new THREE.Mesh(wireGeo, wireMat));
-
-      // Draw Orbit Paths
-      drawOrbits();
-
-      window.addEventListener('resize', onWindowResize);
-      animate();
     }
-
-    function drawOrbits() {
-      // Primary CubeSat Orbit (Cyan)
-      const primaryPoints = [];
-      const r_orbit = 22;
-      for (let i = 0; i <= 100; i++) {
-        const theta = (i / 100) * Math.PI * 2;
-        primaryPoints.push(new THREE.Vector3(
-          r_orbit * Math.cos(theta),
-          r_orbit * Math.sin(theta) * Math.sin(0.9),
-          r_orbit * Math.sin(theta) * Math.cos(0.9)
-        ));
+    function selectedObject() {
+      const objects = (state.workspace && state.workspace.objects) || [];
+      return objects.find((object) => object.id === state.selected) || objects[0] || null;
+    }
+    function definition(pairs) {
+      const list = document.createElement("dl");
+      pairs.forEach(([term, value]) => {
+        const row = document.createElement("div");
+        row.className = "row";
+        const dt = document.createElement("dt");
+        dt.textContent = term;
+        const dd = document.createElement("dd");
+        dd.textContent = value == null || value === "" ? "—" : String(value);
+        row.append(dt, dd);
+        list.append(row);
+      });
+      return list;
+    }
+    function renderDetail() {
+      const object = selectedObject();
+      if (object) state.selected = object.id;
+      const panel = document.getElementById("panel-state");
+      panel.replaceChildren();
+      if (!object) {
+        const p = document.createElement("p");
+        p.className = "note";
+        p.textContent = "Select an object after a catalog is loaded.";
+        panel.append(p);
+      } else {
+        const heading = document.createElement("h3");
+        heading.textContent = object.name;
+        panel.append(heading, definition([
+          ["Mode", object.mode_label],
+          ["Catalog number", object.norad_cat_id == null ? "not a NORAD identity" : object.norad_cat_id],
+          ["Designator", object.international_designator],
+          ["Element epoch", object.element_epoch],
+          ["State time", object.state_time || "unavailable"],
+          ["Frame of the propagated state", object.reference_frame],
+          ["Theory", object.mean_element_theory + " / " + object.gravity_constants],
+          ["Latitude", object.state ? object.state.latitude_deg.toFixed(3) + " deg, derived" : "unavailable"],
+          ["Longitude", object.state ? object.state.longitude_deg.toFixed(3) + " deg, derived" : "unavailable"],
+          ["Altitude", object.state ? object.state.altitude_km.toFixed(2) + " km, derived, WGS-84" : "unavailable"],
+          ["Pc", "not computable"],
+          ["Nc", "not implemented"],
+        ]));
       }
-      const primaryGeo = new THREE.BufferGeometry().setFromPoints(primaryPoints);
-      const primaryMat = new THREE.LineBasicMaterial({ color: 0x00e5ff, linewidth: 2 });
-      primaryOrbitLine = new THREE.Line(primaryGeo, primaryMat);
-      scene.add(primaryOrbitLine);
-
-      // Debris Crossing Orbit (Crimson)
-      const debrisPoints = [];
-      for (let i = 0; i <= 100; i++) {
-        const theta = (i / 100) * Math.PI * 2;
-        debrisPoints.push(new THREE.Vector3(
-          (r_orbit + 0.1) * Math.cos(theta),
-          (r_orbit + 0.1) * Math.sin(theta) * Math.sin(-0.7),
-          (r_orbit + 0.1) * Math.sin(theta) * Math.cos(-0.7)
-        ));
+      renderProvenance(object);
+      renderRisk(object);
+      const caption = document.getElementById("globe-caption");
+      caption.textContent = object && object.state
+        ? object.name + " at " + object.state_time + ". Display frame is TEME rotated by GMST, not ITRF. Track color is an index, not a risk."
+        : "No track. The globe is only a display of latitudes and longitudes the API returns.";
+    }
+    function renderProvenance(object) {
+      const panel = document.getElementById("panel-prov");
+      panel.replaceChildren();
+      if (!object) {
+        panel.textContent = "Provenance appears with an object.";
+        return;
       }
-      const debrisGeo = new THREE.BufferGeometry().setFromPoints(debrisPoints);
-      const debrisMat = new THREE.LineBasicMaterial({ color: 0xf43f5e, linewidth: 2 });
-      debrisOrbitLine = new THREE.Line(debrisGeo, debrisMat);
-      scene.add(debrisOrbitLine);
-
-      // TCA Intersection Marker
-      const tcaGeo = new THREE.SphereGeometry(0.6, 16, 16);
-      const tcaMat = new THREE.MeshBasicMaterial({ color: 0xfbbf24 });
-      tcaMarker = new THREE.Mesh(tcaGeo, tcaMat);
-      tcaMarker.position.set(r_orbit, 0, 0);
-      scene.add(tcaMarker);
-
-      // Post-Maneuver Divergence Path (Emerald)
-      const postPoints = [];
-      for (let i = 0; i <= 100; i++) {
-        const theta = (i / 100) * Math.PI * 2;
-        postPoints.push(new THREE.Vector3(
-          (r_orbit - 0.8) * Math.cos(theta),
-          (r_orbit - 0.8) * Math.sin(theta) * Math.sin(0.9),
-          (r_orbit - 0.8) * Math.sin(theta) * Math.cos(0.9)
-        ));
+      object.provenance.forEach((row) => {
+        const block = document.createElement("article");
+        const title = document.createElement("h3");
+        title.textContent = row.name;
+        block.append(title, definition([
+          ["Value", row.value == null ? "unavailable" : row.value],
+          ["Unit", row.unit || "—"],
+          ["Status", row.status],
+          ["Frame", row.reference_frame || "—"],
+          ["Time system", row.time_system || "—"],
+          ["Observation time", row.observation_time || "unknown"],
+          ["Retrieval time", row.retrieval_time || "unknown"],
+          ["Epoch age", ageText(row.epoch_age_s) + " (" + freshnessText(row.epoch_freshness) + ")"],
+          ["Retrieval age", ageText(row.retrieval_age_s) + " (" + freshnessText(row.retrieval_freshness) + ")"],
+          ["Source", row.source_name],
+          ["Source URL", row.source_url || "—"],
+          ["Note", row.note],
+        ]));
+        panel.append(block);
+      });
+    }
+    function renderEnvironment() {
+      const panel = document.getElementById("panel-env");
+      panel.replaceChildren();
+      const env = state.environment;
+      if (!env) {
+        const p = document.createElement("p");
+        p.className = "note";
+        p.textContent = "Conditions have not been requested yet.";
+        panel.append(p);
+        return;
       }
-      const postGeo = new THREE.BufferGeometry().setFromPoints(postPoints);
-      const postMat = new THREE.LineDashedMaterial({ color: 0x10b981, dashSize: 1, gapSize: 0.5 });
-      postManeuverLine = new THREE.Line(postGeo, postMat);
-      postManeuverLine.computeLineDistances();
-      scene.add(postManeuverLine);
+      ["f107", "planetary_k", "tec", "thermospheric_density"].forEach((key) => {
+        const row = env[key];
+        const block = document.createElement("article");
+        const title = document.createElement("h3");
+        title.textContent = row.name;
+        block.append(title, definition([
+          ["Value", row.value == null ? "unavailable" : row.value],
+          ["Unit", row.unit || "—"],
+          ["Status", row.status],
+          ["Observation time", row.observation_time || "unknown"],
+          ["Retrieval time", row.retrieval_time || "unknown"],
+          ["Epoch age", ageText(row.epoch_age_s)],
+          ["Retrieval age", ageText(row.retrieval_age_s)],
+          ["Source", row.source_url || row.source_name],
+          ["Note", row.note],
+        ]));
+        panel.append(block);
+      });
+      const list = document.createElement("ul");
+      (env.distinctions || []).forEach((item) => {
+        const li = document.createElement("li");
+        li.textContent = item;
+        list.append(li);
+      });
+      panel.append(list);
     }
-
-    function onWindowResize() {
-      const container = document.getElementById('viewport3d');
-      camera.aspect = container.clientWidth / container.clientHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(container.clientWidth, container.clientHeight);
+    function renderRisk() {
+      const panel = document.getElementById("panel-risk");
+      const objects = (state.workspace && state.workspace.objects) || [];
+      const wrap = document.createElement("div");
+      wrap.className = "stack";
+      const intro = document.createElement("p");
+      intro.className = "note";
+      intro.textContent = "This screen reports a sampled separation. It does not report Pc or Nc. A missing covariance is not zero and is not safe. No ellipsoid is drawn.";
+      wrap.append(intro);
+      if (objects.length >= 2) {
+        const primary = document.createElement("select");
+        const secondary = document.createElement("select");
+        primary.id = "screen-primary";
+        secondary.id = "screen-secondary";
+        objects.forEach((object, index) => {
+          const a = document.createElement("option");
+          a.value = object.id;
+          a.textContent = object.name;
+          const b = a.cloneNode(true);
+          primary.append(a);
+          secondary.append(b);
+          if (index === 1) b.selected = true;
+        });
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "primary";
+        button.textContent = "Run geometric screen";
+        button.addEventListener("click", runScreen);
+        wrap.append(primary, secondary, button);
+      } else {
+        const p = document.createElement("p");
+        p.className = "note";
+        p.textContent = "Load at least two objects before screening.";
+        wrap.append(p);
+      }
+      if (state.screen) {
+        const result = state.screen;
+        wrap.append(definition([
+          ["Mode", result.mode_label || result.mode],
+          ["Frame", result.frame || "—"],
+          ["Closest sample", result.geometric_miss_km == null ? "not available" : result.geometric_miss_km.toFixed(3) + " km"],
+          ["Sample time", result.time_of_closest_sample || "—"],
+          ["Relative speed", result.relative_speed_km_s == null ? "—" : result.relative_speed_km_s.toFixed(3) + " km/s"],
+          ["Pc", "not computable"],
+          ["Nc", "not implemented"],
+          ["Safety determination", "not made"],
+          ["Covariance", result.covariance ? result.covariance.status + ". " + result.covariance.reason : "absent"],
+          ["Advisory", result.advisory || "Human-reviewed display only."],
+        ]));
+      }
+      panel.replaceChildren(wrap);
     }
-
-    function animate() {
-      requestAnimationFrame(animate);
-      earthMesh.rotation.y += 0.001;
-      controls.update();
-      renderer.render(scene, camera);
-    }
-
-    // -------------------------------------------------------------
-    // Mission Control API Orchestration
-    // -------------------------------------------------------------
-    let currentBriefingMarkdown = "";
-
-    function logEvent(msg, type = "info") {
-      const logContainer = document.getElementById('agent-log');
-      const now = new Date().toTimeString().split(' ')[0];
-      const div = document.createElement('div');
-      div.className = "log-line";
-      div.innerHTML = `<span class="log-time">[${now}]</span> <span class="log-${type}">${msg}</span>`;
-      logContainer.appendChild(div);
-      logContainer.scrollTop = logContainer.scrollHeight;
-    }
-
-    async function runSimulateThreat() {
-      logEvent("Injecting realistic high-risk debris conjunction encounter...", "alert");
+    async function runScreen() {
+      const primary = document.getElementById("screen-primary").value;
+      const secondary = document.getElementById("screen-secondary").value;
       try {
-        const res = await fetch('/api/v1/orbitguard/demo/simulate-threat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+        state.screen = await getJson("/api/orbitguard/conjunction/screen", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            satellite_name: "AeroCube-3U",
-            threat_debris_name: "COSMOS-2251 DEBRIS [CAT# 34123]",
-            miss_distance_target_km: 0.85,
-            tca_lead_hours: 18.0
+            mode: state.workspace.mode,
+            primary_id: primary,
+            secondary_id: secondary,
+            window_minutes: 120,
+            threshold_km: 50
           })
         });
-        const data = await res.json();
-        if (data.success) {
-          const rep = data.simulation_report;
-          document.getElementById('hud-miss').innerText = `${rep.nominal_encounter.miss_distance_km.toFixed(3)} km`;
-          document.getElementById('hud-pc').innerText = rep.nominal_encounter.collision_probability.toExponential(2);
-          document.getElementById('hud-post-miss').innerText = `${rep.autonomous_resolution.post_maneuver_miss_distance_km.toFixed(1)} km`;
-
-          document.getElementById('telemetry-threat').innerText = rep.chaser_debris;
-          document.getElementById('telemetry-speed').innerText = `${rep.nominal_encounter.relative_speed_km_s.toFixed(2)} km/s`;
-          document.getElementById('cam-strat').innerText = rep.autonomous_resolution.selected_strategy;
-          document.getElementById('cam-burn').innerText = `${rep.autonomous_resolution.burn_duration_seconds.toFixed(1)} seconds`;
-          document.getElementById('cam-fuel').innerText = `${rep.autonomous_resolution.propellant_consumed_grams.toFixed(2)} grams`;
-          document.getElementById('cam-post-miss').innerText = `${rep.autonomous_resolution.post_maneuver_miss_distance_km.toFixed(2)} km`;
-
-          currentBriefingMarkdown = rep.executive_brief_preview;
-          logEvent(`Critical close approach detected: d_min=${rep.nominal_encounter.miss_distance_km} km.`, "alert");
-          logEvent(`Autonomous CAM synthesized: dv=${rep.autonomous_resolution.delta_v_magnitude_m_s} m/s, fuel=${rep.autonomous_resolution.propellant_consumed_grams}g.`, "success");
-          logEvent(`Safety clearance verified: expanded miss distance to ${rep.autonomous_resolution.post_maneuver_miss_distance_km} km (${rep.autonomous_resolution.clearance_multiplier}x expansion).`, "success");
+      } catch (error) {
+        state.screen = { mode_label: error.message, geometric_miss_km: null, pc_status: "not_computable", safety_determination: "not_made" };
+      }
+      renderRisk();
+    }
+    function renderSensors() {
+      const panel = document.getElementById("panel-sense");
+      panel.replaceChildren();
+      const sensors = state.sensors;
+      if (!sensors) return;
+      const lead = document.createElement("p");
+      lead.className = "note";
+      lead.textContent = sensors.tasking;
+      panel.append(lead);
+      sensors.sensors.forEach((sensor) => {
+        const block = document.createElement("article");
+        const title = document.createElement("h3");
+        title.textContent = sensor.name;
+        block.append(title, definition([
+          ["Status", sensor.status],
+          ["Would measure", sensor.measures],
+          ["Does not measure", sensor.does_not_measure],
+          ["Approvals", sensor.approvals || "—"],
+          ["Current values", "none"],
+        ]));
+        panel.append(block);
+      });
+    }
+    function renderPlan() {
+      const panel = document.getElementById("panel-plan");
+      panel.replaceChildren();
+      const roadmap = state.roadmap;
+      if (!roadmap) return;
+      const done = document.createElement("h3");
+      done.textContent = "Implemented";
+      const doneList = document.createElement("ul");
+      roadmap.implemented.forEach((item) => {
+        const li = document.createElement("li");
+        li.textContent = item;
+        doneList.append(li);
+      });
+      const later = document.createElement("h3");
+      later.textContent = "Not implemented";
+      const laterList = document.createElement("ul");
+      roadmap.not_implemented.forEach((item) => {
+        const li = document.createElement("li");
+        li.textContent = item;
+        laterList.append(li);
+      });
+      const deps = document.createElement("h3");
+      deps.textContent = "Dependencies";
+      const depList = document.createElement("ul");
+      roadmap.dependencies.forEach((item) => {
+        const li = document.createElement("li");
+        li.textContent = item;
+        depList.append(li);
+      });
+      const notes = document.createElement("pre");
+      notes.className = "notes";
+      notes.textContent = state.notes || "Operator notes are loading.";
+      panel.append(done, doneList, later, laterList, deps, depList, notes);
+    }
+    function draw() {
+      const canvas = document.getElementById("globe");
+      const rect = canvas.getBoundingClientRect();
+      const ratio = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.max(1, Math.floor(rect.width * ratio));
+      canvas.height = Math.max(1, Math.floor(rect.height * ratio));
+      const ctx = canvas.getContext("2d");
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      const w = rect.width;
+      const h = rect.height;
+      ctx.clearRect(0, 0, w, h);
+      const cx = w / 2;
+      const cy = h / 2;
+      const radius = Math.min(w, h) * 0.42;
+      const selected = selectedObject();
+      const rotation = selected && selected.state ? -selected.state.longitude_deg : 20;
+      ctx.fillStyle = "#12324a";
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#6f8ea8";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      function project(lat, lon) {
+        const latR = lat * Math.PI / 180;
+        const lonR = (lon + rotation) * Math.PI / 180;
+        const x = Math.cos(latR) * Math.sin(lonR);
+        const y = Math.sin(latR);
+        const z = Math.cos(latR) * Math.cos(lonR);
+        if (z < 0) return null;
+        return [cx + x * radius, cy - y * radius];
+      }
+      ctx.strokeStyle = "#2d4d66";
+      for (let lat = -60; lat <= 60; lat += 30) {
+        ctx.beginPath();
+        let open = false;
+        for (let lon = -180; lon <= 180; lon += 6) {
+          const point = project(lat, lon);
+          if (!point) { open = false; continue; }
+          if (!open) { ctx.moveTo(point[0], point[1]); open = true; }
+          else ctx.lineTo(point[0], point[1]);
         }
-      } catch (err) {
-        logEvent("Simulation trigger error: " + err, "alert");
+        ctx.stroke();
       }
-    }
-
-    async function runScreeningSweep() {
-      logEvent("Running 72h physics-informed conjunction screening sweep across active orbits...", "info");
-      try {
-        const res = await fetch('/api/v1/orbitguard/conjunctions/screen', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ horizon_hours: 72.0 })
+      const objects = (state.workspace && state.workspace.objects) || [];
+      objects.forEach((object, index) => {
+        ctx.strokeStyle = colors[index % colors.length];
+        ctx.lineWidth = object.id === (selected && selected.id) ? 2.4 : 1.1;
+        ctx.beginPath();
+        let open = false;
+        (object.track || []).forEach((point) => {
+          const xy = project(point.latitude_deg, point.longitude_deg);
+          if (!xy) { open = false; return; }
+          if (!open) { ctx.moveTo(xy[0], xy[1]); open = true; }
+          else ctx.lineTo(xy[0], xy[1]);
         });
-        const events = await res.json();
-        logEvent(`Screening sweep completed. Evaluated ${events.length} encounter(s).`, "success");
-      } catch (err) {
-        logEvent("Screening sweep error: " + err, "alert");
+        ctx.stroke();
+        if (object.state) {
+          const xy = project(object.state.latitude_deg, object.state.longitude_deg);
+          if (xy) {
+            ctx.fillStyle = colors[index % colors.length];
+            ctx.beginPath();
+            ctx.arc(xy[0], xy[1], object.id === (selected && selected.id) ? 5 : 3, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      });
+    }
+    function showTab(id) {
+      document.querySelectorAll("[role=tab]").forEach((tab) => {
+        const on = tab.id === id;
+        tab.setAttribute("aria-selected", String(on));
+        document.getElementById(tab.getAttribute("aria-controls")).hidden = !on;
+      });
+    }
+    document.querySelectorAll("[role=tab]").forEach((tab, index, tabs) => {
+      tab.addEventListener("click", () => showTab(tab.id));
+      tab.addEventListener("keydown", (event) => {
+        if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+        event.preventDefault();
+        const next = event.key === "ArrowRight" ? (index + 1) % tabs.length : (index - 1 + tabs.length) % tabs.length;
+        tabs[next].focus();
+        showTab(tabs[next].id);
+      });
+    });
+    async function loadWorkspace(mode) {
+      state.screen = null;
+      state.workspace = await getJson("/api/orbitguard/workspace?mode=" + encodeURIComponent(mode));
+      state.selected = state.workspace.objects[0] ? state.workspace.objects[0].id : null;
+      setBanner(state.workspace);
+      renderObjects();
+      renderDetail();
+      draw();
+    }
+    document.getElementById("load-public").addEventListener("click", async () => {
+      const banner = document.getElementById("banner-copy");
+      banner.textContent = "Requesting the stations group once. A recent cache is reused and is not a new download.";
+      try {
+        const report = await getJson("/api/orbitguard/catalog/refresh", { method: "POST" });
+        await loadWorkspace("public_gp");
+        if (!state.workspace.objects.length) {
+          banner.textContent = "No stations were stored. " + (report.reason || report.excerpt || "The feed did not return a catalog.");
+        }
+      } catch (error) {
+        banner.textContent = "Retrieval failed: " + error.message + " No sample positions were substituted.";
       }
-    }
-
-    function openBriefingModal() {
-      const modal = document.getElementById('briefing-modal');
-      const body = document.getElementById('modal-brief-content');
-      body.innerText = currentBriefingMarkdown || "No active threat loaded. Click 'Simulate Critical Encounter' first.";
-      modal.style.display = "flex";
-    }
-
-    function closeBriefingModal() {
-      document.getElementById('briefing-modal').style.display = "none";
-    }
-
-    function approveManeuver() {
-      logEvent("Flight Director 1-Click CAM Authorization uplinked to spacecraft telemetry bus.", "success");
-      alert("✅ Collision Avoidance Maneuver sequence armed and uplinked to AeroCube-3U!");
-    }
-
-    window.onload = () => {
-      init3D();
-      runSimulateThreat();
-    };
+    });
+    document.getElementById("load-sample").addEventListener("click", () => loadWorkspace("simulation_sample").catch((error) => {
+      document.getElementById("banner-copy").textContent = error.message;
+    }));
+    document.getElementById("clear-catalog").addEventListener("click", () => loadWorkspace("awaiting"));
+    window.addEventListener("resize", draw);
+    Promise.all([
+      loadWorkspace((new URLSearchParams(location.search).get("mode") === "simulation_sample" || new URLSearchParams(location.search).get("mode") === "public_gp") ? new URLSearchParams(location.search).get("mode") : "awaiting"),
+      getJson("/api/orbitguard/environment").then((payload) => { state.environment = payload; renderEnvironment(); }).catch((error) => {
+        state.environment = { f107: { name: "f107", value: null, status: "unavailable", note: error.message, unit: "sfu" }, planetary_k: { name: "planetary_k", value: null, status: "unavailable", note: error.message, unit: "1" }, tec: { name: "tec", value: null, status: "unavailable", note: error.message }, thermospheric_density: { name: "density", value: null, status: "unavailable", note: error.message }, distinctions: [] };
+        renderEnvironment();
+      }),
+      getJson("/api/orbitguard/sensors").then((payload) => { state.sensors = payload; renderSensors(); }),
+      getJson("/api/orbitguard/roadmap").then((payload) => { state.roadmap = payload; renderPlan(); }),
+      fetch("/api/orbitguard/operator-notes").then((response) => response.text()).then((text) => { state.notes = text; renderPlan(); })
+    ]).then(() => {
+      document.documentElement.dataset.ready = "yes";
+    }).catch((error) => {
+      document.getElementById("banner-copy").textContent = "The monitoring API did not respond: " + error.message;
+      document.documentElement.dataset.ready = "error";
+    });
   </script>
 </body>
 </html>
