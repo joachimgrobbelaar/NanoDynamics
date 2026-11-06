@@ -10,7 +10,10 @@ from leo_simulator.orbit.elements import (
     coe_to_rv,
     rv_to_coe,
 )
-from leo_simulator.orbit.pinn_propagator import PINNPropagator
+try:
+    from leo_simulator.orbit.pinn_propagator import PINNPropagator
+except ImportError:
+    PINNPropagator = None  # type: ignore
 from leo_simulator.orbit.satellite import Satellite
 
 __all__ = [

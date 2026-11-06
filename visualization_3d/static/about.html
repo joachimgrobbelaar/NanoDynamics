@@ -41,7 +41,7 @@
     .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 72px; flex-wrap: wrap; gap: 12px; }
     .brand { display: flex; align-items: center; gap: 12px; font-family: var(--display); font-weight: 700; font-size: 1.2rem; }
     .brand-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 14px var(--cyan); }
-    .nav-links { display: flex; align-items: center; gap: 22px; font-size: 0.92rem; color: var(--muted); }
+    .nav-links { display: flex; flex-wrap: wrap; align-items: center; gap: 22px; font-size: 0.92rem; color: var(--muted); }
     .nav-links a:hover, .nav-links a.active { color: var(--cyan); }
     .btn {
       display: inline-flex; align-items: center; gap: 8px;
@@ -107,6 +107,7 @@
       <a href="./" class="brand"><span class="brand-dot"></span><span>NANODYNAMICS</span></a>
       <nav class="nav-links">
         <a href="./">Overview</a>
+        <a href="orbitguard">OrbitGuard</a>
         <a href="about" class="active">About &amp; Physics</a>
         <a href="download">Downloads &amp; Models</a>
         <a href="edge-console">HIL Edge Console</a>

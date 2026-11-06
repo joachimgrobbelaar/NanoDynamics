@@ -84,6 +84,10 @@ NanoDynamics/
 
 ---
 
+## OrbitGuard
+
+OrbitGuard is a separate monitoring page at `/orbitguard`. It reads public general-perturbations elements and reuses the numerical propagator only for osculating simulation states. It does not compute a collision probability. Operator notes are in `docs/orbitguard.md`.
+
 ## Quickstart
 
 ### Prerequisites
