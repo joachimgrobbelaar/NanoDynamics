@@ -1,3 +1,13 @@
+---
+title: NanoDynamics
+emoji: 🛰️
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # NanoDynamics
 
 > **Earth-Moon orbital dynamics simulator and autonomous satellite swarm collision-avoidance system powered by Physics-Informed Neural Network (PINN) surrogates, with real-time edge inference on ESP32 hardware.**
@@ -84,6 +94,46 @@ NanoDynamics/
 
 ---
 
+## Physics package
+
+Version 1.1.0. Core install has no web or UI dependencies:
+
+```bash
+pip install "git+https://github.com/joachimgrobbelaar/NanoDynamics@<commit>"
+```
+
+Pin the commit you import. The public modules are:
+
+| Module | Role |
+| --- | --- |
+| `nanodynamics.elements` | GP/OMM validation, TLE checksums, strict Alpha-5 catalog fields |
+| `nanodynamics.frames` | GMST and the TEME-to-GMST display transform (not ITRF) |
+| `nanodynamics.propagation` | SGP4 for mean elements; `leo_simulator.OrbitPropagator` only for a state labelled `osculating_cartesian` in `nanodynamics_eci` |
+
+Mean elements are not accepted as the numerical initial state. SGP4 output stays in TEME until `nanodynamics.frames.teme_to_display`. Constants for those frames live in `nanodynamics.constants`.
+
+```python
+from nanodynamics.elements import validate_omm
+from nanodynamics.propagation import propagate_sgp4, satrec_from_omm, propagate_osculating_cartesian
+```
+
+`pip install -e ".[simulator]"` adds the web simulator dependencies. `pip install -e ".[data]"` adds the Hugging Face dataset loaders. Importing `nanodynamics.propagation` does not import FastAPI or PyTorch.
+
+## Run the simulator
+
+From this repository:
+
+```bash
+pip install -e ".[simulator]"
+uvicorn visualization_3d.app:app --host 0.0.0.0 --port 7860
+```
+
+Port 7860 is the Hugging Face Space port. The container listens there as user id 1000. A local process can use another port.
+
+## OrbitGuard
+
+This repository does not contain the OrbitGuard application. The only link is the environment variable `ORBITGUARD_URL`. When it is unset, the simulator does not show a link and does not invent an address.
+
 ## Quickstart
 
 ### Prerequisites
@@ -98,8 +148,8 @@ pip install -r requirements.txt
 ### Run the Simulation Backend
 
 ```bash
-uvicorn main:app --host 0.0.0.0 --port 8001
-# Open visualization at http://localhost:8001
+uvicorn visualization_3d.app:app --host 0.0.0.0 --port 7860
+# Open http://localhost:7860
 ```
 
 ### Train the PINN Surrogate

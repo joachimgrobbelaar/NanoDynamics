@@ -29,6 +29,9 @@ ai/checkpoints/*
 functions/venv/
 firestore-debug.log
 
+# OrbitGuard local catalog cache (retrieved GP and index files; not source)
+orbitguard/monitor/.cache/
+
 # Logs & temp
 *.log
 .agents/

@@ -36,9 +36,7 @@ jobs:
           to: ${{ secrets.TELEGRAM_CHAT_ID }}
           token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           message: |
-            🚀 *Nanodynamics & OrbitGuard AI Deployed!*
-            • Production Domain: `https://nanodynamics.co.za`
-            • API Endpoint: `https://api.nanodynamics.co.za/api/health`
-            • Astrodynamics: SGP4, Cowell RK45 (J2 + Drag)
-            • OrbitGuard AI: 2D B-plane Conjunction Screening & CDM
-            • Status: *Active & Healthy*
+            NanoDynamics tests passed on main.
+            • Simulator: visualization_3d.app on port 7860 in the Docker Space
+            • Physics package: nanodynamics.elements, frames, propagation
+            • OrbitGuard is a separate repository and is not deployed from here.

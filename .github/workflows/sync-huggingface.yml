@@ -13,13 +13,7 @@ jobs:
           fetch-depth: 0
           lfs: true
 
-      - name: Push to Hugging Face Space
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      - name: Do not push this repository onto the OrbitGuard Space
         run: |
-          if [ -n "$HF_TOKEN" ]; then
-            git remote add hf https://Marnu25:$HF_TOKEN@huggingface.co/spaces/Marnu25/orbitguard-ai || true
-            git push --force hf main || echo "HF push finished with exit code $?"
-          else
-            echo "HF_TOKEN secret not configured, skipping auto-sync."
-          fi
+          echo "NanoDynamics is deployable as its own Docker Space (Dockerfile, port 7860)."
+          echo "This workflow does not push to the OrbitGuard Space."

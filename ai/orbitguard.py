@@ -1,4 +1,9 @@
-"""OrbitGuard AI: Orbital Conjunction Screening, B-Plane Pc Risk Scoring, and CDM Generation."""
+"""Legacy conjunction helper kept for the existing NanoDynamics API.
+
+The OrbitGuard application is a separate repository. New propagation should
+use ``nanodynamics.propagation`` and ``nanodynamics.frames``. This module is
+not a calibrated collision-probability service.
+"""
 
 from __future__ import annotations
 

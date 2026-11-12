@@ -41,7 +41,13 @@ from leo_simulator.orbit.collision import (
     detect_conjunction,
     generate_collision_debris_fragments,
 )
-from leo_simulator.orbit.pinn_propagator import PINNPropagator
+try:
+    from leo_simulator.orbit.pinn_propagator import PINNPropagator
+except ImportError:
+    # Numerical propagation does not need PyTorch. PINN routes report that
+    # the surrogate is unavailable instead of blocking the rest of the app.
+    PINNPropagator = None  # type: ignore
+
 from leo_simulator.orbit.satellite import Satellite
 from leo_simulator.propagator import OrbitPropagator, PropagationResult
 from leo_simulator.coordinates import (
