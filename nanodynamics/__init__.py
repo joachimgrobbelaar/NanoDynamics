@@ -1,32 +1,48 @@
+"""NanoDynamics astrodynamics library.
+
+Public physics API, with no web framework imported from these modules:
+
+* ``nanodynamics.elements`` — GP/OMM validation, TLE checksums, Alpha-5
+* ``nanodynamics.frames`` — GMST and the TEME display transform
+* ``nanodynamics.propagation`` — SGP4 for mean elements, and the numerical
+  integrator for labelled osculating Cartesian states
+
+Dataset helpers stay in ``nanodynamics.data_ingestion`` and are loaded only
+when requested, because they need the optional ``data`` extra.
 """
-nanodynamics – Unified astrodynamics data ingestion & analytics platform.
 
-Provides streaming/batch access to 57+ Hugging Face space & astrodynamics
-datasets organized across 7 functional pillars.
-"""
+__version__ = "1.1.0"
 
-__version__ = "0.2.0"
+_DATA_EXPORTS = {
+    "get_dataset": "get_dataset",
+    "loader": "loader",
+    "DATASET_REGISTRY": "DATASET_REGISTRY",
+    "DataCategory": "DataCategory",
+    "DatasetMeta": "DatasetMeta",
+    "NanodynamicsDataLoader": "NanodynamicsDataLoader",
+    "KeplerianElementRecord": "KeplerianElementRecord",
+    "SpaceWeatherRecord": "SpaceWeatherRecord",
+    "ConjunctionEventRecord": "ConjunctionEventRecord",
+}
 
-from nanodynamics.data_ingestion.loaders import (
-    get_dataset,
-    loader,
-    DATASET_REGISTRY,
-    DataCategory,
-    DatasetMeta,
-    NanodynamicsDataLoader,
-    KeplerianElementRecord,
-    SpaceWeatherRecord,
-    ConjunctionEventRecord,
-)
+__all__ = ["__version__", *list(_DATA_EXPORTS)]
 
-__all__ = [
-    "get_dataset",
-    "loader",
-    "DATASET_REGISTRY",
-    "DataCategory",
-    "DatasetMeta",
-    "NanodynamicsDataLoader",
-    "KeplerianElementRecord",
-    "SpaceWeatherRecord",
-    "ConjunctionEventRecord",
-]
+
+def __getattr__(name: str):
+    if name in _DATA_EXPORTS:
+        from nanodynamics.data_ingestion import loaders
+
+        return getattr(loaders, _DATA_EXPORTS[name])
+    # Submodule imports (nanodynamics.data_ingestion, nanodynamics.propagation, …)
+    # go through this hook once it exists. Load a real submodule, and leave
+    # every other name missing.
+    import importlib
+
+    try:
+        return importlib.import_module(f"{__name__}.{name}")
+    except ModuleNotFoundError as exc:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}") from exc
+
+
+def __dir__():
+    return sorted(set(globals()) | set(_DATA_EXPORTS))

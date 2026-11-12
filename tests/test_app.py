@@ -577,3 +577,16 @@ class TestGeodeticCoordinatesAndBurnEndpoints:
         assert len(res_str.content) > 100
 
 
+def test_orbitguard_link_is_absent_until_configured():
+    """The OrbitGuard site link stays hidden when ORBITGUARD_URL is unset."""
+    response = client.get("/api/site")
+    assert response.status_code == 200
+    assert response.json()["orbitguard_url"] in (None, "")
+    missing = client.get("/orbitguard")
+    assert missing.status_code == 404
+    landing = client.get("/")
+    assert landing.status_code == 200
+    assert 'href="orbitguard"' not in landing.text
+    assert "orbitguard.html" not in landing.text
+
+

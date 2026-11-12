@@ -7,18 +7,24 @@ UT1. Polar motion and the equation of equinoxes are not applied.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 import numpy as np
 from sgp4.api import jday
 
 from leo_simulator.coordinates import OMEGA_EARTH, ecef_to_geodetic
-from orbitguard.monitor.constants import DISPLAY_FRAME, DISPLAY_FRAME_NOTE, GMST_J2000_DEG
-from orbitguard.monitor.provenance import as_utc
+from nanodynamics.constants import DISPLAY_FRAME, DISPLAY_FRAME_NOTE, GMST_J2000_DEG
+
+
+def ensure_utc(moment: datetime) -> datetime:
+    """Return a timezone-aware UTC datetime. Naive values are treated as UTC."""
+    if moment.tzinfo is None:
+        return moment.replace(tzinfo=timezone.utc)
+    return moment.astimezone(timezone.utc)
 
 
 def julian_date(moment: datetime) -> float:
-    moment = as_utc(moment)
+    moment = ensure_utc(moment)
     assert moment is not None
     jd, fraction = jday(
         moment.year,

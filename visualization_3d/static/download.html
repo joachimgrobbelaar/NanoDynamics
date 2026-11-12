@@ -102,7 +102,7 @@
       <a href="./" class="brand"><span class="brand-dot"></span><span>NANODYNAMICS</span></a>
       <nav class="nav-links">
         <a href="./">Overview</a>
-        <a href="orbitguard">OrbitGuard</a>
+        <span id="orbitguard-slot"></span>
         <a href="about">About &amp; Physics</a>
         <a href="download" class="active">Downloads &amp; Models</a>
         <a href="edge-console">HIL Edge Console</a>
@@ -224,5 +224,17 @@
       </div>
     </footer>
   </main>
+  <script>
+    fetch("/api/site").then(function (response) { return response.json(); }).then(function (data) {
+      var url = data && data.orbitguard_url;
+      var slot = document.getElementById("orbitguard-slot");
+      if (!url || !slot) return;
+      var link = document.createElement("a");
+      link.href = url;
+      link.textContent = "OrbitGuard";
+      link.rel = "noopener noreferrer";
+      slot.replaceWith(link);
+    }).catch(function () {});
+  </script>
 </body>
 </html>

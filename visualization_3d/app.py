@@ -64,6 +64,7 @@ from leo_simulator.orbit.finite_burn import (
     compute_finite_burn_duration,
     propagate_finite_burn,
 )
+from nanodynamics.links import ORBITGUARD_URL
 
 
 def _pinn(*args, **kwargs):
@@ -570,15 +571,6 @@ def read_about():
 def read_download():
     return FileResponse(
         os.path.join(BASE_DIR, "static", "download.html"),
-        headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache", "Expires": "0"}
-    )
-
-
-@app.get("/orbitguard")
-@app.get("/copilot")
-def read_orbitguard():
-    return FileResponse(
-        os.path.join(BASE_DIR, "static", "orbitguard.html"),
         headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache", "Expires": "0"}
     )
 
@@ -2541,16 +2533,11 @@ async def get_hf_orbital_catalog(category: str | None = None, q: str | None = No
     return data
 
 
-# OrbitGuard monitoring workspace. Catalog states use SGP4; the numerical
-# engine is reused only for explicitly osculating simulation states.
-# Collision probability is not computed here.
-try:
-    from orbitguard.monitor.api import router as orbitguard_monitor_router
-
-    app.include_router(orbitguard_monitor_router)
-    print("[OrbitGuard] Mounted LEO monitoring API under /api/orbitguard")
-except Exception as e:
-    print(f"[OrbitGuard Mount Warning] {e}")
+@app.get("/api/site")
+def site_links():
+    """External links. orbitguard_url is null until ORBITGUARD_URL is set."""
+    url = ORBITGUARD_URL or None
+    return {"orbitguard_url": url}
 
 
 

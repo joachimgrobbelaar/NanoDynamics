@@ -1,74 +1,28 @@
-# ==============================================================================
-# Nanodynamics Platform & OrbitGuard AI Production Dockerfile
-# Multi-stage build optimized for Render Cloud & Containerized Deployments
-# ==============================================================================
+# Hugging Face Docker Space. The process listens on 7860 and does not run as root.
+# https://huggingface.co/docs/hub/spaces-sdks-docker
 
-# Stage 1: Build stage for dependency compilation
-FROM python:3.11-slim AS builder
+FROM python:3.11-slim
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
+RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN useradd -m -u 1000 user
+USER user
+ENV HOME=/home/user \
+    PATH=/home/user/.local/bin:$PATH \
+    PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-WORKDIR /install
+WORKDIR $HOME/app
 
-# Install build dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    libgomp1 \
-    git \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+COPY --chown=user requirements.txt requirements.txt
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
+    && pip install --no-cache-dir -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
 
-# Install PyTorch CPU-only wheel to keep image lightweight (<250MB)
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir --prefix=/install/env torch --index-url https://download.pytorch.org/whl/cpu
+COPY --chown=user . $HOME/app
+RUN pip install --no-cache-dir --no-deps .
 
-# Copy and install python dependencies into prefix using cpu extra-index
-COPY requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install/env -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
+EXPOSE 7860
 
-
-# ==============================================================================
-# Stage 2: Production runtime image
-# ==============================================================================
-FROM python:3.11-slim AS runtime
-
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app \
-    PORT=8000 \
-    ENVIRONMENT=production
-
-WORKDIR /app
-
-# Install runtime system libraries
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgomp1 \
-    git \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Create secure non-root user
-RUN groupadd -r appuser && useradd -r -g appuser -u 1000 -d /app appuser
-
-# Copy installed Python packages from builder
-COPY --from=builder /install/env /usr/local
-
-# Copy application source code
-COPY . /app
-
-# Ensure proper permissions
-RUN chown -R appuser:appuser /app
-
-# Switch to non-root user
-USER appuser
-
-# Expose Render / Container default port
-EXPOSE 8000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:${PORT:-8000}/api/health || exit 1
-
-# Launch production Uvicorn server
-CMD exec uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}
+CMD ["uvicorn", "visualization_3d.app:app", "--host", "0.0.0.0", "--port", "7860"]

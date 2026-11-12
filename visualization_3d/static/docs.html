@@ -208,7 +208,7 @@
         </div>
 
         <ul class="nav-links">
-            <li><a href="orbitguard">OrbitGuard monitor</a></li>
+            <li id="orbitguard-slot"></li>
             <li><a href="#quickstart" class="active">🚀 Quickstart & Walkthrough</a></li>
             <li><a href="#evolution">📜 Evolution (v0 &rarr; v3)</a></li>
             <li><a href="#orbit-physics">⚛️ Gravity & Perturbations</a></li>
@@ -369,5 +369,17 @@ class SymplecticLoss(nn.Module):
         </section>
     </main>
 
+  <script>
+    fetch("/api/site").then(function (response) { return response.json(); }).then(function (data) {
+      var url = data && data.orbitguard_url;
+      var slot = document.getElementById("orbitguard-slot");
+      if (!url || !slot) return;
+      var link = document.createElement("a");
+      link.href = url;
+      link.textContent = "OrbitGuard";
+      link.rel = "noopener noreferrer";
+      slot.appendChild(link);
+    }).catch(function () {});
+  </script>
 </body>
 </html>

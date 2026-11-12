@@ -16,14 +16,9 @@ from sgp4.api import Satrec, WGS72, jday
 
 from leo_simulator.constants import MU_EARTH, R_EARTH
 from leo_simulator.propagator import OrbitPropagator
-from orbitguard.monitor.constants import (
-    NUMERICAL_FRAME,
-    NUMERICAL_FRAME_NOTE,
-    SGP4_GRAVITY,
-)
-from orbitguard.monitor.frames import teme_to_display
-from orbitguard.monitor.gp_omm import normalize_epoch_text
-from orbitguard.monitor.provenance import as_utc
+from nanodynamics.constants import NUMERICAL_FRAME, NUMERICAL_FRAME_NOTE, SGP4_GRAVITY
+from nanodynamics.elements import normalize_epoch_text
+from nanodynamics.frames import ensure_utc, teme_to_display
 
 
 class MeanElementsNotOsculating(ValueError):
@@ -53,7 +48,7 @@ def _propagate_times(satellite: Satrec, moments: list[datetime]) -> dict[str, An
     used = []
     errors = []
     for moment in moments:
-        moment = as_utc(moment)
+        moment = ensure_utc(moment)
         assert moment is not None
         jd, fraction = jday(
             moment.year,
@@ -92,7 +87,7 @@ def propagate_sgp4(
     if duration_s < 0.0 or step_s <= 0.0:
         raise ValueError("SGP4 duration must be >= 0 and step must be positive")
     count = int(np.floor(duration_s / step_s)) + 1
-    moments = [as_utc(start) + timedelta(seconds=step_s * index) for index in range(count)]
+    moments = [ensure_utc(start) + timedelta(seconds=step_s * index) for index in range(count)]
     assert moments[0] is not None
     raw = _propagate_times(satellite, moments)  # type: ignore[arg-type]
     track = []
