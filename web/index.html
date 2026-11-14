@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NanoDynamics Agentic Grader — Autonomous Rubric Evaluation & Mark Sheet SaaS</title>
+  <meta name="description" content="Autonomous multi-agent grading engine for laboratory reports, physics problem sets, and STEM cohorts. Deterministic rubric parsing, bulk batch ZIP processing, and instant CSV mark sheets.">
+  <link rel="icon" type="image/svg+xml" href="/assets/brand/favicon.svg">
+  <link rel="apple-touch-icon" href="/assets/brand/app-icon-512.svg">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="NanoDynamics Agentic Grader — Autonomous Multi-Agent Lab Report Evaluation">
+  <meta property="og:description" content="Grade university laboratory reports against custom rubrics in seconds. Bulk PDF and ZIP uploads, quantitative error analysis, and instant CSV export.">
+  <meta property="og:image" content="/assets/brand/og-primary.svg">
+  <meta property="og:type" content="website">
+
+  <!-- Design System -->
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/base.css">
+  <link rel="stylesheet" href="/assets/css/components.css">
+  <link rel="stylesheet" href="/assets/css/motion.css">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+
+  <!-- Three.js & Particle Cycle -->
+  <script src="/assets/js/three.min.js"></script>
+
+  <!-- Google Identity Services (GIS) -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+  <style>
+    /* Fullscreen Autonomous Background 3D Particle Canvas */
+    #nanodynamics-particle-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 0;
+      pointer-events: none;
+      opacity: 0.85;
+    }
+
+    .ambient-void-overlay {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle at 50% 15%, rgba(0, 240, 255, 0.05) 0%, rgba(8, 11, 17, 0.92) 65%);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .site-content {
+      position: relative;
+      z-index: 2;
+    }
+
+    /* Top Navigation */
+    .nav-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 72px;
+      backdrop-filter: blur(16px);
+      background: rgba(8, 11, 17, 0.82);
+      border-bottom: 1px solid var(--border-hairline);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 var(--space-8);
+    }
+
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      font-family: var(--font-display);
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--white);
+      text-decoration: none;
+      letter-spacing: -0.01em;
+    }
+
+    .brand-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 12px var(--cyan);
+      animation: pulseGlow 2.5s infinite;
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.25); opacity: 0.7; }
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: var(--space-6);
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover {
+      color: var(--cyan);
+    }
+
+    .nav-auth {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+    }
+
+    /* Hero Section */
+    .hero-wrapper {
+      padding-top: 140px;
+      padding-bottom: var(--space-16);
+      text-align: center;
+      max-width: 980px;
+      margin: 0 auto;
+      padding-left: var(--space-6);
+      padding-right: var(--space-6);
+    }
+
+    .state-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      background: rgba(0, 240, 255, 0.08);
+      border: 1px solid rgba(0, 240, 255, 0.3);
+      border-radius: 9999px;
+      padding: 6px 18px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--cyan);
+      letter-spacing: 0.05em;
+      margin-bottom: var(--space-6);
+      box-shadow: 0 0 20px rgba(0, 240, 255, 0.15);
+    }
+
+    .hero-title {
+      font-family: var(--font-display);
+      font-size: clamp(2.4rem, 5.5vw, 4.4rem);
+      font-weight: 700;
+      line-height: 1.1;
+      color: var(--white);
+      margin-bottom: var(--space-6);
+      letter-spacing: -0.02em;
+    }
+
+    .hero-title .gradient-text {
+      background: linear-gradient(135deg, #ffffff 30%, var(--cyan) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-subtitle {
+      font-size: clamp(1rem, 2vw, 1.25rem);
+      line-height: 1.6;
+      color: var(--text-muted);
+      max-width: 780px;
+      margin: 0 auto var(--space-8);
+    }
+
+    .hero-actions {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-4);
+      flex-wrap: wrap;
+    }
+
+    /* Grader Dashboard Panel */
+    .console-section {
+      max-width: 1200px;
+      margin: 0 auto var(--space-20);
+      padding: 0 var(--space-6);
+    }
+
+    .console-card {
+      background: rgba(13, 17, 24, 0.88);
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      border-radius: var(--radius-2xl);
+      padding: var(--space-8);
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6), 0 0 30px rgba(0, 240, 255, 0.05);
+      backdrop-filter: blur(20px);
+    }
+
+    .console-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-hairline);
+      padding-bottom: var(--space-6);
+      margin-bottom: var(--space-8);
+      flex-wrap: wrap;
+      gap: var(--space-4);
+    }
+
+    .quota-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      background: rgba(0, 240, 255, 0.1);
+      border: 1px solid var(--cyan);
+      color: var(--cyan);
+      padding: 6px 14px;
+      border-radius: var(--radius-md);
+    }
+
+    .grader-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-8);
+      margin-bottom: var(--space-8);
+    }
+
+    @media (max-width: 880px) {
+      .grader-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .pane-title {
+      font-family: var(--font-display);
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--white);
+      margin-bottom: var(--space-4);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .pane-toggle-buttons {
+      display: flex;
+      gap: var(--space-2);
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: 1px solid var(--border-hairline);
+      color: var(--text-muted);
+      padding: 4px 10px;
+      border-radius: var(--radius-sm);
+      font-size: 0.75rem;
+      font-family: var(--font-mono);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+      background: rgba(0, 240, 255, 0.15);
+      border-color: var(--cyan);
+      color: var(--cyan);
+    }
+
+    .rubric-textarea {
+      width: 100%;
+      height: 220px;
+      background: rgba(8, 11, 17, 0.8);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-lg);
+      padding: var(--space-4);
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--white);
+      resize: vertical;
+      line-height: 1.5;
+    }
+
+    .rubric-textarea:focus {
+      outline: none;
+      border-color: var(--cyan);
+      box-shadow: 0 0 12px rgba(0, 240, 255, 0.2);
+    }
+
+    .dropzone-box {
+      border: 2px dashed rgba(255, 255, 255, 0.15);
+      border-radius: var(--radius-lg);
+      padding: var(--space-8);
+      text-align: center;
+      background: rgba(8, 11, 17, 0.5);
+      cursor: pointer;
+      transition: all 0.25s;
+      height: 220px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .dropzone-box:hover, .dropzone-box.dragover {
+      border-color: var(--cyan);
+      background: rgba(0, 240, 255, 0.04);
+      box-shadow: 0 0 20px rgba(0, 240, 255, 0.1);
+    }
+
+    .dropzone-icon {
+      font-size: 2.2rem;
+      margin-bottom: var(--space-3);
+      color: var(--cyan);
+    }
+
+    .dropzone-label {
+      font-size: 0.95rem;
+      color: var(--white);
+      margin-bottom: var(--space-1);
+      font-weight: 600;
+    }
+
+    .dropzone-hint {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    .selected-files-summary {
+      margin-top: var(--space-3);
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--cyan);
+    }
+
+    .action-row {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: var(--space-4);
+      padding-top: var(--space-4);
+      border-top: 1px solid var(--border-hairline);
+    }
+
+    .btn-grade-now {
+      background: linear-gradient(135deg, var(--cyan) 0%, #0070f3 100%);
+      color: #080b11;
+      font-family: var(--font-mono);
+      font-size: 0.95rem;
+      font-weight: 700;
+      padding: 12px 28px;
+      border-radius: var(--radius-md);
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      box-shadow: 0 0 20px rgba(0, 240, 255, 0.3);
+      transition: all 0.2s;
+    }
+
+    .btn-grade-now:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 28px rgba(0, 240, 255, 0.5);
+    }
+
+    .btn-grade-now:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* Live Progress Bar */
+    .progress-track {
+      height: 4px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: var(--space-4);
+      display: none;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--cyan);
+      box-shadow: 0 0 10px var(--cyan);
+      transition: width 0.3s;
+    }
+
+    /* Results View */
+    .results-container {
+      margin-top: var(--space-8);
+      border-top: 1px solid var(--border-hairline);
+      padding-top: var(--space-8);
+      display: none;
+    }
+
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--space-4);
+      margin-bottom: var(--space-6);
+    }
+
+    @media (max-width: 768px) {
+      .kpi-row {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    .kpi-card {
+      background: rgba(8, 11, 17, 0.7);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-md);
+      padding: var(--space-4);
+      text-align: center;
+    }
+
+    .kpi-value {
+      font-family: var(--font-display);
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--cyan);
+    }
+
+    .kpi-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-top: var(--space-1);
+    }
+
+    .table-wrapper {
+      overflow-x: auto;
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-lg);
+      background: rgba(8, 11, 17, 0.6);
+    }
+
+    table.results-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.88rem;
+    }
+
+    table.results-table th {
+      background: rgba(255, 255, 255, 0.04);
+      padding: 12px 16px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border-hairline);
+    }
+
+    table.results-table td {
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      vertical-align: top;
+    }
+
+    .grade-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 9999px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    .grade-badge.a { background: rgba(0, 240, 255, 0.15); color: var(--cyan); border: 1px solid var(--cyan); }
+    .grade-badge.b { background: rgba(0, 112, 243, 0.15); color: #0070f3; border: 1px solid #0070f3; }
+    .grade-badge.c { background: rgba(234, 179, 8, 0.15); color: #eab308; border: 1px solid #eab308; }
+    .grade-badge.f { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid #ef4444; }
+
+    .breakdown-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .breakdown-tag {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-sm);
+      padding: 2px 6px;
+      font-size: 0.72rem;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+    }
+
+    /* Pricing Section */
+    .pricing-section {
+      max-width: 1200px;
+      margin: 0 auto var(--space-20);
+      padding: 0 var(--space-6);
+    }
+
+    .pricing-header {
+      text-align: center;
+      margin-bottom: var(--space-12);
+    }
+
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-8);
+      align-items: stretch;
+    }
+
+    @media (max-width: 960px) {
+      .pricing-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .pricing-card {
+      background: rgba(13, 17, 24, 0.85);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-xl);
+      padding: var(--space-8);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: all 0.3s;
+      position: relative;
+    }
+
+    .pricing-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(0, 240, 255, 0.4);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), 0 0 24px rgba(0, 240, 255, 0.1);
+    }
+
+    .pricing-card.featured {
+      background: linear-gradient(180deg, rgba(20, 27, 38, 0.95) 0%, rgba(10, 14, 20, 0.98) 100%);
+      border-color: var(--cyan);
+      box-shadow: 0 0 32px rgba(0, 240, 255, 0.18);
+    }
+
+    .pricing-featured-badge {
+      position: absolute;
+      top: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--cyan);
+      color: #080b11;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 4px 14px;
+      border-radius: 9999px;
+      letter-spacing: 0.05em;
+    }
+
+    .pricing-tier-name {
+      font-family: var(--font-display);
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--white);
+    }
+
+    .pricing-tier-price {
+      font-family: var(--font-display);
+      font-size: 2.8rem;
+      font-weight: 700;
+      color: var(--white);
+      margin: var(--space-4) 0;
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+
+    .pricing-tier-period {
+      font-size: 0.9rem;
+      font-family: var(--font-body);
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .pricing-features {
+      list-style: none;
+      padding: 0;
+      margin: var(--space-6) 0 var(--space-8);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    .pricing-features li {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+
+    .pricing-features li .check {
+      color: var(--cyan);
+      font-weight: 700;
+    }
+
+    .btn-checkout {
+      width: 100%;
+      padding: 12px 20px;
+      border-radius: var(--radius-md);
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      font-weight: 700;
+      text-align: center;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s;
+      border: 1px solid var(--border-hairline);
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--white);
+      display: block;
+    }
+
+    .btn-checkout.primary {
+      background: var(--cyan);
+      color: #080b11;
+      border: none;
+      box-shadow: 0 0 16px rgba(0, 240, 255, 0.3);
+    }
+
+    .btn-checkout.primary:hover {
+      box-shadow: 0 0 24px rgba(0, 240, 255, 0.5);
+      transform: translateY(-2px);
+    }
+
+    .btn-checkout:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border-hairline);
+      padding: var(--space-8) var(--space-8);
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+  <!-- Autonomous 3D Particle Canvas -->
+  <canvas id="nanodynamics-particle-canvas"></canvas>
+  <div class="ambient-void-overlay"></div>
+
+  <div class="site-content">
+    <!-- Navigation -->
+    <nav class="nav-bar">
+      <a href="/" class="nav-brand">
+        <span class="brand-dot"></span>
+        <span>NanoDynamics // Agentic Grader</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="#grader-console">Live Grader</a></li>
+        <li><a href="#pricing">Pricing (ZAR)</a></li>
+        <li><a href="/api/health" target="_blank">API Health</a></li>
+      </ul>
+      <div class="nav-auth" id="auth-box">
+        <a href="/auth/google" class="btn btn-outline btn-sm" id="btn-login">Sign in with Google</a>
+      </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <header class="hero-wrapper">
+      <div>
+        <span class="state-pill" id="particle-state-badge">Active State: Silicon Microchip</span>
+      </div>
+      <h1 class="hero-title">
+        Autonomous Evaluation &amp; <br>
+        <span class="gradient-text">Deterministic Rubric Mark Sheets</span>
+      </h1>
+      <p class="hero-subtitle">
+        Eliminate the manual SpeedGrader bottleneck. Upload custom grading rubrics, ingest single PDFs or cohort .zip batches, and export verified CSV mark sheets with detailed qualitative feedback in seconds.
+      </p>
+      <div class="hero-actions">
+        <a href="#grader-console" class="btn btn-primary">Open Grader Console</a>
+        <a href="#pricing" class="btn btn-outline">Explore ZAR Plans</a>
+      </div>
+    </header>
+
+    <!-- Interactive Grader Console -->
+    <section class="console-section" id="grader-console">
+      <div class="console-card">
+        <div class="console-header">
+          <div>
+            <h2 style="font-family: var(--font-display); font-size: 1.4rem; color: var(--white); margin: 0 0 4px 0;">
+              Cohort Grading Console
+            </h2>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0;">
+              Zero Canvas session dependency. Pure PyMuPDF extraction + multi-criteria evaluation.
+            </p>
+          </div>
+          <div class="quota-badge" id="quota-display">
+            ⚡ Loading Quota...
+          </div>
+        </div>
+
+        <form id="grading-form">
+          <div class="grader-grid">
+            <!-- Left: Rubric Specification -->
+            <div>
+              <div class="pane-title">
+                <span>1. Evaluation Rubric</span>
+                <div class="pane-toggle-buttons">
+                  <button type="button" class="tab-btn active" id="tab-text-btn" onclick="switchRubricMode('text')">Text / Markdown</button>
+                  <button type="button" class="tab-btn" id="tab-file-btn" onclick="switchRubricMode('file')">Upload PDF / TXT</button>
+                </div>
+              </div>
+
+              <div id="rubric-text-wrapper">
+                <textarea class="rubric-textarea" id="rubric-text-input" name="rubric_text" placeholder="Specify rubric criteria and point weights...">1. Problem Formulation & Objective (20 marks)
+2. Experimental Apparatus & Methodology (30 marks)
+3. Quantitative Data & Uncertainty Analysis (30 marks)
+4. Conclusion & Critical Discussion (20 marks)</textarea>
+              </div>
+
+              <div id="rubric-file-wrapper" style="display: none;">
+                <div class="dropzone-box" onclick="document.getElementById('rubric-file-input').click()">
+                  <div class="dropzone-icon">📄</div>
+                  <div class="dropzone-label">Select Rubric PDF or TXT</div>
+                  <div class="dropzone-hint">Click or drag memorandum document here</div>
+                  <input type="file" id="rubric-file-input" name="rubric_file" accept=".pdf,.txt,.md" style="display: none;" onchange="handleRubricFileSelect(this)">
+                  <div class="selected-files-summary" id="rubric-file-name"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right: Submissions Drag & Drop -->
+            <div>
+              <div class="pane-title">
+                <span>2. Student Submissions</span>
+                <span style="font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-mono);">PDFs or .ZIP Archive</span>
+              </div>
+
+              <div class="dropzone-box" id="submissions-dropzone" onclick="document.getElementById('submissions-input').click()">
+                <div class="dropzone-icon">📦</div>
+                <div class="dropzone-label">Drop Student Reports or .ZIP Batch</div>
+                <div class="dropzone-hint">Supports multiple individual PDFs or a zipped cohort export</div>
+                <input type="file" id="submissions-input" name="submissions" multiple accept=".pdf,.zip" style="display: none;" onchange="handleSubmissionsSelect(this)">
+                <div class="selected-files-summary" id="submissions-summary">No files selected</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="progress-track" id="grading-progress-track">
+            <div class="progress-bar-fill" id="grading-progress-bar"></div>
+          </div>
+
+          <div class="action-row">
+            <span id="grading-status-text" style="font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted);">Ready to evaluate</span>
+            <button type="submit" class="btn-grade-now" id="btn-submit-grade">
+              <span>🚀 Execute Agentic Grading</span>
+            </button>
+          </div>
+        </form>
+
+        <!-- Structured Results Presentation -->
+        <div class="results-container" id="results-panel">
+          <div class="console-header" style="margin-top: var(--space-4);">
+            <h3 style="font-family: var(--font-display); font-size: 1.25rem; color: var(--white); margin: 0;">
+              Grading Results &amp; Mark Sheet
+            </h3>
+            <a href="#" id="btn-download-csv" class="btn btn-primary btn-sm" download>
+              📥 Download CSV Mark Sheet
+            </a>
+          </div>
+
+          <div class="kpi-row">
+            <div class="kpi-card">
+              <div class="kpi-value" id="kpi-total-papers">0</div>
+              <div class="kpi-label">Papers Evaluated</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-value" id="kpi-avg-mark">0%</div>
+              <div class="kpi-label">Cohort Average</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-value" id="kpi-highest-mark">0%</div>
+              <div class="kpi-label">Highest Mark</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-value" id="kpi-lowest-mark">0%</div>
+              <div class="kpi-label">Lowest Mark</div>
+            </div>
+          </div>
+
+          <div class="table-wrapper">
+            <table class="results-table">
+              <thead>
+                <tr>
+                  <th>Student ID</th>
+                  <th>Submission File</th>
+                  <th>Total Score</th>
+                  <th>Grade</th>
+                  <th>Rubric Criteria Breakdown</th>
+                  <th>Feedback Comments</th>
+                </tr>
+              </thead>
+              <tbody id="results-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pricing Section (ZAR) -->
+    <section class="pricing-section" id="pricing">
+      <div class="pricing-header">
+        <h2 style="font-family: var(--font-display); font-size: 2.2rem; color: var(--white); margin-bottom: var(--space-2);">
+          Transparent ZAR Subscription Tiers
+        </h2>
+        <p style="color: var(--text-muted); font-size: 1rem; max-width: 600px; margin: 0 auto;">
+          Billed monthly in South African Rand via Paystack with instant quota provisioning.
+        </p>
+      </div>
+
+      <div class="pricing-grid">
+        <!-- Free Sandbox -->
+        <div class="pricing-card">
+          <div>
+            <div class="pricing-tier-name">Free Sandbox</div>
+            <div class="pricing-tier-price">
+              <span>R0</span>
+              <span class="pricing-tier-period">/ month</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: var(--space-6);">
+              Ideal for individual lab demonstrators, tutors, and trial assessments.
+            </p>
+            <ul class="pricing-features">
+              <li><span class="check">✓</span> <strong>50 papers / month</strong></li>
+              <li><span class="check">✓</span> Deterministic rubric parser</li>
+              <li><span class="check">✓</span> Single &amp; batch PDF grading</li>
+              <li><span class="check">✓</span> Instant CSV mark sheet export</li>
+              <li><span class="check">✓</span> Standard LLM evaluation queue</li>
+            </ul>
+          </div>
+          <button type="button" class="btn-checkout" onclick="selectPlan('free_sandbox')">Current Sandbox Plan</button>
+        </div>
+
+        <!-- Tutor & Lecturer (Featured) -->
+        <div class="pricing-card featured">
+          <div class="pricing-featured-badge">MOST POPULAR</div>
+          <div>
+            <div class="pricing-tier-name" style="color: var(--cyan);">Tutor &amp; Lecturer</div>
+            <div class="pricing-tier-price">
+              <span style="color: var(--cyan);">R299</span>
+              <span class="pricing-tier-period">/ month</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: var(--space-6);">
+              High-volume grading for course convenors, university lecturers, and teaching assistants.
+            </p>
+            <ul class="pricing-features">
+              <li><span class="check">✓</span> <strong>1,500 papers / month</strong></li>
+              <li><span class="check">✓</span> Bulk .ZIP cohort batch extraction</li>
+              <li><span class="check">✓</span> Custom rubric weighting &amp; criteria</li>
+              <li><span class="check">✓</span> Quantitative uncertainty &amp; equation checks</li>
+              <li><span class="check">✓</span> Priority agent execution queue</li>
+              <li><span class="check">✓</span> RFC4180 CSV export with feedback</li>
+            </ul>
+          </div>
+          <button type="button" class="btn-checkout primary" onclick="triggerPaystackSubscription('PLN_tutor_299', 299)">
+            Subscribe with Paystack (R299)
+          </button>
+        </div>
+
+        <!-- Tuition Centre -->
+        <div class="pricing-card">
+          <div>
+            <div class="pricing-tier-name">Tuition Centre</div>
+            <div class="pricing-tier-price">
+              <span>R999</span>
+              <span class="pricing-tier-period">/ month</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: var(--space-6);">
+              Large-scale institutional pipelines for high schools, academies, and departments.
+            </p>
+            <ul class="pricing-features">
+              <li><span class="check">✓</span> <strong>10,000 papers / month</strong></li>
+              <li><span class="check">✓</span> Unlimited concurrent batch grading</li>
+              <li><span class="check">✓</span> Custom LMS mark sheet formats</li>
+              <li><span class="check">✓</span> Multi-user department licensing</li>
+              <li><span class="check">✓</span> Dedicated WhatsApp &amp; SLA support</li>
+            </ul>
+          </div>
+          <button type="button" class="btn-checkout" onclick="triggerPaystackSubscription('PLN_centre_999', 999)">
+            Subscribe with Paystack (R999)
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+      <p style="margin: 0 0 6px 0;">
+        <strong>NanoDynamics Agentic Grader</strong> &bull; Operated by Super Intelligence Solutions
+      </p>
+      <p style="margin: 0; font-family: var(--font-mono); font-size: 0.78rem;">
+        nanodynamics.co.za &bull; Encrypted TLS via Let's Encrypt &bull; Billed via Paystack ZAR
+      </p>
+    </footer>
+  </div>
+
+  <!-- Client-side Logic -->
+  <script>
+    let rubricMode = 'text';
+    let selectedSubmissions = [];
+
+    // Switch between Text rubric and File upload
+    function switchRubricMode(mode) {
+      rubricMode = mode;
+      document.getElementById('tab-text-btn').classList.toggle('active', mode === 'text');
+      document.getElementById('tab-file-btn').classList.toggle('active', mode === 'file');
+      document.getElementById('rubric-text-wrapper').style.display = (mode === 'text' ? 'block' : 'none');
+      document.getElementById('rubric-file-wrapper').style.display = (mode === 'file' ? 'block' : 'none');
+    }
+
+    function handleRubricFileSelect(input) {
+      if (input.files && input.files[0]) {
+        document.getElementById('rubric-file-name').textContent = 'Selected: ' + input.files[0].name;
+      }
+    }
+
+    function handleSubmissionsSelect(input) {
+      selectedSubmissions = Array.from(input.files || []);
+      updateSubmissionsUI();
+    }
+
+    function updateSubmissionsUI() {
+      const summary = document.getElementById('submissions-summary');
+      if (selectedSubmissions.length === 0) {
+        summary.textContent = 'No files selected';
+      } else if (selectedSubmissions.length === 1) {
+        summary.textContent = '1 file: ' + selectedSubmissions[0].name;
+      } else {
+        summary.textContent = selectedSubmissions.length + ' files ready for evaluation';
+      }
+    }
+
+    // Drag and drop handlers for submissions dropzone
+    const dropzone = document.getElementById('submissions-dropzone');
+    dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
+    dropzone.addEventListener('dragleave', () => { dropzone.classList.remove('dragover'); });
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+      if (e.dataTransfer.files) {
+        selectedSubmissions = Array.from(e.dataTransfer.files);
+        updateSubmissionsUI();
+      }
+    });
+
+    // Fetch live user quota and auth status
+    async function refreshUserQuota() {
+      try {
+        const res = await fetch('/api/quota');
+        if (res.ok) {
+          const data = await res.json();
+          const display = document.getElementById('quota-display');
+          const planLabel = data.plan_code === 'free_sandbox' ? 'Free Sandbox' : (data.plan_code.includes('tutor') ? 'Tutor & Lecturer' : 'Tuition Centre');
+          display.textContent = `⚡ Quota: ${data.papers_remaining} / ${data.papers_limit} papers left (${planLabel})`;
+        }
+      } catch (err) {
+        console.error('Failed fetching quota:', err);
+      }
+    }
+
+    async function checkAuthSession() {
+      try {
+        const res = await fetch('/whoami');
+        if (res.ok) {
+          const user = await res.json();
+          if (user.authenticated && user.email) {
+            const authBox = document.getElementById('auth-box');
+            authBox.innerHTML = `
+              <span style="font-size:0.85rem; color:var(--text-muted);">${user.email}</span>
+              <a href="/auth/logout" class="btn btn-outline btn-sm">Sign Out</a>
+            `;
+          }
+        }
+      } catch (e) {}
+    }
+
+    // Form Submission: POST /api/grade
+    document.getElementById('grading-form').addEventListener('submit', async function (e) {
+      e.preventDefault();
+
+      if (selectedSubmissions.length === 0) {
+        alert('Please select or drop at least one PDF submission or a .zip cohort archive.');
+        return;
+      }
+
+      const submitBtn = document.getElementById('btn-submit-grade');
+      const statusText = document.getElementById('grading-status-text');
+      const progressTrack = document.getElementById('grading-progress-track');
+      const progressBar = document.getElementById('grading-progress-bar');
+      const resultsPanel = document.getElementById('results-panel');
+
+      submitBtn.disabled = true;
+      progressTrack.style.display = 'block';
+      progressBar.style.width = '20%';
+      statusText.textContent = 'Extracting documents and parsing rubric...';
+
+      const formData = new FormData();
+      if (rubricMode === 'text') {
+        formData.append('rubric_text', document.getElementById('rubric-text-input').value);
+      } else {
+        const fileInput = document.getElementById('rubric-file-input');
+        if (fileInput.files && fileInput.files[0]) {
+          formData.append('rubric_file', fileInput.files[0]);
+        }
+      }
+
+      for (let file of selectedSubmissions) {
+        formData.append('submissions', file);
+      }
+
+      try {
+        progressBar.style.width = '60%';
+        statusText.textContent = 'Evaluating criteria and synthesizing feedback...';
+
+        const response = await fetch('/api/grade', {
+          method: 'POST',
+          body: formData
+        });
+
+        progressBar.style.width = '100%';
+
+        if (response.status === 402) {
+          const errData = await response.json();
+          alert(errData.detail || 'Insufficient paper quota. Please upgrade your subscription.');
+          statusText.textContent = 'Quota exhausted (402). Upgrade to proceed.';
+          return;
+        }
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.detail || 'Grading failed with HTTP ' + response.status);
+        }
+
+        const data = await response.json();
+        statusText.textContent = `Completed grading ${data.total_papers} papers!`;
+
+        // Render Results
+        renderGradingResults(data);
+        resultsPanel.style.display = 'block';
+        resultsPanel.scrollIntoView({ behavior: 'smooth' });
+
+        // Refresh quota badge
+        refreshUserQuota();
+
+      } catch (err) {
+        console.error(err);
+        alert('Grading Error: ' + err.message);
+        statusText.textContent = 'Failed: ' + err.message;
+      } finally {
+        submitBtn.disabled = false;
+        setTimeout(() => { progressTrack.style.display = 'none'; }, 2000);
+      }
+    });
+
+    function renderGradingResults(data) {
+      document.getElementById('btn-download-csv').href = data.csv_url;
+      document.getElementById('kpi-total-papers').textContent = data.total_papers;
+
+      let marks = data.results.map(r => r.percentage);
+      let avg = marks.length > 0 ? (marks.reduce((a, b) => a + b, 0) / marks.length).toFixed(1) : 0;
+      let maxMark = marks.length > 0 ? Math.max(...marks).toFixed(1) : 0;
+      let minMark = marks.length > 0 ? Math.min(...marks).toFixed(1) : 0;
+
+      document.getElementById('kpi-avg-mark').textContent = avg + '%';
+      document.getElementById('kpi-highest-mark').textContent = maxMark + '%';
+      document.getElementById('kpi-lowest-mark').textContent = minMark + '%';
+
+      const tbody = document.getElementById('results-table-body');
+      tbody.innerHTML = '';
+
+      for (let item of data.results) {
+        let badgeClass = item.percentage >= 75 ? 'a' : (item.percentage >= 60 ? 'b' : (item.percentage >= 50 ? 'c' : 'f'));
+        let breakdownHtml = Object.entries(item.rubric_breakdown || {})
+          .map(([k, v]) => `<span class="breakdown-tag">${k}: ${v}</span>`)
+          .join('');
+
+        let feedbackHtml = (item.feedback || []).map(f => `<div>• ${f}</div>`).join('');
+
+        let tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><strong style="font-family:var(--font-mono); color:var(--white);">${item.student_id}</strong></td>
+          <td style="color:var(--text-muted); font-size:0.8rem;">${item.student_file}</td>
+          <td><strong style="color:var(--white);">${item.score}</strong> / ${item.max_score}</td>
+          <td><span class="grade-badge ${badgeClass}">${item.percentage}%</span></td>
+          <td><div class="breakdown-tags">${breakdownHtml}</div></td>
+          <td style="font-size:0.8rem; color:var(--text-muted);">${feedbackHtml}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    function selectPlan(plan) {
+      alert('You are already on the Free Sandbox tier with 50 papers/month included!');
+    }
+
+    function triggerPaystackSubscription(planCode, amountZar) {
+      // Direct checkout trigger or email prompt
+      const email = prompt('Enter your billing email for Paystack ZAR checkout:', 'lecturer@university.ac.za');
+      if (!email) return;
+
+      // In production, opens Paystack inline popup or redirects to checkout
+      alert(`Initializing Paystack checkout for ${planCode} (R${amountZar}/month) for ${email}...\nWebhook endpoint is live at https://nanodynamics.co.za/webhooks/paystack.`);
+    }
+
+    // Startup initialization
+    window.addEventListener('DOMContentLoaded', () => {
+      refreshUserQuota();
+      checkAuthSession();
+    });
+  </script>
+
+  <!-- Particle Cycle Script -->
+  <script src="/assets/js/nanodynamics-particles.js"></script>
+</body>
+</html>

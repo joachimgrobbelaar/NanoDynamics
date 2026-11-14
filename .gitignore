@@ -42,3 +42,8 @@ visualization_3d/static/models/launch/
 .vscode/
 .idea/
 *.swp
+storage_state.json
+*.pdf
+*.zip
+*.csv
+*.db
